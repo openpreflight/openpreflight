@@ -20,9 +20,6 @@ Passed in 42s
 View full logs →
 ```
 
-The spec, the verification trail and the task list live in
-[.plans/coolify-github-ci/](.plans/coolify-github-ci/).
-
 ## Why a GitHub App
 
 Only a GitHub App can create Check Runs — user and OAuth tokens are refused. A
@@ -144,7 +141,8 @@ Check Run carries a truncated tail; the full log is on the details page.
 `GET /runs/{job-id}` is the `details_url` GitHub links to. **GitHub never fetches
 it — the reader's browser does**, so it requires a session by default. A binding
 can opt into shareable logs, which makes that one job's page readable by anyone
-holding the link. Job ids are random UUIDs, but treat such a link as a secret.
+holding the link. The same rule applies to `GET /api/v1/jobs/{id}/logs`. Job ids
+are random UUIDs, but treat such a link as a secret.
 
 ## API
 
@@ -184,6 +182,7 @@ DELETE /api/v1/bindings/{id}
 
 GET    /api/v1/jobs
 GET    /api/v1/jobs/{id}
+GET    /api/v1/jobs/{id}/logs             full log (session, or shareable opt-in)
 POST   /api/v1/jobs/{id}/rerun            new job, new Check Run
 POST   /api/v1/jobs/{id}/cancel
 

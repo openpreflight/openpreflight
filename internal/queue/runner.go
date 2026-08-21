@@ -226,6 +226,10 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	if checkName == "" {
 		checkName = firstNonEmpty(app.CheckName, settings.DefaultCheckName, "Coolify CI")
 	}
+	// Persist the resolved name so the Jobs API matches what GitHub shows.
+	if err := r.store.SetJobCheckName(job.ID, checkName); err != nil {
+		r.log.Error("record check name", "job", job.ID, "error", err)
+	}
 	detailsURL := r.detailsURL(settings, job.ID)
 
 	// The Check Run goes up before any git work so a slow clone still shows a

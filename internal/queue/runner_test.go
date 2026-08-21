@@ -125,6 +125,9 @@ func TestRunnerHappyPath(t *testing.T) {
 	if job.CheckRunID != 555 {
 		t.Fatalf("check run id not recorded: %d", job.CheckRunID)
 	}
+	if job.CheckName != "Coolify CI" {
+		t.Fatalf("resolved check name not written on the job: %q", job.CheckName)
+	}
 
 	created := h.github.CreatedCheckRuns()
 	if len(created) != 1 {
@@ -242,6 +245,9 @@ func TestRunnerUsesBindingOverridesAndCheckName(t *testing.T) {
 	}
 	if name := h.github.CreatedCheckRuns()[0].Body["name"]; name != "Winpra CI" {
 		t.Fatalf("binding check name should win: %v", name)
+	}
+	if job.CheckName != "Winpra CI" {
+		t.Fatalf("binding check name not written on the job: %q", job.CheckName)
 	}
 	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
 	if !strings.Contains(body, "override-ran") {

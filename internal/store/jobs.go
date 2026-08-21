@@ -193,6 +193,13 @@ func (s *Store) SetJobCheckRun(id string, checkRunID int64) error {
 	return err
 }
 
+// SetJobCheckName writes the name that was actually sent to GitHub, including
+// the App/global fallback when the binding left it blank.
+func (s *Store) SetJobCheckName(id, name string) error {
+	_, err := s.db.Exec(`UPDATE jobs SET check_name = ? WHERE id = ?`, name, id)
+	return err
+}
+
 // SetJobLogBytes records how much log the job wrote.
 func (s *Store) SetJobLogBytes(id string, n int64) error {
 	_, err := s.db.Exec(`UPDATE jobs SET log_bytes = ? WHERE id = ?`, n, id)
