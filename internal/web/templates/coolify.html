@@ -1,0 +1,96 @@
+{{define "content"}}
+<h1>Coolify instances</h1>
+<p class="lede">One row is one <strong>(base URL, API token)</strong> pair. A Coolify API token is scoped
+to a single team, so a row covers that team — not the whole host. A second team on the same host is a
+second row.</p>
+
+<div class="panel">
+  <h2>Configured</h2>
+  {{if .Data.Instances}}
+  <div class="overflow"><table>
+    <tr><th>Name</th><th>Base URL</th><th>Team</th><th>Token</th><th>Last test</th><th></th></tr>
+    {{range .Data.Instances}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td class="mono small">{{.BaseURL}}</td>
+      <td>{{if .TeamName}}{{.TeamName}} <span class="muted small">#{{.TeamID}}</span>
+          {{else}}<span class="muted">untested</span>{{end}}</td>
+      <td class="mono small muted">{{.APITokenRedacted}}</td>
+      <td>
+        {{if .LastError}}<span class="pill bad">failed</span>
+          <div class="small muted">{{.LastError}}</div>
+        {{else if .LastSeenAt}}<span class="pill ok">ok</span>
+          <div class="small muted">{{ago .LastSeenAt.UTC}}</div>
+        {{else}}<span class="pill off">never</span>{{end}}
+      </td>
+      <td>
+        <form method="post" action="/api/v1/coolify/{{.ID}}/test" style="display:inline">
+          {{$.CSRFField}}<button class="link" type="submit">Test</button>
+        </form>
+        <a href="/coolify?inspect={{.ID}}">Inspect</a>
+        <form method="post" action="/api/v1/coolify/{{.ID}}/delete" style="display:inline"
+          onsubmit="return confirm('Remove this Coolify instance? Bindings that name it keep working.')">
+          {{$.CSRFField}}<button class="danger" type="submit">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </table></div>
+  {{else}}
+  <p class="muted">None yet. Coolify is optional: it gives you server inventory and a repo picker.
+  The CI GitHub App is what actually runs checks.</p>
+  {{end}}
+</div>
+
+{{if .Data.Inspect}}
+<div class="panel">
+  <h2>{{.Data.Inspect.Name}}</h2>
+  {{if .Data.InspectError}}<p class="pill bad">{{.Data.InspectError}}</p>{{end}}
+  {{if .Data.Servers}}
+  <h2>Servers in this team</h2>
+  <div class="overflow"><table>
+    <tr><th>Name</th><th>IP</th><th>UUID</th></tr>
+    {{range .Data.Servers}}
+    <tr><td>{{.Name}}</td><td class="mono small">{{.IP}}</td><td class="mono small">{{.UUID}}</td></tr>
+    {{end}}
+  </table></div>
+  {{end}}
+  {{if .Data.Connectors}}
+  <h2>GitHub connectors (deploy sources)</h2>
+  <p class="muted small">These are Coolify's deploy sources. They cannot write commit checks — no
+  <code>checks</code> permission, and their webhook belongs to Coolify. They are useful here as a repo
+  list.</p>
+  <div class="overflow"><table>
+    <tr><th>Name</th><th>App ID</th><th>Installation</th><th>UUID</th></tr>
+    {{range .Data.Connectors}}
+    <tr><td>{{.Name}}</td><td class="mono small">{{.AppID}}</td>
+      <td class="mono small">{{.InstallationID}}</td><td class="mono small">{{.UUID}}</td></tr>
+    {{end}}
+  </table></div>
+  {{end}}
+</div>
+{{end}}
+
+<div class="panel">
+  <h2>Add an instance</h2>
+  <form method="post" action="/api/v1/coolify">
+    {{.CSRFField}}
+    <div class="row">
+      <div>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" placeholder="prod-platform">
+      </div>
+      <div>
+        <label for="base_url">Base URL</label>
+        <input id="base_url" name="base_url" type="url" placeholder="https://coolify.example.com" required>
+      </div>
+    </div>
+    <label for="api_token">API token</label>
+    <input id="api_token" name="api_token" type="password" placeholder="3|Waobq…" required>
+    <div class="hint">Coolify UI: <strong>Security → API Tokens</strong> (some versions:
+      <strong>Keys &amp; Tokens</strong>). Read-only is enough for inventory. The token is stored
+      encrypted and never shown again.</div>
+    <div class="actions"><button class="primary" type="submit">Add and test</button></div>
+  </form>
+</div>
+{{end}}
