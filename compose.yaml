@@ -1,0 +1,35 @@
+services:
+  coolify-github-ci:
+    build: .
+    # Coolify sets this from the service domain; it is also how webhook URLs and
+    # the details_url on commit checks are built.
+    environment:
+      # Required. Losing it makes every stored PEM and API token unreadable —
+      # there is no rotation in v1. Generate with: openssl rand -base64 48
+      CI_SECRET_KEY: ${CI_SECRET_KEY:?set CI_SECRET_KEY}
+      CI_PUBLIC_BASE_URL: ${CI_PUBLIC_BASE_URL:-}
+      # Optional: seeds the admin on first boot so the API can be driven without
+      # opening the browser wizard.
+      CI_BOOTSTRAP_ADMIN_PASSWORD: ${CI_BOOTSTRAP_ADMIN_PASSWORD:-}
+      LISTEN_ADDR: ":8080"
+      DATA_DIR: /data
+      WORKSPACE_DIR: /workspace
+    ports:
+      - "8080:8080"
+    volumes:
+      # Config, job history and logs. This must survive a redeploy.
+      - ci-data:/data
+      # Per-job checkouts. Disposable, but a volume keeps builds off the
+      # container's writable layer.
+      - ci-workspace:/workspace
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  ci-data:
+  ci-workspace:

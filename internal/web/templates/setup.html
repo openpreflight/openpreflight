@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>First-run setup</h1>
+<p class="lede">One admin account, one public URL. Everything else is configured after you sign in.</p>
+<div class="panel">
+<form method="post" action="/api/v1/setup">
+  {{.CSRFField}}
+  <label for="username">Admin username</label>
+  <input id="username" name="username" type="text" value="admin" required>
+
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" minlength="12" required autocomplete="new-password">
+  <div class="hint">At least 12 characters. There is no password reset in v1 — store it somewhere.</div>
+
+  <label for="public_base_url">Public base URL</label>
+  <input id="public_base_url" name="public_base_url" type="url" placeholder="https://ci.example.com"
+    value="{{.Data.PublicBaseURL}}" required>
+  <div class="hint">GitHub posts webhooks to <code>{this URL}/webhook/{app-slug}</code> and links commit
+    checks to <code>{this URL}/runs/{job-id}</code>. It must be reachable from GitHub over HTTPS.</div>
+
+  <div class="actions"><button class="primary" type="submit">Create admin and continue</button></div>
+</form>
+</div>
+{{end}}

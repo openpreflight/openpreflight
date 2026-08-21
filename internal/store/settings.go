@@ -1,0 +1,93 @@
+package store
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+)
+
+// defaultSettings mirror the table defaults and the PLAN.md settings table.
+func defaultSettings() Settings {
+	return Settings{
+		DefaultCheckName:      "Coolify CI",
+		DefaultPipelineFile:   ".ci.yml",
+		DefaultTimeoutSeconds: 900,
+		MaxConcurrentJobs:     1,
+		MaxLogBytes:           10 << 20,
+		MaxWorkspaceBytes:     1 << 30,
+		LogRetentionDays:      14,
+		SkipForkPRs:           true,
+	}
+}
+
+// Settings returns the single settings row, creating it on first read so the
+// rest of the code never has to handle "not configured yet".
+func (s *Store) Settings() (Settings, error) {
+	var (
+		out         Settings
+		skipForks   int
+		scanErr     error
+		selectQuery = `SELECT public_base_url, default_check_name, default_pipeline_file,
+			default_timeout_seconds, max_concurrent_jobs, max_log_bytes,
+			max_workspace_bytes, log_retention_days, skip_fork_prs
+			FROM settings WHERE id = 1`
+	)
+	scanErr = s.db.QueryRow(selectQuery).Scan(
+		&out.PublicBaseURL, &out.DefaultCheckName, &out.DefaultPipelineFile,
+		&out.DefaultTimeoutSeconds, &out.MaxConcurrentJobs, &out.MaxLogBytes,
+		&out.MaxWorkspaceBytes, &out.LogRetentionDays, &skipForks,
+	)
+	if errors.Is(scanErr, sql.ErrNoRows) {
+		d := defaultSettings()
+		if err := s.seedSettings(d); err != nil {
+			return Settings{}, err
+		}
+		return d, nil
+	}
+	if scanErr != nil {
+		return Settings{}, fmt.Errorf("store: settings: %w", scanErr)
+	}
+	out.SkipForkPRs = skipForks != 0
+	return out, nil
+}
+
+func (s *Store) seedSettings(v Settings) error {
+	ts := formatTime(now())
+	_, err := s.db.Exec(`INSERT INTO settings (id, public_base_url, default_check_name,
+		default_pipeline_file, default_timeout_seconds, max_concurrent_jobs, max_log_bytes,
+		max_workspace_bytes, log_retention_days, skip_fork_prs, created_at, updated_at)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		v.PublicBaseURL, v.DefaultCheckName, v.DefaultPipelineFile, v.DefaultTimeoutSeconds,
+		v.MaxConcurrentJobs, v.MaxLogBytes, v.MaxWorkspaceBytes, v.LogRetentionDays,
+		boolInt(v.SkipForkPRs), ts, ts)
+	if err != nil {
+		return fmt.Errorf("store: seed settings: %w", err)
+	}
+	return nil
+}
+
+// SaveSettings writes the whole row. Callers read-modify-write so a PATCH of one
+// field cannot silently reset the others.
+func (s *Store) SaveSettings(v Settings) error {
+	if _, err := s.Settings(); err != nil { // ensure the row exists
+		return err
+	}
+	_, err := s.db.Exec(`UPDATE settings SET public_base_url = ?, default_check_name = ?,
+		default_pipeline_file = ?, default_timeout_seconds = ?, max_concurrent_jobs = ?,
+		max_log_bytes = ?, max_workspace_bytes = ?, log_retention_days = ?,
+		skip_fork_prs = ?, updated_at = ? WHERE id = 1`,
+		v.PublicBaseURL, v.DefaultCheckName, v.DefaultPipelineFile, v.DefaultTimeoutSeconds,
+		v.MaxConcurrentJobs, v.MaxLogBytes, v.MaxWorkspaceBytes, v.LogRetentionDays,
+		boolInt(v.SkipForkPRs), formatTime(now()))
+	if err != nil {
+		return fmt.Errorf("store: save settings: %w", err)
+	}
+	return nil
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}

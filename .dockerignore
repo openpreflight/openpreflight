@@ -1,0 +1,7 @@
+.git
+.plans
+data
+workspace
+*.pem
+.env
+coolify-github-ci

@@ -1,0 +1,118 @@
+{{define "content"}}
+<h1>CI GitHub Apps</h1>
+<p class="lede">Your own GitHub App is what makes this a CI provider: only an App can write commit
+checks, and each App has exactly one webhook URL. Coolify's deploy connector cannot do this job.</p>
+
+<div class="panel">
+  <h2>Configured</h2>
+  {{if .Data.Apps}}
+  <div class="overflow"><table>
+    <tr><th>Name</th><th>App ID</th><th>Webhook URL</th><th>Check name</th><th>Last test</th><th></th></tr>
+    {{range .Data.Apps}}
+    <tr>
+      <td>{{.Name}}<div class="muted small mono">{{.Slug}}</div></td>
+      <td class="mono small">{{.AppID}}</td>
+      <td class="mono small">{{webhookURL $.Data.Settings.PublicBaseURL .Slug}}</td>
+      <td class="small">{{if .CheckName}}{{.CheckName}}{{else}}<span class="muted">{{$.Data.Settings.DefaultCheckName}} (global)</span>{{end}}</td>
+      <td>
+        {{if .LastError}}<span class="pill bad">failed</span><div class="small muted">{{.LastError}}</div>
+        {{else if .LastSeenAt}}<span class="pill ok">ok</span><div class="small muted">{{ago .LastSeenAt.UTC}}</div>
+        {{else}}<span class="pill off">never</span>{{end}}
+      </td>
+      <td>
+        <form method="post" action="/api/v1/github-apps/{{.ID}}/test" style="display:inline">
+          {{$.CSRFField}}<button class="link" type="submit">Test</button>
+        </form>
+        <a href="/github-apps?inspect={{.ID}}">Installations</a>
+        <form method="post" action="/api/v1/github-apps/{{.ID}}/delete" style="display:inline"
+          onsubmit="return confirm('Remove this App? Its repo bindings are removed too.')">
+          {{$.CSRFField}}<button class="danger" type="submit">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {{end}}
+  </table></div>
+  {{else}}
+  <p class="muted">None yet.</p>
+  {{end}}
+</div>
+
+{{if .Data.Inspect}}
+<div class="panel">
+  <h2>{{.Data.Inspect.Name}} — installations</h2>
+  {{if .Data.InspectError}}<p class="pill bad">{{.Data.InspectError}}</p>{{end}}
+  {{if .Data.Installations}}
+  <div class="overflow"><table>
+    <tr><th>Account</th><th>Installation</th><th>Repos</th></tr>
+    {{range .Data.Installations}}
+    <tr>
+      <td>{{.Account.Login}} <span class="muted small">{{.Account.Type}}</span></td>
+      <td class="mono small">{{.ID}}</td>
+      <td class="small">{{.RepositorySelection}}</td>
+    </tr>
+    {{end}}
+  </table></div>
+  {{end}}
+  {{if .Data.Repos}}
+  <h2>Repositories visible to this App</h2>
+  <div class="overflow"><table>
+    <tr><th>Repo</th><th>Private</th></tr>
+    {{range .Data.Repos}}
+    <tr><td class="mono small">{{.FullName}}</td><td class="small">{{if .Private}}yes{{else}}no{{end}}</td></tr>
+    {{end}}
+  </table></div>
+  <p class="muted small">Enable the ones you want checked on the <a href="/repos">Repos</a> page.</p>
+  {{end}}
+</div>
+{{end}}
+
+<div class="panel">
+  <h2>Add an App</h2>
+  <p class="muted small">Register it on GitHub first
+    (<a href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>),
+    then paste the credentials here. This service never creates Apps for you.</p>
+  <p class="muted small">Permissions: <code>checks: write</code>, <code>contents: read</code>,
+    <code>metadata: read</code>. Subscribe to <strong>Check suite</strong> and
+    <strong>Check run</strong> events. Webhook URL:
+    <code>{{if .Data.Settings.PublicBaseURL}}{{.Data.Settings.PublicBaseURL}}{{else}}{public base URL}{{end}}/webhook/{slug}</code>
+    — the slug below.</p>
+  <form method="post" action="/api/v1/github-apps">
+    {{.CSRFField}}
+    <div class="row">
+      <div>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" placeholder="winpra-ci" required>
+      </div>
+      <div>
+        <label for="slug">Slug (webhook path)</label>
+        <input id="slug" name="slug" type="text" placeholder="winpra-ci">
+        <div class="hint">Lowercase letters, digits, dashes. Defaults from the name.</div>
+      </div>
+      <div>
+        <label for="app_id">App ID</label>
+        <input id="app_id" name="app_id" type="number" min="1" required>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="api_url">API URL</label>
+        <input id="api_url" name="api_url" type="url" value="https://api.github.com">
+        <div class="hint">Change only for GitHub Enterprise.</div>
+      </div>
+      <div>
+        <label for="check_name">Check name for this App</label>
+        <input id="check_name" name="check_name" type="text"
+          placeholder="{{.Data.Settings.DefaultCheckName}}">
+        <div class="hint">Optional. Blank uses the global default.</div>
+      </div>
+    </div>
+    <label for="webhook_secret">Webhook secret</label>
+    <input id="webhook_secret" name="webhook_secret" type="password" required>
+    <div class="hint">Must match the secret set on the App. Use a different one per App.</div>
+    <label for="pem">Private key (PEM)</label>
+    <textarea id="pem" name="pem" required placeholder="-----BEGIN RSA PRIVATE KEY-----"></textarea>
+    <div class="hint">Stored encrypted with <code>CI_SECRET_KEY</code>. Never displayed again.</div>
+    <div class="actions"><button class="primary" type="submit">Add and test</button></div>
+  </form>
+</div>
+{{end}}

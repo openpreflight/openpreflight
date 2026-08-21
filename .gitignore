@@ -1,0 +1,7 @@
+/data/
+/workspace/
+.env
+*.pem
+/coolify-github-ci
+/tmp/
+.plans/*

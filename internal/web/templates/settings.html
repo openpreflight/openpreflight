@@ -1,0 +1,77 @@
+{{define "content"}}
+<h1>Settings</h1>
+<p class="lede">Global defaults. A repo binding overrides its GitHub App, which overrides these.</p>
+<div class="panel">
+<form method="post" action="/api/v1/settings">
+  {{.CSRFField}}
+  <label for="public_base_url">Public base URL</label>
+  <input id="public_base_url" name="public_base_url" type="url" value="{{.Data.Settings.PublicBaseURL}}"
+    placeholder="https://ci.example.com">
+  <div class="hint">Used for webhook URLs and the <code>details_url</code> GitHub links from a check.</div>
+
+  <div class="row">
+    <div>
+      <label for="default_check_name">Default check name</label>
+      <input id="default_check_name" name="default_check_name" type="text"
+        value="{{.Data.Settings.DefaultCheckName}}">
+    </div>
+    <div>
+      <label for="default_pipeline_file">Default pipeline file</label>
+      <input id="default_pipeline_file" name="default_pipeline_file" type="text"
+        value="{{.Data.Settings.DefaultPipelineFile}}">
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="default_timeout_seconds">Default timeout (seconds)</label>
+      <input id="default_timeout_seconds" name="default_timeout_seconds" type="number" min="30"
+        value="{{.Data.Settings.DefaultTimeoutSeconds}}">
+    </div>
+    <div>
+      <label for="max_concurrent_jobs">Max concurrent jobs</label>
+      <input id="max_concurrent_jobs" name="max_concurrent_jobs" type="number" min="1" max="32"
+        value="{{.Data.Settings.MaxConcurrentJobs}}">
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label for="max_log_bytes">Max log bytes per job</label>
+      <input id="max_log_bytes" name="max_log_bytes" type="number" min="4096"
+        value="{{.Data.Settings.MaxLogBytes}}">
+      <div class="hint">Logs stop growing at this size; the run continues.</div>
+    </div>
+    <div>
+      <label for="log_retention_days">Log retention (days)</label>
+      <input id="log_retention_days" name="log_retention_days" type="number" min="1" max="3650"
+        value="{{.Data.Settings.LogRetentionDays}}">
+      <div class="hint">Job rows and log files older than this are pruned hourly.</div>
+    </div>
+  </div>
+
+  <label for="max_workspace_bytes">Max workspace bytes</label>
+  <input id="max_workspace_bytes" name="max_workspace_bytes" type="number" min="1048576"
+    value="{{.Data.Settings.MaxWorkspaceBytes}}">
+
+  <div class="checkrow" style="margin-top:14px">
+    <input id="skip_fork_prs" name="skip_fork_prs" type="checkbox" value="1"
+      {{if .Data.Settings.SkipForkPRs}}checked{{end}} disabled>
+    <label for="skip_fork_prs" style="margin:0">Skip fork pull requests</label>
+  </div>
+  <div class="hint">Always on in v1: a fork PR would run untrusted code on this host.</div>
+
+  <div class="actions"><button class="primary" type="submit">Save settings</button></div>
+</form>
+</div>
+
+<div class="panel">
+  <h2>Change admin password</h2>
+  <form method="post" action="/api/v1/password">
+    {{.CSRFField}}
+    <label for="password">New password</label>
+    <input id="password" name="password" type="password" minlength="12" required autocomplete="new-password">
+    <div class="actions"><button type="submit">Update password</button></div>
+  </form>
+</div>
+{{end}}
