@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
 )
 
@@ -37,6 +38,35 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request, _ store.User) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"job": job})
+}
+
+// getJobLogs is the JSON equivalent of GET /runs/{id}. Unguarded so a shareable
+// job is readable without a session, matching that page's rule.
+func (s *Server) getJobLogs(w http.ResponseWriter, r *http.Request) {
+	job, err := s.store.Job(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, err)
+		return
+	}
+	_, _, authed := s.authenticate(r)
+	if !authed && !job.ShareableLogs {
+		if wantsJSON(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+			return
+		}
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	body, err := logs.Read(s.cfg.LogDir(), job.ID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":    job.ID,
+		"log":   body,
+		"bytes": int64(len(body)),
+	})
 }
 
 // rerunJob queues a fresh job for the same commit. Per PLAN.md this is a new job

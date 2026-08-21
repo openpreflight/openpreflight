@@ -129,12 +129,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// handleLogout drops the session.
+// handleLogout drops every session credential the caller presented: the cookie
+// and/or the Bearer token. JSON login issues a Bearer token and no cookie, so
+// looking at the cookie alone left that token valid for its full 14 days.
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
-		// Only the holder of the cookie can log it out, so no CSRF check is
-		// needed for a logout to be safe.
 		s.store.DeleteSession(c.Value)
+	}
+	if authz := r.Header.Get("Authorization"); strings.HasPrefix(authz, "Bearer ") {
+		if token := strings.TrimSpace(strings.TrimPrefix(authz, "Bearer ")); token != "" {
+			s.store.DeleteSession(token)
+		}
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1,
 		HttpOnly: true, Secure: isHTTPS(r), SameSite: http.SameSiteLaxMode})

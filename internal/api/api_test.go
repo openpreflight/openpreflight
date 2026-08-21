@@ -402,11 +402,58 @@ func TestLogoutInvalidatesTheSession(t *testing.T) {
 	if rec := ts.authed(t, token, http.MethodGet, "/api/v1/settings", ""); rec.Code != http.StatusOK {
 		t.Fatal("token should work before logout")
 	}
-	req := jsonReq(http.MethodPost, "/api/v1/logout", "")
-	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: token})
-	ts.do(req)
+	// JSON login issues a Bearer token and no cookie. Logout must revoke that
+	// token; stuffing it into a cookie hid the bug.
+	if rec := ts.authed(t, token, http.MethodPost, "/api/v1/logout", ""); rec.Code != http.StatusOK {
+		t.Fatalf("logout: %d %s", rec.Code, rec.Body.String())
+	}
 	if rec := ts.authed(t, token, http.MethodGet, "/api/v1/settings", ""); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("token still valid after logout: %d", rec.Code)
+	}
+}
+
+func TestJobLogsAPIHonoursShareableLogs(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	private, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "aaa", ShareableLogs: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "bbb", ShareableLogs: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{private.ID, shared.ID} {
+		w, err := logs.Create(ts.cfg.LogDir(), id, 1<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Printf("secret build output for %s\n", id)
+		w.Close()
+	}
+
+	rec := ts.do(jsonReq(http.MethodGet, "/api/v1/jobs/"+private.ID+"/logs", ""))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("private logs leaked: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.do(jsonReq(http.MethodGet, "/api/v1/jobs/"+shared.ID+"/logs", ""))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "secret build output for "+shared.ID) {
+		t.Fatalf("shareable logs: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/"+private.ID+"/logs", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "secret build output for "+private.ID) {
+		t.Fatalf("authenticated logs: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/1e6b1f9c-0000-4000-8000-000000000000/logs", "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing job: %d %s", rec.Code, rec.Body.String())
 	}
 }
 
