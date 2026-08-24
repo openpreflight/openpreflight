@@ -174,6 +174,30 @@ func (s *Store) InFlightJobForDelivery(deliveryID string) (Job, error) {
 	return j, nil
 }
 
+// InFlightJobForSuite finds the queued or running job for one commit of one
+// App. GitHub creates at most one check suite per (App, commit), so this is the
+// "is the suite already running" question, keyed on data we always have —
+// unlike check_suite_id, which is recorded but may be absent (ADR 004).
+//
+// Keyed on (github_app_id, repo, sha) and not on ref: the same commit can arrive
+// on a second branch, which is exactly the duplicate InFlightJobsForRef cannot
+// see.
+func (s *Store) InFlightJobForSuite(appID int64, repo, sha string) (Job, error) {
+	if repo == "" || sha == "" {
+		return Job{}, ErrNotFound
+	}
+	j, err := scanJob(s.db.QueryRow(`SELECT `+jobCols+` FROM jobs
+		WHERE github_app_id = ? AND repo = ? AND sha = ? AND status IN (?, ?)
+		ORDER BY created_at DESC LIMIT 1`, appID, repo, sha, JobQueued, JobInProgress))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Job{}, ErrNotFound
+	}
+	if err != nil {
+		return Job{}, fmt.Errorf("store: suite lookup: %w", err)
+	}
+	return j, nil
+}
+
 // InFlightJobsForRef lists queued/running jobs for a repo+ref so a newer push
 // can cancel them.
 func (s *Store) InFlightJobsForRef(repo, ref string) ([]Job, error) {

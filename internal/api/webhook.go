@@ -144,6 +144,35 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("webhook: delivery lookup", "error", err)
 	}
 
+	// One live run per commit. GitHub owns at most one check suite per (App,
+	// commit), and we publish one Check Run per job, so two concurrent jobs for
+	// one SHA would put two runs with the same name on the same commit — the PR
+	// then shows a duplicate check and branch protection reads whichever
+	// finished last (ADR 004).
+	//
+	// ev.Action decides what a second delivery means, a distinction the handler
+	// could not make before: "requested" is GitHub asking again, "rerequested"
+	// is a human pressing Re-run.
+	if existing, err := s.store.InFlightJobForSuite(app.ID, ev.Repo, ev.SHA); err == nil {
+		if ev.Action == "requested" {
+			s.log.Info("webhook: suite already running for this commit",
+				"job", existing.ID, "repo", ev.Repo, "sha", ev.SHA)
+			writeJSON(w, http.StatusAccepted, map[string]string{
+				"status": "already queued", "job": existing.ID,
+			})
+			return
+		}
+		// A rerequest supersedes the run in flight. The cancelled job patches
+		// its own Check Run to cancelled, so the commit ends up with one
+		// cancelled run and one fresh run — never two live ones.
+		if s.runner.CancelJob(existing.ID) {
+			s.log.Info("cancelled the in-flight run for a rerequest",
+				"job", existing.ID, "repo", ev.Repo, "sha", ev.SHA)
+		}
+	} else if !errors.Is(err, store.ErrNotFound) {
+		s.log.Error("webhook: suite lookup", "repo", ev.Repo, "sha", ev.SHA, "error", err)
+	}
+
 	// A newer commit on the same ref makes the older run pointless.
 	s.cancelSuperseded(ev.Repo, ev.Branch, ev.SHA)
 
@@ -173,8 +202,9 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 // cancelSuperseded cancels in-flight jobs for the same repo and ref on a
-// different commit. Same-SHA duplicates are left alone: those are re-runs the
-// user asked for.
+// different commit. Same-SHA jobs are left alone because the caller has already
+// dealt with them: the one-live-run-per-commit guard above either answered
+// "already queued" or cancelled the run in flight.
 func (s *Server) cancelSuperseded(repo, ref, sha string) {
 	if ref == "" {
 		return

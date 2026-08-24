@@ -96,6 +96,18 @@ func checkSuiteBody(repo, sha, branch string) string {
 	}`, sha, branch, appNumericID, repo)
 }
 
+// checkSuiteBodyAction is checkSuiteBody with the action spelled out, for the
+// rerequested (human pressed Re-run) path.
+func checkSuiteBodyAction(repo, sha, branch, action string) string {
+	return fmt.Sprintf(`{
+	  "action": %q,
+	  "check_suite": {"id": 5150, "head_sha": %q, "head_branch": %q, "pull_requests": [], "app": {"id": %d}},
+	  "repository": {"id": 10, "full_name": %q, "private": true},
+	  "installation": {"id": 101},
+	  "sender": {"login": "tester"}
+	}`, action, sha, branch, appNumericID, repo)
+}
+
 func decodeBody(t *testing.T, rec *httptest.ResponseRecorder) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -418,5 +430,103 @@ func TestWebhookMalformedPayloadIsAccepted(t *testing.T) {
 	}
 	if ts.jobCount(t) != 0 {
 		t.Fatal("a malformed payload must not enqueue")
+	}
+}
+
+// One live run per commit: two "requested" deliveries for one SHA are GitHub
+// asking twice, not two builds to run. Without the guard each would enqueue and
+// the commit would carry two Check Runs with the same name (ADR 004).
+func TestWebhookDuplicateSuiteRequestIsNotRunTwice(t *testing.T) {
+	ts := newTestServer(t)
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	body := checkSuiteBody("winpra/api", "abc1234", "main")
+
+	first := decodeBody(t, ts.post(t, "ci", "check_suite", "delivery-1", body))["job"]
+	if ts.jobCount(t) != 1 {
+		t.Fatal("the first delivery should enqueue")
+	}
+	// A distinct delivery id, so the delivery dedup cannot catch this one.
+	rec := ts.post(t, "ci", "check_suite", "delivery-2", body)
+	got := decodeBody(t, rec)
+	if got["status"] != "already queued" {
+		t.Fatalf("status %q body %q", got["status"], rec.Body.String())
+	}
+	if got["job"] != first {
+		t.Fatalf("should point at the run already in flight: %q vs %q", got["job"], first)
+	}
+	if ts.jobCount(t) != 1 {
+		t.Fatal("two requested deliveries for one commit must produce one job")
+	}
+}
+
+// A rerequest is a human pressing Re-run, so it supersedes the run in flight
+// rather than being dropped. The commit ends up with one cancelled run and one
+// fresh run — never two live ones.
+func TestWebhookRerequestCancelsInFlightRunForSameSHA(t *testing.T) {
+	ts := newTestServer(t)
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+
+	first := decodeBody(t, ts.post(t, "ci", "check_suite", "d-1",
+		checkSuiteBody("winpra/api", "abc1234", "main")))["job"]
+
+	rec := ts.post(t, "ci", "check_suite", "d-2",
+		checkSuiteBodyAction("winpra/api", "abc1234", "main", "rerequested"))
+	if got := decodeBody(t, rec)["status"]; got != "queued" {
+		t.Fatalf("a rerequest should enqueue: status %q body %q", got, rec.Body.String())
+	}
+
+	older, err := ts.store.Job(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if older.Status != store.JobCancelled {
+		t.Fatalf("the superseded run should be cancelled, status %q", older.Status)
+	}
+
+	jobs, err := ts.store.ListJobs(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var live int
+	for _, j := range jobs {
+		if j.InFlight() {
+			live++
+		}
+	}
+	if live != 1 {
+		t.Fatalf("exactly one run may be live for a commit, found %d in %+v", live, jobs)
+	}
+}
+
+// The same commit can arrive on a second branch — a branch cut from the tip, or
+// a PR opened on an existing commit. cancelSuperseded keys on (repo, ref) and
+// cannot see this; the suite guard can.
+func TestWebhookSameSHAOnSecondRefDoesNotDuplicate(t *testing.T) {
+	ts := newTestServer(t)
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+
+	ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "abc1234", "main"))
+	rec := ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("winpra/api", "abc1234", "release/2026"))
+
+	if got := decodeBody(t, rec)["status"]; got != "already queued" {
+		t.Fatalf("status %q body %q", got, rec.Body.String())
+	}
+	if ts.jobCount(t) != 1 {
+		t.Fatal("one commit means one run, whichever ref it arrives on")
+	}
+}
+
+// The suite id travels from the payload onto the job row.
+func TestWebhookRecordsCheckSuiteID(t *testing.T) {
+	ts := newTestServer(t)
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	id := decodeBody(t, ts.post(t, "ci", "check_suite", "d-1",
+		checkSuiteBodyAction("winpra/api", "abc1234", "main", "requested")))["job"]
+	job, err := ts.store.Job(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.CheckSuiteID != 5150 {
+		t.Fatalf("check suite id not recorded on the job: %d", job.CheckSuiteID)
 	}
 }

@@ -353,6 +353,76 @@ func TestInFlightJobsForRef(t *testing.T) {
 	}
 }
 
+func TestInFlightJobForSuite(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	other := mustApp(t, st, "ci-two")
+
+	a, _ := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "aaa", Ref: "main"})
+	// Same commit, different ref: still the same suite. This is the duplicate
+	// InFlightJobsForRef cannot see.
+	got, err := st.InFlightJobForSuite(app.ID, "o/r", "aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != a.ID {
+		t.Fatalf("expected %s, got %s", a.ID, got.ID)
+	}
+
+	// A different commit, repo or App is a different suite.
+	for _, c := range []struct {
+		name      string
+		appID     int64
+		repo, sha string
+	}{
+		{"other sha", app.ID, "o/r", "bbb"},
+		{"other repo", app.ID, "o/other", "aaa"},
+		{"other app", other.ID, "o/r", "aaa"},
+	} {
+		if _, err := st.InFlightJobForSuite(c.appID, c.repo, c.sha); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s should not match: %v", c.name, err)
+		}
+	}
+
+	// An empty repo or sha must not match every row.
+	if _, err := st.InFlightJobForSuite(app.ID, "", ""); !errors.Is(err, ErrNotFound) {
+		t.Errorf("empty key should not match: %v", err)
+	}
+
+	st.FinishJob(a.ID, JobSuccess, "success", "[]", "")
+	if _, err := st.InFlightJobForSuite(app.ID, "o/r", "aaa"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("a finished job is not in flight: %v", err)
+	}
+}
+
+// The suite id round-trips onto the job row. It is recorded for traceability,
+// so a zero value must also be preserved rather than rejected.
+func TestEnqueueJobRecordsCheckSuiteID(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	withID, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "aaa", CheckSuiteID: 5150})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withID.CheckSuiteID != 5150 {
+		t.Fatalf("suite id not stored: %d", withID.CheckSuiteID)
+	}
+	reloaded, err := st.Job(withID.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.CheckSuiteID != 5150 {
+		t.Fatalf("suite id not reloaded: %d", reloaded.CheckSuiteID)
+	}
+	none, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "bbb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if none.CheckSuiteID != 0 {
+		t.Fatalf("a job with no suite id should store zero: %d", none.CheckSuiteID)
+	}
+}
+
 func TestPruneJobsRespectsInFlight(t *testing.T) {
 	st := newTestStore(t)
 	app := mustApp(t, st, "ci")
