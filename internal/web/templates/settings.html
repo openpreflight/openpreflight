@@ -54,10 +54,10 @@
   <input id="max_workspace_bytes" name="max_workspace_bytes" type="number" min="1048576"
     value="{{.Data.Settings.MaxWorkspaceBytes}}">
 
-  <div class="checkrow" style="margin-top:14px">
+  <div class="checkrow mt">
     <input id="skip_fork_prs" name="skip_fork_prs" type="checkbox" value="1"
       {{if .Data.Settings.SkipForkPRs}}checked{{end}} disabled>
-    <label for="skip_fork_prs" style="margin:0">Skip fork pull requests</label>
+    <label for="skip_fork_prs">Skip fork pull requests</label>
   </div>
   <div class="hint">Always on in v1: a fork PR would run untrusted code on this host.</div>
 

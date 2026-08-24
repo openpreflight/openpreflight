@@ -5,3 +5,4 @@ workspace
 *.pem
 .env
 coolify-github-ci
+node_modules

@@ -2,12 +2,27 @@
 <h1 class="mono">{{.Data.Job.Repo}}</h1>
 <p class="lede">
   {{statusPill .Data.Job}}
-  <span class="mono">{{shortSHA .Data.Job.SHA}}</span>
+  {{if .Data.CommitURL}}<a class="mono" href="{{.Data.CommitURL}}">{{shortSHA .Data.Job.SHA}}</a>
+  {{else}}<span class="mono">{{shortSHA .Data.Job.SHA}}</span>{{end}}
   {{if .Data.Job.Ref}}on <span class="mono">{{.Data.Job.Ref}}</span>{{end}}
   · {{.Data.Job.Event}}
   {{if .Data.Job.StartedAt}}· {{duration .Data.Job.Duration}}{{end}}
   · {{ago .Data.Job.CreatedAt}}
 </p>
+
+{{if .User}}
+<div class="actions">
+  <form method="post" action="/api/v1/jobs/{{.Data.Job.ID}}/rerun">
+    {{.CSRFField}}<button class="link" type="submit">re-run</button>
+  </form>
+  {{if .Data.Job.InFlight}}
+  <form method="post" action="/api/v1/jobs/{{.Data.Job.ID}}/cancel">
+    {{.CSRFField}}<button class="danger" type="submit">cancel</button>
+  </form>
+  {{end}}
+  <a href="/jobs">← all jobs</a>
+</div>
+{{end}}
 
 <div class="panel">
   <table>
@@ -24,12 +39,12 @@
 <div class="panel">
   <h2>Steps</h2>
   <table>
-    <tr><th>Step</th><th>Command</th><th>Outcome</th><th>Took</th></tr>
+    <tr><th></th><th>Step</th><th>Command</th><th>Took</th></tr>
     {{range .Data.Steps}}
     <tr>
+      <td class="mono">{{stepMark .}}</td>
       <td>{{.Name}}</td>
       <td class="mono small">{{.Command}}</td>
-      <td class="small">{{if .Skipped}}skipped{{else if .TimedOut}}timed out{{else if eq .ExitCode 0}}passed{{else}}failed (exit {{.ExitCode}}){{end}}</td>
       <td class="small">{{if .Skipped}}—{{else}}{{duration .Duration}}{{end}}</td>
     </tr>
     {{end}}
@@ -47,5 +62,4 @@
 <p class="muted small">You are viewing this with a shareable link. Anyone holding the URL can read this
 build output.</p>
 {{end}}
-{{if .User}}<p style="margin-top:18px"><a href="/jobs">← all jobs</a></p>{{end}}
 {{end}}

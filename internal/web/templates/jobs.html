@@ -16,13 +16,13 @@
         {{if .Error}}<div class="small muted">{{.Error}}</div>{{end}}</td>
       <td class="small">{{if .StartedAt}}{{duration .Duration}}{{else}}—{{end}}</td>
       <td class="small muted">{{ago .CreatedAt}}</td>
-      <td class="small">
+      <td class="actions-cell small">
         <a href="/runs/{{.ID}}">logs</a>
-        <form method="post" action="/api/v1/jobs/{{.ID}}/rerun" style="display:inline">
+        <form method="post" action="/api/v1/jobs/{{.ID}}/rerun">
           {{$.CSRFField}}<button class="link" type="submit">re-run</button>
         </form>
         {{if .InFlight}}
-        <form method="post" action="/api/v1/jobs/{{.ID}}/cancel" style="display:inline">
+        <form method="post" action="/api/v1/jobs/{{.ID}}/cancel">
           {{$.CSRFField}}<button class="danger" type="submit">cancel</button>
         </form>
         {{end}}

@@ -12,19 +12,25 @@ checks, and each App has exactly one webhook URL. Coolify's deploy connector can
     <tr>
       <td>{{.Name}}<div class="muted small mono">{{.Slug}}</div></td>
       <td class="mono small">{{.AppID}}</td>
-      <td class="mono small">{{webhookURL $.Data.Settings.PublicBaseURL .Slug}}</td>
+      <td class="mono small">
+        <input type="text" class="mono" readonly
+          value="{{webhookURL $.Data.Settings.PublicBaseURL .Slug}}"
+          aria-label="Webhook URL for {{.Name}}"
+          onfocus="this.select()">
+      </td>
       <td class="small">{{if .CheckName}}{{.CheckName}}{{else}}<span class="muted">{{$.Data.Settings.DefaultCheckName}} (global)</span>{{end}}</td>
       <td>
         {{if .LastError}}<span class="pill bad">failed</span><div class="small muted">{{.LastError}}</div>
         {{else if .LastSeenAt}}<span class="pill ok">ok</span><div class="small muted">{{ago .LastSeenAt.UTC}}</div>
         {{else}}<span class="pill off">never</span>{{end}}
       </td>
-      <td>
-        <form method="post" action="/api/v1/github-apps/{{.ID}}/test" style="display:inline">
+      <td class="actions-cell">
+        <form method="post" action="/api/v1/github-apps/{{.ID}}/test">
           {{$.CSRFField}}<button class="link" type="submit">Test</button>
         </form>
+        <a href="/github-apps?edit={{.ID}}">Edit</a>
         <a href="/github-apps?inspect={{.ID}}">Installations</a>
-        <form method="post" action="/api/v1/github-apps/{{.ID}}/delete" style="display:inline"
+        <form method="post" action="/api/v1/github-apps/{{.ID}}/delete"
           onsubmit="return confirm('Remove this App? Its repo bindings are removed too.')">
           {{$.CSRFField}}<button class="danger" type="submit">Remove</button>
         </form>
@@ -67,7 +73,8 @@ checks, and each App has exactly one webhook URL. Coolify's deploy connector can
 {{end}}
 
 <div class="panel">
-  <h2>Add an App</h2>
+  <h2>{{if .Data.Edit}}Edit {{.Data.Edit.Name}}{{else}}Add an App{{end}}</h2>
+  {{if not .Data.Edit}}
   <p class="muted small">Register it on GitHub first
     (<a href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>),
     then paste the credentials here. This service never creates Apps for you.</p>
@@ -76,43 +83,66 @@ checks, and each App has exactly one webhook URL. Coolify's deploy connector can
     <strong>Check run</strong> events. Webhook URL:
     <code>{{if .Data.Settings.PublicBaseURL}}{{.Data.Settings.PublicBaseURL}}{{else}}{public base URL}{{end}}/webhook/{slug}</code>
     — the slug below.</p>
-  <form method="post" action="/api/v1/github-apps">
+  {{end}}
+  <form method="post" action="{{if .Data.Edit}}/api/v1/github-apps/{{.Data.Edit.ID}}{{else}}/api/v1/github-apps{{end}}">
     {{.CSRFField}}
     <div class="row">
       <div>
         <label for="name">Name</label>
-        <input id="name" name="name" type="text" placeholder="winpra-ci" required>
+        <input id="name" name="name" type="text" placeholder="winpra-ci" required
+          value="{{if .Data.Edit}}{{.Data.Edit.Name}}{{end}}">
       </div>
       <div>
         <label for="slug">Slug (webhook path)</label>
-        <input id="slug" name="slug" type="text" placeholder="winpra-ci">
+        <input id="slug" name="slug" type="text" placeholder="winpra-ci"
+          value="{{if .Data.Edit}}{{.Data.Edit.Slug}}{{end}}">
+        {{if .Data.Edit}}
+        <div class="hint">Changing the slug changes the webhook URL GitHub must post to.</div>
+        {{else}}
         <div class="hint">Lowercase letters, digits, dashes. Defaults from the name.</div>
+        {{end}}
       </div>
       <div>
         <label for="app_id">App ID</label>
-        <input id="app_id" name="app_id" type="number" min="1" required>
+        <input id="app_id" name="app_id" type="number" min="1" required
+          value="{{if .Data.Edit}}{{.Data.Edit.AppID}}{{end}}">
       </div>
     </div>
     <div class="row">
       <div>
         <label for="api_url">API URL</label>
-        <input id="api_url" name="api_url" type="url" value="https://api.github.com">
+        <input id="api_url" name="api_url" type="url"
+          value="{{if .Data.Edit}}{{.Data.Edit.APIURL}}{{else}}https://api.github.com{{end}}">
         <div class="hint">Change only for GitHub Enterprise.</div>
       </div>
       <div>
         <label for="check_name">Check name for this App</label>
         <input id="check_name" name="check_name" type="text"
-          placeholder="{{.Data.Settings.DefaultCheckName}}">
+          placeholder="{{.Data.Settings.DefaultCheckName}}"
+          value="{{if .Data.Edit}}{{.Data.Edit.CheckName}}{{end}}">
         <div class="hint">Optional. Blank uses the global default.</div>
       </div>
     </div>
     <label for="webhook_secret">Webhook secret</label>
-    <input id="webhook_secret" name="webhook_secret" type="password" required>
+    <input id="webhook_secret" name="webhook_secret" type="password"
+      {{if not .Data.Edit}}required{{end}}>
+    {{if .Data.Edit}}
+    <div class="hint">Leave blank to keep the stored secret.</div>
+    {{else}}
     <div class="hint">Must match the secret set on the App. Use a different one per App.</div>
+    {{end}}
     <label for="pem">Private key (PEM)</label>
-    <textarea id="pem" name="pem" required placeholder="-----BEGIN RSA PRIVATE KEY-----"></textarea>
+    <textarea id="pem" name="pem" {{if not .Data.Edit}}required{{end}}
+      placeholder="-----BEGIN RSA PRIVATE KEY-----"></textarea>
+    {{if .Data.Edit}}
+    <div class="hint">Leave blank to keep the stored key. Never displayed.</div>
+    {{else}}
     <div class="hint">Stored encrypted with <code>CI_SECRET_KEY</code>. Never displayed again.</div>
-    <div class="actions"><button class="primary" type="submit">Add and test</button></div>
+    {{end}}
+    <div class="actions">
+      <button class="primary" type="submit">{{if .Data.Edit}}Save{{else}}Add and test{{end}}</button>
+      {{if .Data.Edit}}<a class="btn" href="/github-apps">Cancel</a>{{end}}
+    </div>
   </form>
 </div>
 {{end}}

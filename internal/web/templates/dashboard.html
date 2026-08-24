@@ -1,36 +1,63 @@
 {{define "content"}}
 <h1>Overview</h1>
-<p class="lede">This service configures itself: add Coolify team tokens, add your CI GitHub App,
-then enable the repos it should check.</p>
+<p class="lede">Set the public URL, add your CI GitHub App, then enable the repos it should check.
+Coolify is optional.</p>
 
-<div class="grid2">
-  <div class="panel">
-    <h2>Coolify instances</h2>
-    <p class="muted small">One row per team token. Used for inventory and as a repo picker.</p>
-    <p><strong>{{len .Data.Coolify}}</strong> configured</p>
-    <a class="btn" href="/coolify">Manage</a>
-  </div>
-  <div class="panel">
-    <h2>CI GitHub Apps</h2>
-    <p class="muted small">Receives webhooks, writes Check Runs, clones the commit.</p>
-    <p><strong>{{len .Data.Apps}}</strong> configured</p>
-    <a class="btn" href="/github-apps">Manage</a>
-  </div>
-  <div class="panel">
-    <h2>Enabled repos</h2>
-    <p class="muted small">The worker runs nothing without an enabled binding.</p>
-    <p><strong>{{.Data.EnabledBindings}}</strong> of {{len .Data.Bindings}} enabled</p>
-    <a class="btn" href="/repos">Manage</a>
-  </div>
-</div>
-
-{{if not .Data.Settings.PublicBaseURL}}
 <div class="panel">
-  <h2>Public base URL is not set</h2>
-  <p class="muted">Without it, webhook URLs and the <code>details_url</code> on commit checks cannot be
-  built. Set it in <a href="/settings">Settings</a>.</p>
+  <h2>Setup</h2>
+  <ol class="checklist">
+    <li>
+      {{if .Data.Settings.PublicBaseURL}}
+        <span class="pill ok">done</span>
+        Public base URL
+        <span class="muted small mono">{{.Data.Settings.PublicBaseURL}}</span>
+        <a href="/settings">Settings</a>
+      {{else}}
+        <span class="pill warn">needed</span>
+        Public base URL
+        <a href="/settings">Set it in Settings</a>
+      {{end}}
+    </li>
+    <li>
+      {{if .Data.Apps}}
+        <span class="pill ok">done</span>
+        CI GitHub App
+        <span class="muted small">{{len .Data.Apps}} configured</span>
+        <a href="/github-apps">Manage</a>
+      {{else}}
+        <span class="pill warn">needed</span>
+        CI GitHub App
+        <a href="/github-apps">Add one</a>
+      {{end}}
+    </li>
+    <li>
+      {{if .Data.EnabledBindings}}
+        <span class="pill ok">done</span>
+        Enabled repo
+        <span class="muted small">{{.Data.EnabledBindings}} of {{len .Data.Bindings}} enabled</span>
+        <a href="/repos">Manage</a>
+      {{else}}
+        <span class="pill warn">needed</span>
+        Enabled repo
+        <span class="muted small">{{if .Data.Bindings}}{{len .Data.Bindings}} bound, none enabled{{else}}the worker runs nothing without one{{end}}</span>
+        <a href="/repos">Enable a repo</a>
+      {{end}}
+    </li>
+    <li>
+      {{if .Data.Coolify}}
+        <span class="pill ok">done</span>
+        Coolify
+        <span class="muted small">{{len .Data.Coolify}} configured · optional</span>
+        <a href="/coolify">Manage</a>
+      {{else}}
+        <span class="pill off">optional</span>
+        Coolify
+        <span class="muted small">server inventory and a repo picker</span>
+        <a href="/coolify">Add an instance</a>
+      {{end}}
+    </li>
+  </ol>
 </div>
-{{end}}
 
 <div class="panel">
   <h2>Recent jobs</h2>

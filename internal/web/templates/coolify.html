@@ -23,12 +23,13 @@ second row.</p>
           <div class="small muted">{{ago .LastSeenAt.UTC}}</div>
         {{else}}<span class="pill off">never</span>{{end}}
       </td>
-      <td>
-        <form method="post" action="/api/v1/coolify/{{.ID}}/test" style="display:inline">
+      <td class="actions-cell">
+        <form method="post" action="/api/v1/coolify/{{.ID}}/test">
           {{$.CSRFField}}<button class="link" type="submit">Test</button>
         </form>
+        <a href="/coolify?edit={{.ID}}">Edit</a>
         <a href="/coolify?inspect={{.ID}}">Inspect</a>
-        <form method="post" action="/api/v1/coolify/{{.ID}}/delete" style="display:inline"
+        <form method="post" action="/api/v1/coolify/{{.ID}}/delete"
           onsubmit="return confirm('Remove this Coolify instance? Bindings that name it keep working.')">
           {{$.CSRFField}}<button class="danger" type="submit">Remove</button>
         </form>
@@ -72,25 +73,35 @@ second row.</p>
 {{end}}
 
 <div class="panel">
-  <h2>Add an instance</h2>
-  <form method="post" action="/api/v1/coolify">
+  <h2>{{if .Data.Edit}}Edit {{.Data.Edit.Name}}{{else}}Add an instance{{end}}</h2>
+  <form method="post" action="{{if .Data.Edit}}/api/v1/coolify/{{.Data.Edit.ID}}{{else}}/api/v1/coolify{{end}}">
     {{.CSRFField}}
     <div class="row">
       <div>
         <label for="name">Name</label>
-        <input id="name" name="name" type="text" placeholder="prod-platform">
+        <input id="name" name="name" type="text" placeholder="prod-platform"
+          value="{{if .Data.Edit}}{{.Data.Edit.Name}}{{end}}">
       </div>
       <div>
         <label for="base_url">Base URL</label>
-        <input id="base_url" name="base_url" type="url" placeholder="https://coolify.example.com" required>
+        <input id="base_url" name="base_url" type="url" placeholder="https://coolify.example.com" required
+          value="{{if .Data.Edit}}{{.Data.Edit.BaseURL}}{{end}}">
       </div>
     </div>
     <label for="api_token">API token</label>
-    <input id="api_token" name="api_token" type="password" placeholder="3|Waobq…" required>
+    <input id="api_token" name="api_token" type="password" placeholder="3|Waobq…"
+      {{if not .Data.Edit}}required{{end}}>
+    {{if .Data.Edit}}
+    <div class="hint">Leave blank to keep the stored token. Current: <span class="mono">{{.Data.Edit.APITokenRedacted}}</span></div>
+    {{else}}
     <div class="hint">Coolify UI: <strong>Security → API Tokens</strong> (some versions:
       <strong>Keys &amp; Tokens</strong>). Read-only is enough for inventory. The token is stored
       encrypted and never shown again.</div>
-    <div class="actions"><button class="primary" type="submit">Add and test</button></div>
+    {{end}}
+    <div class="actions">
+      <button class="primary" type="submit">{{if .Data.Edit}}Save{{else}}Add and test{{end}}</button>
+      {{if .Data.Edit}}<a class="btn" href="/coolify">Cancel</a>{{end}}
+    </div>
   </form>
 </div>
 {{end}}
