@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 // pageSetup shows the first-run wizard, or sends you on if setup already ran.

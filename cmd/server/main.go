@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/api"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/config"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/queue"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/api"
+	"github.com/trivedi-vatsal/openpreflight/internal/config"
+	"github.com/trivedi-vatsal/openpreflight/internal/queue"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 func main() {

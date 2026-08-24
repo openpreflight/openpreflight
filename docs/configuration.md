@@ -38,7 +38,7 @@ Single row, `id = 1`. Changed from **Settings** in the UI or
 | Field | Default | Purpose |
 |---|---|---|
 | `public_base_url` | empty (or seeded from env) | Webhook URLs and Check Run `details_url` |
-| `default_check_name` | `Coolify CI` | Check Run name unless the App or binding overrides |
+| `default_check_name` | `openpreflight` | Check Run name unless the App or binding overrides. New installs only — an existing database keeps the name it already has, because GitHub matches a required status check by name and renaming one strands its branch protection rule |
 | `default_pipeline_file` | `.ci.yml` | Path in the repo |
 | `default_timeout_seconds` | `900` | Per-job timeout |
 | `max_concurrent_jobs` | `1` | Runner concurrency |

@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · Coolify CI</title>
+<title>{{.Title}} · openpreflight</title>
 {{if gt .RefreshSeconds 0}}<meta http-equiv="refresh" content="{{.RefreshSeconds}}">{{end}}
 <style>{{.CSS}}</style>
 </head>
 <body>
 <header class="border-b border-line bg-panel">
   <div class="mx-auto flex max-w-[1080px] flex-wrap items-center gap-5 px-5">
-    <a class="brand" href="/">Coolify CI</a>
+    <a class="brand" href="/">openpreflight</a>
     {{if .User}}
     <nav class="flex flex-wrap gap-5">
       <a href="/" class="nav-link {{if eq .Nav "home"}}on{{end}}">Overview</a>

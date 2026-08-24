@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/testsupport"
+	"github.com/trivedi-vatsal/openpreflight/internal/testsupport"
 )
 
 func TestCloneExactSHA(t *testing.T) {

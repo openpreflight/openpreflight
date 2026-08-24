@@ -33,6 +33,7 @@ type pullRequestRef struct {
 }
 
 type checkSuitePayload struct {
+	ID           int64            `json:"id"`
 	HeadSHA      string           `json:"head_sha"`
 	HeadBranch   *string          `json:"head_branch"`
 	PullRequests []pullRequestRef `json:"pull_requests"`
@@ -74,9 +75,13 @@ type Event struct {
 	// CheckRunAppID is the App that owns the re-requested Check Run. We only act
 	// on our own; another App's rerequest is not ours to answer.
 	CheckRunAppID int64
-	IsFork        bool
-	PullNumber    int
-	Sender        string
+	// CheckSuiteID is GitHub's id for the suite this delivery belongs to. It is
+	// recorded for traceability only — the one-live-run-per-commit guard keys on
+	// (app, repo, sha), so a zero id here cannot weaken it (ADR 005).
+	CheckSuiteID int64
+	IsFork       bool
+	PullNumber   int
+	Sender       string
 }
 
 // SkipReason explains why an otherwise valid delivery produces no job. Empty
@@ -134,6 +139,9 @@ func Parse(eventName string, body []byte) (Event, SkipReason, error) {
 		return ev, SkipReason("event " + eventName + " is not handled"), nil
 	}
 
+	if suite != nil {
+		ev.CheckSuiteID = suite.ID
+	}
 	if suite != nil && suite.HeadBranch != nil {
 		ev.Branch = strings.TrimPrefix(*suite.HeadBranch, "refs/heads/")
 	}

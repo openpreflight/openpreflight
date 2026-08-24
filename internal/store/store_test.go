@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
 )
 
 // testKey is a fixture key: tests never depend on a real CI_SECRET_KEY.
@@ -45,7 +45,7 @@ func TestSettingsSeedAndSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.DefaultCheckName != "Coolify CI" || got.DefaultPipelineFile != ".ci.yml" {
+	if got.DefaultCheckName != "openpreflight" || got.DefaultPipelineFile != ".ci.yml" {
 		t.Fatalf("unexpected defaults: %+v", got)
 	}
 	if !got.SkipForkPRs {
@@ -62,6 +62,44 @@ func TestSettingsSeedAndSave(t *testing.T) {
 	}
 	if again.PublicBaseURL != "https://ci.example.com" || again.LogRetentionDays != 3 {
 		t.Fatalf("settings did not persist: %+v", again)
+	}
+}
+
+// Renaming the product must not rename a live install's Check Run. GitHub
+// matches a required status check by name string, so rewriting an existing row
+// would leave that repo's branch protection waiting for a check that never
+// reports again. The new default applies to fresh databases only.
+func TestExistingInstallKeepsItsCheckName(t *testing.T) {
+	box, _ := secret.New(testKey)
+	path := filepath.Join(t.TempDir(), "ci.db")
+
+	st, err := Open(path, box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stand in for an install created before the rename.
+	settings, err := st.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.DefaultCheckName = "Coolify CI"
+	if err := st.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	// Reopen: migrations re-run and the settings row is read, not reseeded.
+	again, err := Open(path, box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	got, err := again.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DefaultCheckName != "Coolify CI" {
+		t.Fatalf("an existing install's check name was rewritten to %q", got.DefaultCheckName)
 	}
 }
 
@@ -350,6 +388,76 @@ func TestInFlightJobsForRef(t *testing.T) {
 	jobs, _ = st.InFlightJobsForRef("o/r", "main")
 	if len(jobs) != 0 {
 		t.Fatal("finished jobs are not in flight")
+	}
+}
+
+func TestInFlightJobForSuite(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	other := mustApp(t, st, "ci-two")
+
+	a, _ := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "aaa", Ref: "main"})
+	// Same commit, different ref: still the same suite. This is the duplicate
+	// InFlightJobsForRef cannot see.
+	got, err := st.InFlightJobForSuite(app.ID, "o/r", "aaa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != a.ID {
+		t.Fatalf("expected %s, got %s", a.ID, got.ID)
+	}
+
+	// A different commit, repo or App is a different suite.
+	for _, c := range []struct {
+		name      string
+		appID     int64
+		repo, sha string
+	}{
+		{"other sha", app.ID, "o/r", "bbb"},
+		{"other repo", app.ID, "o/other", "aaa"},
+		{"other app", other.ID, "o/r", "aaa"},
+	} {
+		if _, err := st.InFlightJobForSuite(c.appID, c.repo, c.sha); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s should not match: %v", c.name, err)
+		}
+	}
+
+	// An empty repo or sha must not match every row.
+	if _, err := st.InFlightJobForSuite(app.ID, "", ""); !errors.Is(err, ErrNotFound) {
+		t.Errorf("empty key should not match: %v", err)
+	}
+
+	st.FinishJob(a.ID, JobSuccess, "success", "[]", "")
+	if _, err := st.InFlightJobForSuite(app.ID, "o/r", "aaa"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("a finished job is not in flight: %v", err)
+	}
+}
+
+// The suite id round-trips onto the job row. It is recorded for traceability,
+// so a zero value must also be preserved rather than rejected.
+func TestEnqueueJobRecordsCheckSuiteID(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	withID, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "aaa", CheckSuiteID: 5150})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withID.CheckSuiteID != 5150 {
+		t.Fatalf("suite id not stored: %d", withID.CheckSuiteID)
+	}
+	reloaded, err := st.Job(withID.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.CheckSuiteID != 5150 {
+		t.Fatalf("suite id not reloaded: %d", reloaded.CheckSuiteID)
+	}
+	none, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "bbb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if none.CheckSuiteID != 0 {
+		t.Fatalf("a job with no suite id should store zero: %d", none.CheckSuiteID)
 	}
 }
 

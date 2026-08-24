@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/config"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/queue"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/web"
+	"github.com/trivedi-vatsal/openpreflight/internal/config"
+	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/trivedi-vatsal/openpreflight/internal/queue"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/web"
 )
 
 const (

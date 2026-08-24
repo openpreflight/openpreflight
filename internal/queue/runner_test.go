@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/config"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/testsupport"
+	"github.com/trivedi-vatsal/openpreflight/internal/config"
+	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/trivedi-vatsal/openpreflight/internal/logs"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/testsupport"
 )
 
 type harness struct {
@@ -71,6 +71,12 @@ func newHarness(t *testing.T) *harness {
 }
 
 // runOne enqueues a job and drives the runner until it reaches a terminal state.
+//
+// Terminal status alone is not enough to assert on. runJob writes the terminal
+// status before it PATCHes the Check Run and before the deferred
+// SetJobLogBytes, so returning the moment InFlight() goes false races both.
+// activeCount() drops to zero only after runJob has returned, so that is the
+// signal that every write for this job has landed.
 func (h *harness) runOne(t *testing.T, in store.JobInput) store.Job {
 	t.Helper()
 	job, err := h.store.EnqueueJob(in)
@@ -88,8 +94,13 @@ func (h *harness) runOne(t *testing.T, in store.JobInput) store.Job {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !current.InFlight() {
-			return current
+		if !current.InFlight() && h.runner.activeCount() == 0 {
+			// Re-read: the trailing writes landed after the load above.
+			settled, err := h.store.Job(job.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return settled
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -125,7 +136,7 @@ func TestRunnerHappyPath(t *testing.T) {
 	if job.CheckRunID != 555 {
 		t.Fatalf("check run id not recorded: %d", job.CheckRunID)
 	}
-	if job.CheckName != "Coolify CI" {
+	if job.CheckName != "openpreflight" {
 		t.Fatalf("resolved check name not written on the job: %q", job.CheckName)
 	}
 
@@ -133,7 +144,7 @@ func TestRunnerHappyPath(t *testing.T) {
 	if len(created) != 1 {
 		t.Fatalf("expected one Check Run, got %d", len(created))
 	}
-	if created[0].Body["name"] != "Coolify CI" {
+	if created[0].Body["name"] != "openpreflight" {
 		t.Fatalf("check name should fall back to the global default: %v", created[0].Body["name"])
 	}
 	if created[0].Body["head_sha"] != sha {

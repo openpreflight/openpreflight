@@ -44,8 +44,11 @@ that database. See [configuration.md](configuration.md).
 3. Fork PRs are dropped unless `skip_fork_prs` is off, Docker is reachable, and
    `default_runtime` is set. A repo with no enabled binding is acknowledged and
    dropped. Delivery ids still in-flight are deduped.
-4. An older in-flight job for the same repo+ref is cancelled; the new SHA is
-   enqueued; the handler returns 202.
+4. One live run per commit is enforced: a `requested` delivery for a
+   `(app, repo, sha)` already in flight is answered `already queued`, while a
+   `rerequested` one cancels that run first. An older in-flight job for the same
+   repo+ref on a *different* SHA is then cancelled, the new SHA is enqueued, and
+   the handler returns 202.
 5. The runner mints an installation token from the payload's installation id,
    creates the Check Run, fetches that commit (fork PRs fall back to
    `refs/pull/N/head`), detaches, strips the remote, runs the pipeline under a
@@ -62,3 +65,12 @@ shareable logs.
 - [ADR 002](adr/002-authentication.md) — local admin + opaque sessions, not GitHub OAuth.
 - [ADR 003](adr/003-github-app.md) — our GitHub App, not Coolify's GitHub connector.
 - [ADR 004](adr/004-docker-executor.md) — `runtime:` is `docker run`; fork PRs stay off until that works.
+- [ADR 005](adr/005-check-suite-gating.md) — `check_suite`/`check_run` only, one Check Run per job, one live run per commit.
+
+### Prior art
+
+The trigger model is Zuul's, at a single server's scale: gate on the commit,
+queue against an immutable SHA, attach logs to the run, write the result back to
+the forge. Zuul's architecture — ZooKeeper, Nodepool, Ansible, a scheduler apart
+from its executors — is explicitly not adopted. [ADR 005](adr/005-check-suite-gating.md)
+records what is borrowed, what is rejected, and where the ceiling is.

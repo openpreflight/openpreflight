@@ -1,12 +1,20 @@
-# coolify-github-ci
+# openpreflight
 
 A small CI provider for private repos: one Go binary that is both a
 **configurator** (add Coolify team tokens, GitHub Apps, repo bindings in a web UI
 or over JSON) and a **worker** (receive GitHub App webhooks, run install/test/build
 on the exact commit, report one Check Run with full logs).
 
-This is not GitHub Actions and not `actions/runner`. It writes the same commit
-checks you already see on a PR, using your own GitHub App.
+It is the smallest useful version of GitHub-native CI: a self-hosted Check Runs
+runner for teams that want CI on their own server, without Actions and without
+learning a pipeline DSL. The systems that already fill this slot are full
+platforms, hosted control planes, Kubernetes-oriented, or heavyweight gating
+systems; this one is a binary and a SQLite file on a box you already pay for.
+
+Runs are gated on the commit, the way Zuul does it — trigger on the check suite,
+build the immutable SHA, one live run per commit, result written back as a Check
+Run. See [ADR 005](docs/adr/005-check-suite-gating.md) for what that borrows,
+what it rejects, and where the ceiling is.
 
 ## Documentation
 
@@ -17,7 +25,7 @@ checks you already see on a PR, using your own GitHub App.
 - [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ```text
-Coolify CI
+openpreflight
 ────────────────────
 ✓ install    8s
 ✓ test      21s
@@ -27,6 +35,15 @@ Passed in 42s
 
 View full logs →
 ```
+
+## Where Coolify fits
+
+Coolify is a supported deployment target and an optional repo source — not the
+product, and not required. Add a team-scoped API token and you get server
+inventory, a repository picker, and a one-click **Install this worker**. Skip it
+entirely and everything else works the same: the checks come from a GitHub App
+you register, and jobs run here or on any Docker engine you point
+`CI_DOCKER_HOST` at.
 
 ## Why a GitHub App
 

@@ -2,7 +2,7 @@
 /workspace/
 .env
 *.pem
-/coolify-github-ci
+/openpreflight
 /tmp/
 .plans/*
 node_modules/

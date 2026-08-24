@@ -19,7 +19,7 @@ RUN go mod download
 COPY . .
 COPY --from=css /web/static/app.css internal/web/static/app.css
 ENV CGO_ENABLED=0 GOOS=linux
-RUN go build -trimpath -ldflags="-s -w" -o /out/coolify-github-ci ./cmd/server
+RUN go build -trimpath -ldflags="-s -w" -o /out/openpreflight ./cmd/server
 
 # Runtime: git is required to check out commits, and Node is the default
 # pipeline runtime (README Pipelines). Everything runs as a non-root user.
@@ -30,7 +30,7 @@ RUN apk add --no-cache git nodejs npm ca-certificates tini docker-cli \
  && mkdir -p /data /workspace \
  && chown -R ci:ci /data /workspace /home/ci
 
-COPY --from=build /out/coolify-github-ci /usr/local/bin/coolify-github-ci
+COPY --from=build /out/openpreflight /usr/local/bin/openpreflight
 
 USER ci
 WORKDIR /home/ci
@@ -41,7 +41,7 @@ EXPOSE 8080
 VOLUME ["/data", "/workspace"]
 
 # tini reaps the shells a pipeline step leaves behind.
-ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/coolify-github-ci"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/openpreflight"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1

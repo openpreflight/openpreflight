@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/githubapp"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/githubapp"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 // clientCache reuses one githubapp.Client per App so installation tokens are

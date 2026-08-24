@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/coolify"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/coolify"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 // coolifyClient builds a client for a stored instance, decrypting its token.

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 // errNoApp is returned when the picker posts without an App: a binding cannot
