@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/trivedi-vatsal/openpreflight/internal/logs"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 // jsonReq builds an API-surface request.

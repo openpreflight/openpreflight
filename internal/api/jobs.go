@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/logs"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 // errNoInstallation means we never learned which installation to authenticate

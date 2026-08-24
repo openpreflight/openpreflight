@@ -1,4 +1,4 @@
-module github.com/trivedi-vatsal/coolify-github-ci
+module github.com/trivedi-vatsal/openpreflight
 
 go 1.26.5
 

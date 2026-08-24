@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
 )
 
 // RotateSecrets re-seals every secret column from old into this store's box

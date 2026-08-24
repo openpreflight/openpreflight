@@ -153,7 +153,7 @@ func TestParseCheckRunRerequestedCarriesAppID(t *testing.T) {
 	body := []byte(`{
 	  "action": "rerequested",
 	  "check_run": {
-	    "id": 900, "head_sha": "cafe1234", "name": "Coolify CI",
+	    "id": 900, "head_sha": "cafe1234", "name": "openpreflight",
 	    "app": {"id": 4242},
 	    "check_suite": {"id": 6161, "head_sha":"cafe1234","head_branch": "main", "pull_requests": []}
 	  },

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
 )
 
 // testKey is a fixture key: tests never depend on a real CI_SECRET_KEY.
@@ -45,7 +45,7 @@ func TestSettingsSeedAndSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.DefaultCheckName != "Coolify CI" || got.DefaultPipelineFile != ".ci.yml" {
+	if got.DefaultCheckName != "openpreflight" || got.DefaultPipelineFile != ".ci.yml" {
 		t.Fatalf("unexpected defaults: %+v", got)
 	}
 	if !got.SkipForkPRs {
@@ -62,6 +62,44 @@ func TestSettingsSeedAndSave(t *testing.T) {
 	}
 	if again.PublicBaseURL != "https://ci.example.com" || again.LogRetentionDays != 3 {
 		t.Fatalf("settings did not persist: %+v", again)
+	}
+}
+
+// Renaming the product must not rename a live install's Check Run. GitHub
+// matches a required status check by name string, so rewriting an existing row
+// would leave that repo's branch protection waiting for a check that never
+// reports again. The new default applies to fresh databases only.
+func TestExistingInstallKeepsItsCheckName(t *testing.T) {
+	box, _ := secret.New(testKey)
+	path := filepath.Join(t.TempDir(), "ci.db")
+
+	st, err := Open(path, box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stand in for an install created before the rename.
+	settings, err := st.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.DefaultCheckName = "Coolify CI"
+	if err := st.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	// Reopen: migrations re-run and the settings row is read, not reseeded.
+	again, err := Open(path, box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	got, err := again.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DefaultCheckName != "Coolify CI" {
+		t.Fatalf("an existing install's check name was rewritten to %q", got.DefaultCheckName)
 	}
 }
 

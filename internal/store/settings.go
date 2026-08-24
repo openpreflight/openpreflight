@@ -6,10 +6,19 @@ import (
 	"fmt"
 )
 
-// defaultSettings mirror the table defaults and docs/configuration.md.
+// defaultSettings seed the settings row on first read, and are the only place
+// the default check name comes from — the DEFAULT in migration 0001's DDL is
+// never exercised because seedSettings always supplies the column.
+//
+// Changing this name therefore affects new installs only. That is deliberate:
+// GitHub matches a required status check by its name string, so renaming a live
+// install's check would leave its branch protection rule permanently
+// unsatisfiable ("Expected — waiting for status to be reported"). Existing
+// installs keep the name already in their database until an operator changes it
+// in the UI. See docs/configuration.md.
 func defaultSettings() Settings {
 	return Settings{
-		DefaultCheckName:      "Coolify CI",
+		DefaultCheckName:      "openpreflight",
 		DefaultPipelineFile:   ".ci.yml",
 		DefaultTimeoutSeconds: 900,
 		MaxConcurrentJobs:     1,
