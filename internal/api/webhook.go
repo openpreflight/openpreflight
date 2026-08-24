@@ -148,7 +148,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// commit), and we publish one Check Run per job, so two concurrent jobs for
 	// one SHA would put two runs with the same name on the same commit — the PR
 	// then shows a duplicate check and branch protection reads whichever
-	// finished last (ADR 004).
+	// finished last (ADR 005).
 	//
 	// ev.Action decides what a second delivery means, a distinction the handler
 	// could not make before: "requested" is GitHub asking again, "rerequested"

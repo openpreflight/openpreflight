@@ -435,7 +435,7 @@ func TestWebhookMalformedPayloadIsAccepted(t *testing.T) {
 
 // One live run per commit: two "requested" deliveries for one SHA are GitHub
 // asking twice, not two builds to run. Without the guard each would enqueue and
-// the commit would carry two Check Runs with the same name (ADR 004).
+// the commit would carry two Check Runs with the same name (ADR 005).
 func TestWebhookDuplicateSuiteRequestIsNotRunTwice(t *testing.T) {
 	ts := newTestServer(t)
 	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})

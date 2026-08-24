@@ -26,6 +26,24 @@ v1 of the configurator and worker in one Go binary.
 - `CI_SECRET_KEY_OLD` re-seals secret columns under `CI_SECRET_KEY` on boot.
 - Settings `default_runtime`. `skip_fork_prs` is writable when Docker is
   reachable and a default runtime is set; fork jobs always use Docker.
+- `check_suite_id` recorded on every job, from both the `check_suite` and the
+  `check_run` payload, as a stable handle back to GitHub's suite.
+- One live run per `(app, repo, sha)`. A `check_suite.requested` delivery for a
+  commit already in flight is answered `already queued`; a `rerequested` one
+  cancels that run and enqueues a fresh one.
+- [ADR 005](docs/adr/005-check-suite-gating.md) records the trigger model:
+  `check_suite`/`check_run` only, one Check Run per job, Zuul as the referenced
+  model with its architecture rejected.
+
+### Fixed
+
+- Duplicate Check Runs with the same name on one commit. Dedup was keyed on
+  `delivery_id` and cancellation on `(repo, ref)`, so the same commit arriving on
+  a second ref — or a rerequest landing while a job ran — started a second
+  concurrent job, and branch protection read whichever finished last.
+- Intermittent failures in the `internal/queue` tests: the harness asserted as
+  soon as a job's status went terminal, which is written before the Check Run
+  PATCH and the final log-size write.
 
 ### Security
 
