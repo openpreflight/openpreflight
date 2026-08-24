@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// defaultSettings mirror the table defaults and the PLAN.md settings table.
+// defaultSettings mirror the table defaults and docs/configuration.md.
 func defaultSettings() Settings {
 	return Settings{
 		DefaultCheckName:      "Coolify CI",

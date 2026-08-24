@@ -1,5 +1,6 @@
 // Package executor runs pipeline steps. v1 has one implementation: local
-// processes under a timeout. A Docker executor is the intended second (PLAN.md).
+// processes under a timeout. A Docker executor is the intended second
+// (README "Not in v1").
 package executor
 
 import (

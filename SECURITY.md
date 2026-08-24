@@ -7,7 +7,11 @@ tokens. Treat a running instance as a secrets store, not just a CI worker.
 
 Do **not** open a public issue.
 
-Report privately via GitHub Security Advisories:
+This repository is private. GitHub private vulnerability reporting and
+Security Advisories are not available on it. Email **trivedivatsal005@gmail.com**
+instead.
+
+If the repository is later made public, use GitHub Security Advisories:
 
 https://github.com/trivedi-vatsal/coolify-github-ci/security/advisories/new
 

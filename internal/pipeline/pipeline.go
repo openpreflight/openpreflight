@@ -16,7 +16,7 @@ import (
 )
 
 // Spec is the repo's pipeline file. `runtime` is parsed and reported but ignored
-// until there is a Docker executor (PLAN.md).
+// until there is a Docker executor (README "Not in v1").
 type Spec struct {
 	Runtime string `yaml:"runtime"`
 	Install string `yaml:"install"`
@@ -149,7 +149,7 @@ type packageJSON struct {
 }
 
 // nodeDefaults infers steps from package.json. A missing test or build script is
-// simply not a step — missing scripts are skipped, not failed (PLAN.md).
+// simply not a step — missing scripts are skipped, not failed (README Pipelines).
 func nodeDefaults(repoDir string) ([]Step, error) {
 	raw, err := os.ReadFile(filepath.Join(repoDir, "package.json"))
 	if os.IsNotExist(err) {

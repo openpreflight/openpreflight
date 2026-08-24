@@ -120,7 +120,8 @@ the timeout, the install/test/build commands, and whether logs are shareable.
 
 ## Pipelines
 
-Commit a pipeline file (default `.ci.yml`) to the repo:
+Commit a pipeline file (default `.ci.yml`) to the repo. A copy lives in
+[`examples/.ci.yml`](examples/.ci.yml):
 
 ```yaml
 runtime: node:24     # recorded but ignored until there is a Docker executor

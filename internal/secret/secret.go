@@ -15,7 +15,7 @@ import (
 )
 
 // Box seals and opens values with AES-256-GCM under a key derived from
-// CI_SECRET_KEY. There is no key rotation in v1 (see PLAN.md).
+// CI_SECRET_KEY. There is no key rotation in v1 (README "Not in v1").
 type Box struct {
 	aead cipher.AEAD
 }
