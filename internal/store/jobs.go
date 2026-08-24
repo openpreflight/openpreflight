@@ -9,7 +9,7 @@ import (
 )
 
 const jobCols = `id, COALESCE(binding_id, 0), github_app_id, repo, sha, ref, event, delivery_id,
-	installation_id, check_run_id, check_name, status, conclusion, steps_json, error,
+	installation_id, check_suite_id, check_run_id, check_name, status, conclusion, steps_json, error,
 	log_bytes, shareable_logs, is_fork, pull_number, created_at, started_at, finished_at`
 
 func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
@@ -21,7 +21,7 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 		started, finished sql.NullString
 	)
 	if err := sc.Scan(&j.ID, &j.BindingID, &j.GitHubAppID, &j.Repo, &j.SHA, &j.Ref, &j.Event,
-		&j.DeliveryID, &j.InstallationID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
+		&j.DeliveryID, &j.InstallationID, &j.CheckSuiteID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
 		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &created, &started, &finished); err != nil {
 		return Job{}, err
 	}
@@ -58,6 +58,7 @@ type JobInput struct {
 	Event          string
 	DeliveryID     string
 	InstallationID int64
+	CheckSuiteID   int64
 	CheckName      string
 	ShareableLogs  bool
 	IsFork         bool
@@ -71,11 +72,12 @@ func (s *Store) EnqueueJob(in JobInput) (Job, error) {
 	}
 	id := NewJobID()
 	_, err := s.db.Exec(`INSERT INTO jobs (id, binding_id, github_app_id, repo, sha, ref, event,
-		delivery_id, installation_id, check_name, status, shareable_logs, is_fork, pull_number, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		delivery_id, installation_id, check_suite_id, check_name, status, shareable_logs, is_fork,
+		pull_number, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullInt64(in.BindingID), in.GitHubAppID, in.Repo, in.SHA, in.Ref, in.Event,
-		in.DeliveryID, in.InstallationID, in.CheckName, JobQueued, boolInt(in.ShareableLogs),
-		boolInt(in.IsFork), in.PullNumber, formatTime(now()))
+		in.DeliveryID, in.InstallationID, in.CheckSuiteID, in.CheckName, JobQueued,
+		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, formatTime(now()))
 	if err != nil {
 		return Job{}, fmt.Errorf("store: enqueue job: %w", err)
 	}

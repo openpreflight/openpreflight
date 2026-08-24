@@ -39,6 +39,7 @@ func TestVerifySignature(t *testing.T) {
 const checkSuitePush = `{
   "action": "requested",
   "check_suite": {
+    "id": 5150,
     "head_sha": "1111111111111111111111111111111111111111",
     "head_branch": "main",
     "pull_requests": [],
@@ -62,6 +63,9 @@ func TestParseCheckSuite(t *testing.T) {
 	}
 	if ev.IsFork {
 		t.Fatal("a same-repo branch push is not a fork")
+	}
+	if ev.CheckSuiteID != 5150 {
+		t.Fatalf("check suite id not carried on the check_suite path: %d", ev.CheckSuiteID)
 	}
 }
 
@@ -151,7 +155,7 @@ func TestParseCheckRunRerequestedCarriesAppID(t *testing.T) {
 	  "check_run": {
 	    "id": 900, "head_sha": "cafe1234", "name": "Coolify CI",
 	    "app": {"id": 4242},
-	    "check_suite": {"head_sha":"cafe1234","head_branch": "main", "pull_requests": []}
+	    "check_suite": {"id": 6161, "head_sha":"cafe1234","head_branch": "main", "pull_requests": []}
 	  },
 	  "repository": {"id": 10, "full_name": "winpra/api"},
 	  "installation": {"id": 777}
@@ -165,6 +169,35 @@ func TestParseCheckRunRerequestedCarriesAppID(t *testing.T) {
 	}
 	if ev.Branch != "main" || ev.SHA != "cafe1234" {
 		t.Fatalf("unexpected event: %+v", ev)
+	}
+	// The suite id comes from the nested check_run.check_suite on this path.
+	if ev.CheckSuiteID != 6161 {
+		t.Fatalf("check suite id not carried on the check_run path: %d", ev.CheckSuiteID)
+	}
+}
+
+// A payload with no suite id must parse and stay actionable: the id is recorded
+// for traceability, never load-bearing (ADR 004).
+func TestParseMissingCheckSuiteIDIsStillActionable(t *testing.T) {
+	body := []byte(`{
+	  "action": "rerequested",
+	  "check_run": {
+	    "id": 900, "head_sha": "cafe1234", "name": "openpreflight",
+	    "app": {"id": 4242},
+	    "check_suite": {"head_sha":"cafe1234","head_branch": "main", "pull_requests": []}
+	  },
+	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "installation": {"id": 777}
+	}`)
+	ev, skip, err := Parse(EventCheckRun, body)
+	if err != nil || skip != "" {
+		t.Fatalf("parse: %v %q", err, skip)
+	}
+	if ev.CheckSuiteID != 0 {
+		t.Fatalf("expected a zero suite id, got %d", ev.CheckSuiteID)
+	}
+	if ev.SHA != "cafe1234" {
+		t.Fatalf("a missing suite id must not affect the rest of the event: %+v", ev)
 	}
 }
 

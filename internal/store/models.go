@@ -111,6 +111,7 @@ type Job struct {
 	Event          string     `json:"event"`
 	DeliveryID     string     `json:"delivery_id"`
 	InstallationID int64      `json:"installation_id"`
+	CheckSuiteID   int64      `json:"check_suite_id"`
 	CheckRunID     int64      `json:"check_run_id"`
 	CheckName      string     `json:"check_name"`
 	Status         string     `json:"status"`
