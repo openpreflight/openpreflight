@@ -54,12 +54,19 @@
   <input id="max_workspace_bytes" name="max_workspace_bytes" type="number" min="1048576"
     value="{{.Data.Settings.MaxWorkspaceBytes}}">
 
+  <label for="default_runtime">Default Docker runtime</label>
+  <input id="default_runtime" name="default_runtime" type="text"
+    value="{{.Data.Settings.DefaultRuntime}}" placeholder="node:24">
+  <div class="hint">Used when a pipeline sets <code>runtime:</code>, and required to run fork PRs.
+    Docker is {{if .Data.DockerAvailable}}reachable{{else}}not reachable{{end}}{{if .Data.DockerHost}}
+    (<code>{{.Data.DockerHost}}</code>){{end}}.</div>
+
   <div class="checkrow mt">
     <input id="skip_fork_prs" name="skip_fork_prs" type="checkbox" value="1"
-      {{if .Data.Settings.SkipForkPRs}}checked{{end}} disabled>
+      {{if .Data.Settings.SkipForkPRs}}checked{{end}}>
     <label for="skip_fork_prs">Skip fork pull requests</label>
   </div>
-  <div class="hint">Always on in v1: a fork PR would run untrusted code on this host.</div>
+  <div class="hint">Leave on unless Docker is working and a default runtime is set. Fork jobs always run in Docker.</div>
 
   <div class="actions"><button class="primary" type="submit">Save settings</button></div>
 </form>

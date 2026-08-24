@@ -5,6 +5,7 @@
 package coolify
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -119,6 +120,39 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 	}
 	if err := json.Unmarshal(body, out); err != nil {
 		return fmt.Errorf("coolify: %s did not return the expected JSON (is the base URL the Coolify root?): %w", path, err)
+	}
+	return nil
+}
+
+func (c *Client) post(ctx context.Context, path string, in any, out any) error {
+	body, err := json.Marshal(in)
+	if err != nil {
+		return fmt.Errorf("coolify: encode %s: %w", path, err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("coolify: build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	res, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("coolify: %s: %w", path, err)
+	}
+	defer res.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if err != nil {
+		return fmt.Errorf("coolify: read %s: %w", path, err)
+	}
+	if res.StatusCode < 200 || res.StatusCode > 299 {
+		return &APIError{Status: res.StatusCode, Path: path, Body: string(raw)}
+	}
+	if out == nil || len(raw) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return fmt.Errorf("coolify: %s did not return the expected JSON: %w", path, err)
 	}
 	return nil
 }

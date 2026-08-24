@@ -64,7 +64,9 @@ func (s *Server) pageSettings(w http.ResponseWriter, r *http.Request, user store
 		return
 	}
 	s.render(w, "settings", s.page(w, r, &user, "Settings", "settings", map[string]any{
-		"Settings": settings,
+		"Settings":        settings,
+		"DockerAvailable": s.dockerAvailable(),
+		"DockerHost":      s.cfg.DockerHost,
 	}))
 }
 

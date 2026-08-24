@@ -39,9 +39,7 @@ cd internal/web && npm ci && npm run css
 ## What we will not take yet
 
 Anything listed under **Not in v1** in the README: GitHub Actions YAML,
-`actions/runner`, creating GitHub Apps for you, deploying this worker through
-Coolify's Applications API, remote Docker executors, fork PRs, matrices,
-caches, artifacts, or `CI_SECRET_KEY` rotation.
+`actions/runner`, creating GitHub Apps for you, matrices, caches, or artifacts.
 
 ## Pull requests
 

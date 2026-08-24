@@ -14,6 +14,7 @@ type Settings struct {
 	MaxWorkspaceBytes     int64  `json:"max_workspace_bytes"`
 	LogRetentionDays      int    `json:"log_retention_days"`
 	SkipForkPRs           bool   `json:"skip_fork_prs"`
+	DefaultRuntime        string `json:"default_runtime"`
 }
 
 // User is a configurator admin. v1 has exactly one.
@@ -118,6 +119,8 @@ type Job struct {
 	Error          string     `json:"error"`
 	LogBytes       int64      `json:"log_bytes"`
 	ShareableLogs  bool       `json:"shareable_logs"`
+	IsFork         bool       `json:"is_fork"`
+	PullNumber     int        `json:"pull_number"`
 	CreatedAt      time.Time  `json:"created_at"`
 	StartedAt      *time.Time `json:"started_at"`
 	FinishedAt     *time.Time `json:"finished_at"`

@@ -75,6 +75,7 @@ type Event struct {
 	// on our own; another App's rerequest is not ours to answer.
 	CheckRunAppID int64
 	IsFork        bool
+	PullNumber    int
 	Sender        string
 }
 
@@ -143,6 +144,12 @@ func Parse(eventName string, body []byte) (Event, SkipReason, error) {
 		return ev, "", fmt.Errorf("webhook: %s payload has no head sha", eventName)
 	}
 	ev.IsFork = isFork(raw.Repository, suite, prs)
+	if len(prs) > 0 {
+		ev.PullNumber = prs[0].Number
+		if ev.Branch == "" && prs[0].Head.Ref != "" {
+			ev.Branch = strings.TrimPrefix(prs[0].Head.Ref, "refs/heads/")
+		}
+	}
 	if ev.InstallationID == 0 {
 		return ev, "", fmt.Errorf("webhook: %s payload has no installation id", eventName)
 	}

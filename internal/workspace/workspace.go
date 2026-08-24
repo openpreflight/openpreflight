@@ -63,6 +63,9 @@ type CloneOptions struct {
 	// BaseURL is the git origin root, e.g. https://github.com, or the
 	// GitHub Enterprise host. Empty means github.com.
 	BaseURL string
+	// PullNumber, when set, is used as a fetch fallback for fork PRs
+	// (`refs/pull/N/head` on the base repository).
+	PullNumber int
 }
 
 // Clone fetches exactly one commit and detaches onto it, then removes the
@@ -86,22 +89,26 @@ func (w *Workspace) Clone(ctx context.Context, opts CloneOptions, out io.Writer)
 	}
 	remote := fmt.Sprintf("%s/%s.git", base, opts.Repo)
 
-	steps := [][]string{
-		{"init", "--quiet"},
-		{"remote", "add", "origin", remote},
-		// One commit, no history, no tags: the pipeline only needs this tree.
-		{"fetch", "--no-tags", "--depth", "1", "origin", opts.SHA},
-		{"checkout", "--detach", "--quiet", "FETCH_HEAD"},
-		// Drop the remote so a build script cannot reuse the credential, and so
-		// `git remote -v` in a log shows nothing to reuse.
-		{"remote", "remove", "origin"},
+	if err := w.git(ctx, opts.Token, base, []string{"init", "--quiet"}, out); err != nil {
+		return err
 	}
-	for _, args := range steps {
-		if err := w.git(ctx, opts.Token, base, args, out); err != nil {
+	if err := w.git(ctx, opts.Token, base, []string{"remote", "add", "origin", remote}, out); err != nil {
+		return err
+	}
+	fetchSpec := opts.SHA
+	if err := w.git(ctx, opts.Token, base, []string{"fetch", "--no-tags", "--depth", "1", "origin", fetchSpec}, out); err != nil {
+		if opts.PullNumber <= 0 {
+			return err
+		}
+		ref := fmt.Sprintf("refs/pull/%d/head", opts.PullNumber)
+		if err2 := w.git(ctx, opts.Token, base, []string{"fetch", "--no-tags", "--depth", "1", "origin", ref}, out); err2 != nil {
 			return err
 		}
 	}
-	return nil
+	if err := w.git(ctx, opts.Token, base, []string{"checkout", "--detach", "--quiet", "FETCH_HEAD"}, out); err != nil {
+		return err
+	}
+	return w.git(ctx, opts.Token, base, []string{"remote", "remove", "origin"}, out)
 }
 
 // git runs one git command in the checkout with the auth header supplied

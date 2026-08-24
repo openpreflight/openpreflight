@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/webhook"
@@ -83,13 +84,29 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fork PRs run untrusted code; v1 always skips them.
+	// Fork PRs run untrusted code on the host unless Docker isolation is on.
 	if ev.IsFork && settings.SkipForkPRs {
 		s.log.Info("webhook: fork skipped", "repo", ev.Repo, "sha", ev.SHA)
 		writeJSON(w, http.StatusAccepted, map[string]string{
 			"status": "ignored", "reason": "fork pull requests are not run",
 		})
 		return
+	}
+	if ev.IsFork {
+		if !s.dockerAvailable() {
+			writeJSON(w, http.StatusAccepted, map[string]string{
+				"status": "ignored",
+				"reason": "fork pull requests require a working Docker executor",
+			})
+			return
+		}
+		if strings.TrimSpace(settings.DefaultRuntime) == "" {
+			writeJSON(w, http.StatusAccepted, map[string]string{
+				"status": "ignored",
+				"reason": "fork pull requests require settings.default_runtime",
+			})
+			return
+		}
 	}
 
 	binding, err := s.store.EnabledBinding(app.ID, ev.Repo)
@@ -141,6 +158,8 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		InstallationID: ev.InstallationID,
 		CheckName:      binding.CheckName,
 		ShareableLogs:  binding.ShareableLogs,
+		IsFork:         ev.IsFork,
+		PullNumber:     ev.PullNumber,
 	})
 	if err != nil {
 		s.log.Error("webhook: enqueue", "repo", ev.Repo, "error", err)
