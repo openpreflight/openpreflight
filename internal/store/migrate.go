@@ -131,6 +131,16 @@ ALTER TABLE settings ADD COLUMN default_runtime TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN is_fork INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE jobs ADD COLUMN pull_number INTEGER NOT NULL DEFAULT 0;
 `},
+	// The index is deliberately NOT unique. CancelJob returns as soon as it has
+	// cancelled the context; the 'cancelled' status is written later by the
+	// job's own goroutine, so a partial unique index on the in-flight statuses
+	// would intermittently reject the rerun insert. The one-live-run-per-commit
+	// invariant is an application guard (ADR 004); this index only serves its
+	// lookup.
+	{"0003_check_suite", `
+ALTER TABLE jobs ADD COLUMN check_suite_id INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX idx_jobs_app_repo_sha ON jobs(github_app_id, repo, sha, status);
+`},
 }
 
 func (s *Store) migrate() error {

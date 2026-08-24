@@ -156,6 +156,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		Event:          ev.Name + "." + ev.Action,
 		DeliveryID:     deliveryID,
 		InstallationID: ev.InstallationID,
+		CheckSuiteID:   ev.CheckSuiteID,
 		CheckName:      binding.CheckName,
 		ShareableLogs:  binding.ShareableLogs,
 		IsFork:         ev.IsFork,
