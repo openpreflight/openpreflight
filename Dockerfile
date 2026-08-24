@@ -24,7 +24,7 @@ RUN go build -trimpath -ldflags="-s -w" -o /out/coolify-github-ci ./cmd/server
 # Runtime: git is required to check out commits, and Node is the default
 # pipeline runtime (README Pipelines). Everything runs as a non-root user.
 FROM alpine:3.21
-RUN apk add --no-cache git nodejs npm ca-certificates tini \
+RUN apk add --no-cache git nodejs npm ca-certificates tini docker-cli \
  && addgroup -g 10001 ci \
  && adduser -D -u 10001 -G ci -h /home/ci ci \
  && mkdir -p /data /workspace \

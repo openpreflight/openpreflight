@@ -256,6 +256,53 @@ func (s *Server) deleteCoolify(w http.ResponseWriter, r *http.Request, _ store.U
 		"/coolify", "Instance removed.", "ok")
 }
 
+func (s *Server) installWorker(w http.ResponseWriter, r *http.Request, _ store.User) {
+	id, err := pathID(r)
+	if err != nil {
+		s.badRequest(w, r, err)
+		return
+	}
+	client, inst, err := s.coolifyClient(id)
+	if err != nil {
+		s.notFound(w, r, err)
+		return
+	}
+	in, err := readInput(r)
+	if err != nil {
+		s.badRequest(w, r, err)
+		return
+	}
+	serverUUID := in.Str("server_uuid")
+	if serverUUID == "" {
+		serverUUID = inst.DefaultServerUUID
+	}
+	projectUUID := in.Str("project_uuid")
+	if projectUUID == "" {
+		projectUUID = inst.DefaultProjectUUID
+	}
+	if serverUUID == "" || projectUUID == "" {
+		s.badRequest(w, r, errors.New("server_uuid and project_uuid are required"))
+		return
+	}
+	name := in.Str("name")
+	envName := in.Str("environment_name")
+	uuid, err := client.CreateComposeApplication(r.Context(), coolify.ComposeApplicationInput{
+		Name:            name,
+		ProjectUUID:     projectUUID,
+		ServerUUID:      serverUUID,
+		EnvironmentName: envName,
+		InstantDeploy:   false,
+	})
+	if err != nil {
+		s.reply(w, r, http.StatusBadGateway, map[string]string{"error": err.Error()},
+			"/coolify?inspect="+fmt.Sprintf("%d", id), err.Error(), "err")
+		return
+	}
+	msg := "Created Coolify application " + uuid + ". Set CI_SECRET_KEY on it before deploying."
+	s.reply(w, r, http.StatusCreated, map[string]string{"uuid": uuid},
+		"/coolify?inspect="+fmt.Sprintf("%d", id), msg, "ok")
+}
+
 // notFound answers a missing row on either surface.
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, store.ErrNotFound) {

@@ -53,6 +53,30 @@ func TestPipelineFilePartialStepsOnly(t *testing.T) {
 	}
 }
 
+func TestRuntimeOnlyFileAppliesToFallbackCommands(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, ".ci.yml", "runtime: node:24\ntimeout: 5m\n")
+	writeFile(t, dir, "package.json", `{"scripts":{"test":"jest"}}`)
+	writeFile(t, dir, "package-lock.json", `{}`)
+
+	plan, err := Resolve(dir, ".ci.yml", Overrides{}, 15*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Runtime != "node:24" {
+		t.Fatalf("runtime from a commands-less file must still apply: %q", plan.Runtime)
+	}
+	if plan.Timeout != 5*time.Minute {
+		t.Fatalf("timeout from that file must still apply: %s", plan.Timeout)
+	}
+	if plan.Source != "Node defaults from package.json" {
+		t.Fatalf("source: %q", plan.Source)
+	}
+	if len(plan.Steps) != 2 {
+		t.Fatalf("steps: %+v", plan.Steps)
+	}
+}
+
 func TestBindingOverridesUsedWhenNoFile(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "package.json", `{"scripts":{"test":"jest"}}`)

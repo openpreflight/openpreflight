@@ -260,6 +260,76 @@ func TestWebhookSkipsForkPRs(t *testing.T) {
 	}
 }
 
+func TestWebhookRunsForkWhenEnabled(t *testing.T) {
+	ts := newTestServer(t)
+	ts.dockerOK = func() bool { return true }
+	settings, err := ts.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.SkipForkPRs = false
+	settings.DefaultRuntime = "node:24"
+	if err := ts.store.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	body := fmt.Sprintf(`{
+	  "action": "requested",
+	  "check_suite": {
+	    "head_sha": "abc1234", "head_branch": "patch-1",
+	    "pull_requests": [{"number": 12, "head": {"ref": "patch-1", "repo": {"id": 99, "full_name": "outsider/api"}},
+	                       "base": {"repo": {"id": 10, "full_name": "winpra/api"}}}],
+	    "app": {"id": %d}
+	  },
+	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "installation": {"id": 101}
+	}`, appNumericID)
+	rec := ts.post(t, "ci", "check_suite", "d-fork-run", body)
+	if got := decodeBody(t, rec)["status"]; got != "queued" {
+		t.Fatalf("status %q body %s", got, rec.Body.String())
+	}
+	jobs, err := ts.store.ListJobs(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 || !jobs[0].IsFork || jobs[0].PullNumber != 12 {
+		t.Fatalf("jobs: %+v", jobs)
+	}
+}
+
+func TestWebhookForkRequiresDockerEvenWhenEnabled(t *testing.T) {
+	ts := newTestServer(t)
+	ts.dockerOK = func() bool { return false }
+	settings, err := ts.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.SkipForkPRs = false
+	settings.DefaultRuntime = "node:24"
+	if err := ts.store.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	body := fmt.Sprintf(`{
+	  "action": "requested",
+	  "check_suite": {
+	    "head_sha": "abc1234", "head_branch": "patch-1",
+	    "pull_requests": [{"number": 12, "head": {"repo": {"id": 99, "full_name": "outsider/api"}},
+	                       "base": {"repo": {"id": 10, "full_name": "winpra/api"}}}],
+	    "app": {"id": %d}
+	  },
+	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "installation": {"id": 101}
+	}`, appNumericID)
+	rec := ts.post(t, "ci", "check_suite", "d-fork-nodocker", body)
+	if reason := decodeBody(t, rec)["reason"]; !strings.Contains(reason, "Docker") {
+		t.Fatalf("reason: %q", reason)
+	}
+	if ts.jobCount(t) != 0 {
+		t.Fatal("a fork PR must not run without Docker")
+	}
+}
+
 func TestWebhookBranchAllowList(t *testing.T) {
 	ts := newTestServer(t)
 	ts.store.UpsertBinding(store.BindingInput{

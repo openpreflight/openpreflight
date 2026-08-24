@@ -15,8 +15,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Spec is the repo's pipeline file. `runtime` is parsed and reported but ignored
-// until there is a Docker executor (README "Not in v1").
+// Spec is the repo's pipeline file. `runtime` is a Docker image; empty means
+// the worker process (Node in this image).
 type Spec struct {
 	Runtime string `yaml:"runtime"`
 	Install string `yaml:"install"`
@@ -38,8 +38,7 @@ type Plan struct {
 	// Source says where the plan came from, for the log header and the Check
 	// Run summary.
 	Source string
-	// Runtime is the declared runtime, recorded so the log can say it was
-	// ignored rather than silently dropping it.
+	// Runtime is the declared Docker image. Empty means the host process executor.
 	Runtime string
 }
 
@@ -90,18 +89,20 @@ func Resolve(repoDir, pipelineFile string, ov Overrides, defaultTimeout time.Dur
 		return Plan{}, err
 	}
 	plan := Plan{Timeout: defaultTimeout}
-
-	if found && (spec.Install != "" || spec.Test != "" || spec.Build != "") {
-		plan.Source = pipelineFileName(pipelineFile)
-		plan.Runtime = spec.Runtime
-		plan.Steps = named(spec.Install, spec.Test, spec.Build)
+	if found {
+		plan.Runtime = strings.TrimSpace(spec.Runtime)
 		if spec.Timeout != "" {
 			d, err := ParseDuration(spec.Timeout)
 			if err != nil {
-				return Plan{}, fmt.Errorf("pipeline: %s: %w", plan.Source, err)
+				return Plan{}, fmt.Errorf("pipeline: %s: %w", pipelineFileName(pipelineFile), err)
 			}
 			plan.Timeout = d
 		}
+	}
+
+	if found && (spec.Install != "" || spec.Test != "" || spec.Build != "") {
+		plan.Source = pipelineFileName(pipelineFile)
+		plan.Steps = named(spec.Install, spec.Test, spec.Build)
 		return plan, nil
 	}
 

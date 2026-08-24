@@ -69,6 +69,37 @@ second row.</p>
     {{end}}
   </table></div>
   {{end}}
+
+  <h2>Install this worker on a Coolify server</h2>
+  <p class="muted small">Creates a Docker Compose application via Coolify's API. Set
+    <code>CI_SECRET_KEY</code> on the application before the first deploy. Needs a server UUID and
+    a project UUID (from the instance defaults, or filled in below).</p>
+  <form method="post" action="/api/v1/coolify/{{.Data.Inspect.ID}}/install-worker">
+    {{$.CSRFField}}
+    <div class="row">
+      <div>
+        <label for="install_server_uuid">Server UUID</label>
+        <input id="install_server_uuid" name="server_uuid" type="text"
+          value="{{.Data.Inspect.DefaultServerUUID}}" required>
+      </div>
+      <div>
+        <label for="install_project_uuid">Project UUID</label>
+        <input id="install_project_uuid" name="project_uuid" type="text"
+          value="{{.Data.Inspect.DefaultProjectUUID}}" required>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="install_name">Application name</label>
+        <input id="install_name" name="name" type="text" value="coolify-github-ci">
+      </div>
+      <div>
+        <label for="install_env">Environment</label>
+        <input id="install_env" name="environment_name" type="text" value="production">
+      </div>
+    </div>
+    <div class="actions"><button type="submit">Create application</button></div>
+  </form>
 </div>
 {{end}}
 

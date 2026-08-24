@@ -1,4 +1,4 @@
-runtime: node:24     # recorded but ignored until there is a Docker executor
+runtime: node:24
 install: npm ci
 test: npm test
 build: npm run build

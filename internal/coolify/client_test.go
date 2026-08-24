@@ -19,7 +19,10 @@ func fakeCoolify(t *testing.T, token string, routes map[string]string) *httptest
 			w.Write([]byte(`{"message":"Unauthenticated."}`))
 			return
 		}
-		body, ok := routes[r.URL.Path]
+		body, ok := routes[r.Method+" "+r.URL.Path]
+		if !ok {
+			body, ok = routes[r.URL.Path]
+		}
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`{"message":"Not found."}`))
@@ -141,5 +144,28 @@ func TestNonJSONResponseIsExplained(t *testing.T) {
 	_, err := c.CurrentTeam(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "base URL") {
 		t.Fatalf("expected a base-URL hint, got %v", err)
+	}
+}
+
+func TestCreateComposeApplication(t *testing.T) {
+	srv := fakeCoolify(t, "t", map[string]string{
+		"POST /api/v1/applications/dockercompose": `{"uuid":"app-9"}`,
+	})
+	c := New(srv.URL, "t")
+	uuid, err := c.CreateComposeApplication(context.Background(), ComposeApplicationInput{
+		ProjectUUID: "proj", ServerUUID: "srv", Name: "ci",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uuid != "app-9" {
+		t.Fatalf("uuid %q", uuid)
+	}
+}
+
+func TestCreateComposeApplicationRequiresUUIDs(t *testing.T) {
+	c := New("http://example.invalid", "t")
+	if _, err := c.CreateComposeApplication(context.Background(), ComposeApplicationInput{}); err == nil {
+		t.Fatal("expected an error without project and server uuids")
 	}
 }

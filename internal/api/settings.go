@@ -1,9 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
 )
 
@@ -44,9 +46,19 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 	next.MaxLogBytes = int64(in.Int("max_log_bytes", int(current.MaxLogBytes)))
 	next.MaxWorkspaceBytes = int64(in.Int("max_workspace_bytes", int(current.MaxWorkspaceBytes)))
 	next.LogRetentionDays = in.Int("log_retention_days", current.LogRetentionDays)
-	// Fork PRs are always skipped in v1 (README "Not in v1"); the field exists so the
-	// setting is visible, not adjustable.
-	next.SkipForkPRs = true
+	if in.json != nil {
+		if in.Has("skip_fork_prs") {
+			next.SkipForkPRs = in.Bool("skip_fork_prs")
+		}
+		if in.Has("default_runtime") {
+			next.DefaultRuntime = strings.TrimSpace(in.Str("default_runtime"))
+		}
+	} else {
+		next.SkipForkPRs = in.Bool("skip_fork_prs")
+		if in.Has("default_runtime") {
+			next.DefaultRuntime = strings.TrimSpace(in.Str("default_runtime"))
+		}
+	}
 
 	if next.DefaultCheckName == "" {
 		next.DefaultCheckName = "Coolify CI"
@@ -65,6 +77,22 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 	}
 	if next.LogRetentionDays < 1 {
 		next.LogRetentionDays = 1
+	}
+	if next.DefaultRuntime != "" {
+		if err := executor.ValidImage(next.DefaultRuntime); err != nil {
+			s.badRequest(w, r, err)
+			return
+		}
+	}
+	if !next.SkipForkPRs {
+		if next.DefaultRuntime == "" {
+			s.badRequest(w, r, errors.New("default_runtime is required to run fork pull requests"))
+			return
+		}
+		if !s.dockerAvailable() {
+			s.badRequest(w, r, errors.New("fork pull requests require a working Docker executor"))
+			return
+		}
 	}
 
 	if err := s.store.SaveSettings(next); err != nil {

@@ -23,8 +23,9 @@ before any public write-up.
 
 ## What this project already treats as sensitive
 
-- `CI_SECRET_KEY` — AES-256-GCM key material. Losing it makes stored PEMs and
-  tokens unreadable. There is no rotation in v1.
+- `CI_SECRET_KEY` — AES-256-GCM key material. Losing it (and any
+  `CI_SECRET_KEY_OLD` still needed for a rotate) makes stored PEMs and tokens
+  unreadable. To rotate, boot once with both keys set, then unset the old one.
 - GitHub App PEM and webhook secret (encrypted at rest, redacted on GET).
 - Coolify API tokens (same).
 - Session cookies and Bearer session tokens.
@@ -35,8 +36,10 @@ secret columns. A stolen key plus the database is.
 
 ## Scope notes
 
-- Fork pull requests are skipped on purpose: a pipeline runs the repo's own
-  commands on this host.
+- Fork pull requests are skipped by default. Enabling them requires a reachable
+  Docker engine and `default_runtime`; those jobs always run in Docker
+  (`no-new-privileges`, `cap-drop ALL`, no docker.sock in the job container).
+  That is isolation, not a sandbox VM.
 - `/webhook/{slug}` is public and HMAC-verified. `/health` is public. A
   shareable `/runs/{id}` is public only when that job's binding opted in.
 - Job environments are built from scratch: no `CI_SECRET_KEY`, no PEMs, no

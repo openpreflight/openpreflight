@@ -1,6 +1,4 @@
-// Package executor runs pipeline steps. v1 has one implementation: local
-// processes under a timeout. A Docker executor is the intended second
-// (README "Not in v1").
+// Package executor runs pipeline steps as local processes or as `docker run`.
 package executor
 
 import (
@@ -40,8 +38,8 @@ type Result struct {
 // OK reports whether the step passed (or was skipped, which is not a failure).
 func (r Result) OK() bool { return r.Skipped || (r.ExitCode == 0 && r.Err == "") }
 
-// Executor runs steps. The interface exists so a Docker executor can be added
-// without touching the pipeline.
+// Executor runs steps. Process is the default; Docker is used when the plan
+// names a runtime image or the job is a fork PR.
 type Executor interface {
 	Run(ctx context.Context, step Step, out io.Writer) Result
 }

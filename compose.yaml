@@ -4,13 +4,16 @@ services:
     # Coolify sets this from the service domain; it is also how webhook URLs and
     # the details_url on commit checks are built.
     environment:
-      # Required. Losing it makes every stored PEM and API token unreadable —
-      # there is no rotation in v1. Generate with: openssl rand -base64 48
+      # Required. Generate with: openssl rand -base64 48
+      # Rotation: set CI_SECRET_KEY to the new key and CI_SECRET_KEY_OLD to the
+      # previous one, start once, then unset CI_SECRET_KEY_OLD.
       CI_SECRET_KEY: ${CI_SECRET_KEY:?set CI_SECRET_KEY}
+      CI_SECRET_KEY_OLD: ${CI_SECRET_KEY_OLD:-}
       CI_PUBLIC_BASE_URL: ${CI_PUBLIC_BASE_URL:-}
       # Optional: seeds the admin on first boot so the API can be driven without
       # opening the browser wizard.
       CI_BOOTSTRAP_ADMIN_PASSWORD: ${CI_BOOTSTRAP_ADMIN_PASSWORD:-}
+      CI_DOCKER_HOST: ${CI_DOCKER_HOST:-unix:///var/run/docker.sock}
       LISTEN_ADDR: ":8080"
       DATA_DIR: /data
       WORKSPACE_DIR: /workspace
@@ -22,6 +25,10 @@ services:
       # Per-job checkouts. Disposable, but a volume keeps builds off the
       # container's writable layer.
       - ci-workspace:/workspace
+      # Sibling job containers. Required for `runtime:` and fork PRs.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - ${DOCKER_GID:-998}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s

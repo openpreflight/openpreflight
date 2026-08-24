@@ -42,7 +42,8 @@ type Runner struct {
 	running map[string]context.CancelFunc
 }
 
-// New builds a runner over the local process executor.
+// New builds a runner. Jobs with an empty runtime use the process executor;
+// a pipeline `runtime:` (or a fork job) switches to Docker for that job.
 func New(st *store.Store, cfg config.Config, log *slog.Logger) *Runner {
 	return &Runner{
 		store:   st,
@@ -300,10 +301,11 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 
 	cloneStart := time.Now()
 	if err := ws.Clone(ctx, workspace.CloneOptions{
-		Repo:    job.Repo,
-		SHA:     job.SHA,
-		Token:   token,
-		BaseURL: gitBaseURL(app.APIURL),
+		Repo:       job.Repo,
+		SHA:        job.SHA,
+		Token:      token,
+		BaseURL:    gitBaseURL(app.APIURL),
+		PullNumber: job.PullNumber,
 	}, w); err != nil {
 		msg := fmt.Sprintf("clone failed: %v", err)
 		w.Printf("%s\n", msg)
@@ -345,8 +347,30 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 
 	w.Printf("plan from %s\n", plan.Source)
-	if plan.Runtime != "" {
-		w.Printf("runtime %q is recorded but ignored: v1 runs on the worker image\n", plan.Runtime)
+	image := strings.TrimSpace(plan.Runtime)
+	if job.IsFork && image == "" {
+		image = strings.TrimSpace(settings.DefaultRuntime)
+	}
+	exec := r.exec
+	if image != "" {
+		if err := executor.ValidImage(image); err != nil {
+			w.Printf("%v\n", err)
+			r.fail(job, nil, "", err.Error())
+			complete("failure", nil, err.Error())
+			return err
+		}
+		d := executor.Docker{Host: r.cfg.DockerHost, Image: image}
+		if !d.Available(ctx) {
+			msg := fmt.Sprintf("runtime %q needs Docker, but the engine is not reachable (set CI_DOCKER_HOST or mount docker.sock)", image)
+			w.Printf("%s\n", msg)
+			r.fail(job, nil, "", msg)
+			complete("failure", nil, msg)
+			return errors.New(msg)
+		}
+		exec = d
+		w.Printf("runtime %s via docker\n", image)
+	} else {
+		w.Printf("runtime: worker process\n")
 	}
 	// A pipeline file may set its own timeout, which the outer context does not
 	// know about. Tighten (or extend) here.
@@ -380,7 +404,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 			continue
 		}
 		w.Printf("\n--- %s ---\n$ %s\n", step.Name, step.Command)
-		res := r.exec.Run(stepCtx, executor.Step{
+		res := exec.Run(stepCtx, executor.Step{
 			Name:    step.Name,
 			Command: step.Command,
 			Dir:     ws.Repo,

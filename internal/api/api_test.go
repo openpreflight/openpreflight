@@ -161,13 +161,50 @@ func TestSettingsRejectsNonsenseValues(t *testing.T) {
 	}
 }
 
-func TestForkSkippingCannotBeTurnedOff(t *testing.T) {
+func TestForkSkippingCannotBeTurnedOffWithoutDocker(t *testing.T) {
 	ts := newTestServer(t)
+	ts.dockerOK = func() bool { return false }
 	token := ts.login(t)
-	ts.authed(t, token, http.MethodPatch, "/api/v1/settings", `{"skip_fork_prs":false}`)
+	rec := ts.authed(t, token, http.MethodPatch, "/api/v1/settings",
+		`{"skip_fork_prs":false,"default_runtime":"node:24"}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
 	settings, _ := ts.store.Settings()
 	if !settings.SkipForkPRs {
-		t.Fatal("v1 must always skip fork PRs")
+		t.Fatal("fork PRs must stay skipped until Docker is available")
+	}
+}
+
+func TestForkSkippingCanBeTurnedOffWithDockerAndRuntime(t *testing.T) {
+	ts := newTestServer(t)
+	ts.dockerOK = func() bool { return true }
+	token := ts.login(t)
+	rec := ts.authed(t, token, http.MethodPatch, "/api/v1/settings",
+		`{"skip_fork_prs":false,"default_runtime":"node:24"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	settings, _ := ts.store.Settings()
+	if settings.SkipForkPRs {
+		t.Fatal("fork skipping should be off when Docker and a runtime are configured")
+	}
+	if settings.DefaultRuntime != "node:24" {
+		t.Fatalf("runtime %q", settings.DefaultRuntime)
+	}
+}
+
+func TestForkSkippingCannotBeTurnedOffWithoutRuntime(t *testing.T) {
+	ts := newTestServer(t)
+	ts.dockerOK = func() bool { return true }
+	token := ts.login(t)
+	rec := ts.authed(t, token, http.MethodPatch, "/api/v1/settings", `{"skip_fork_prs":false}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	settings, _ := ts.store.Settings()
+	if !settings.SkipForkPRs {
+		t.Fatal("fork PRs must stay skipped without default_runtime")
 	}
 }
 

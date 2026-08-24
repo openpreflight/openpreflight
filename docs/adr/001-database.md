@@ -19,12 +19,14 @@ changes are append-only migrations in `internal/store`.
 Secret columns (`pem_enc`, `webhook_secret_enc`, `api_token_enc`) are
 AES-256-GCM sealed by `internal/secret` under a key derived from
 `CI_SECRET_KEY` (SHA-256 → 32 bytes). GET responses return a redacted marker.
-There is no key rotation in v1.
+Set `CI_SECRET_KEY_OLD` on boot to re-seal stored columns under the new key,
+then unset it. Lose both keys and the ciphertext is unreadable.
 
 ## Consequences
 
 - A persistent volume on `/data` is mandatory. Lose it and you re-enter Apps
-  and tokens; lose `CI_SECRET_KEY` and the existing ciphertext is unreadable.
+  and tokens; lose `CI_SECRET_KEY` (and any `CI_SECRET_KEY_OLD` still needed)
+  and the existing ciphertext is unreadable.
 - No Postgres/Redis to operate. No horizontal scale: `max_concurrent_jobs`
   is in-process.
 - A stolen database without the key is not a full secret leak. A stolen key

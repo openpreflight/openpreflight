@@ -126,6 +126,11 @@ CREATE INDEX idx_jobs_status ON jobs(status);
 CREATE INDEX idx_jobs_delivery ON jobs(delivery_id);
 CREATE INDEX idx_jobs_repo_ref ON jobs(repo, ref);
 `},
+	{"0002_wave4", `
+ALTER TABLE settings ADD COLUMN default_runtime TEXT NOT NULL DEFAULT '';
+ALTER TABLE jobs ADD COLUMN is_fork INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE jobs ADD COLUMN pull_number INTEGER NOT NULL DEFAULT 0;
+`},
 }
 
 func (s *Store) migrate() error {

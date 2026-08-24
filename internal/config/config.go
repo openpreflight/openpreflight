@@ -22,6 +22,11 @@ type Config struct {
 	BootstrapAdminPassword string
 	// PublicBaseURL seeds the settings row on first boot only.
 	PublicBaseURL string
+	// DockerHost is passed to the docker CLI as DOCKER_HOST. Empty uses the
+	// engine's default (typically the mounted unix socket).
+	DockerHost string
+	// OldSecretKey, when set, re-seals secret columns under SecretKey on boot.
+	OldSecretKey string
 }
 
 // ErrNoSecretKey is returned when CI_SECRET_KEY is absent or too weak.
@@ -39,9 +44,18 @@ func Load() (Config, error) {
 		SecretKey:              os.Getenv("CI_SECRET_KEY"),
 		BootstrapAdminPassword: os.Getenv("CI_BOOTSTRAP_ADMIN_PASSWORD"),
 		PublicBaseURL:          strings.TrimRight(os.Getenv("CI_PUBLIC_BASE_URL"), "/"),
+		OldSecretKey:           os.Getenv("CI_SECRET_KEY_OLD"),
+	}
+	if host := os.Getenv("CI_DOCKER_HOST"); host != "" {
+		c.DockerHost = host
+	} else {
+		c.DockerHost = os.Getenv("DOCKER_HOST")
 	}
 	if len(strings.TrimSpace(c.SecretKey)) < minSecretKeyLen {
 		return Config{}, ErrNoSecretKey
+	}
+	if c.OldSecretKey != "" && len(strings.TrimSpace(c.OldSecretKey)) < minSecretKeyLen {
+		return Config{}, errors.New("CI_SECRET_KEY_OLD is set but shorter than 32 bytes")
 	}
 	if c.DataDir == "" {
 		return Config{}, errors.New("DATA_DIR must not be empty")

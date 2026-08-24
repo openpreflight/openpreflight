@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/config"
+	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/queue"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/web"
@@ -36,6 +37,7 @@ type Server struct {
 	runner   *queue.Runner
 	renderer *web.Renderer
 	log      *slog.Logger
+	dockerOK func() bool
 }
 
 // New builds the server.
@@ -82,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/coolify/{id}", s.guard(s.updateCoolify))
 	mux.HandleFunc("POST /api/v1/coolify/{id}", s.guard(s.updateCoolify))
 	mux.HandleFunc("POST /api/v1/coolify/{id}/test", s.guard(s.testCoolify))
+	mux.HandleFunc("POST /api/v1/coolify/{id}/install-worker", s.guard(s.installWorker))
 	mux.HandleFunc("GET /api/v1/coolify/{id}/servers", s.guard(s.coolifyServers))
 	mux.HandleFunc("GET /api/v1/coolify/{id}/github-apps", s.guard(s.coolifyConnectors))
 	mux.HandleFunc("GET /api/v1/coolify/{id}/repos", s.guard(s.coolifyRepos))
@@ -112,6 +115,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/jobs/{id}/cancel", s.guard(s.cancelJob))
 
 	return s.withRecovery(s.withLogging(mux))
+}
+
+func (s *Server) dockerAvailable() bool {
+	if s.dockerOK != nil {
+		return s.dockerOK()
+	}
+	return executor.Docker{Host: s.cfg.DockerHost}.Ping()
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {

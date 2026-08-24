@@ -51,6 +51,19 @@ func run(log *slog.Logger) error {
 	}
 	defer st.Close()
 
+	if cfg.OldSecretKey != "" {
+		old, err := secret.New(cfg.OldSecretKey)
+		if err != nil {
+			return fmt.Errorf("CI_SECRET_KEY_OLD: %w", err)
+		}
+		n, err := st.RotateSecrets(old)
+		if err != nil {
+			return fmt.Errorf("rotate secrets: %w", err)
+		}
+		log.Info("re-sealed secret columns under CI_SECRET_KEY", "count", n)
+		log.Warn("unset CI_SECRET_KEY_OLD and restart so the previous key is not left in the environment")
+	}
+
 	if err := bootstrapAdmin(st, cfg, log); err != nil {
 		return err
 	}
