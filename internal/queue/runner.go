@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/config"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/githubapp"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/pipeline"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/workspace"
+	"github.com/trivedi-vatsal/openpreflight/internal/config"
+	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/trivedi-vatsal/openpreflight/internal/githubapp"
+	"github.com/trivedi-vatsal/openpreflight/internal/logs"
+	"github.com/trivedi-vatsal/openpreflight/internal/pipeline"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/workspace"
 )
 
 // pollInterval is the fallback for the notify channel: a job enqueued while the
@@ -225,7 +225,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 
 	checkName := job.CheckName
 	if checkName == "" {
-		checkName = firstNonEmpty(app.CheckName, settings.DefaultCheckName, "Coolify CI")
+		checkName = firstNonEmpty(app.CheckName, settings.DefaultCheckName, "openpreflight")
 	}
 	// Persist the resolved name so the Jobs API matches what GitHub shows.
 	if err := r.store.SetJobCheckName(job.ID, checkName); err != nil {

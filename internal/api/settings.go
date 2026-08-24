@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
 )
 
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -61,7 +61,7 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 	}
 
 	if next.DefaultCheckName == "" {
-		next.DefaultCheckName = "Coolify CI"
+		next.DefaultCheckName = "openpreflight"
 	}
 	if next.DefaultPipelineFile == "" {
 		next.DefaultPipelineFile = ".ci.yml"

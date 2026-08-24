@@ -1,4 +1,4 @@
-# coolify-github-ci
+# openpreflight
 
 A small CI provider for private repos: one Go binary that is both a
 **configurator** (add Coolify team tokens, GitHub Apps, repo bindings in a web UI
@@ -25,7 +25,7 @@ what it rejects, and where the ceiling is.
 - [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ```text
-Coolify CI
+openpreflight
 ────────────────────
 ✓ install    8s
 ✓ test      21s
@@ -35,6 +35,15 @@ Passed in 42s
 
 View full logs →
 ```
+
+## Where Coolify fits
+
+Coolify is a supported deployment target and an optional repo source — not the
+product, and not required. Add a team-scoped API token and you get server
+inventory, a repository picker, and a one-click **Install this worker**. Skip it
+entirely and everything else works the same: the checks come from a GitHub App
+you register, and jobs run here or on any Docker engine you point
+`CI_DOCKER_HOST` at.
 
 ## Why a GitHub App
 

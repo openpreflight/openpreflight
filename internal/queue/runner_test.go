@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/config"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/testsupport"
+	"github.com/trivedi-vatsal/openpreflight/internal/config"
+	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/trivedi-vatsal/openpreflight/internal/logs"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/trivedi-vatsal/openpreflight/internal/testsupport"
 )
 
 type harness struct {
@@ -136,7 +136,7 @@ func TestRunnerHappyPath(t *testing.T) {
 	if job.CheckRunID != 555 {
 		t.Fatalf("check run id not recorded: %d", job.CheckRunID)
 	}
-	if job.CheckName != "Coolify CI" {
+	if job.CheckName != "openpreflight" {
 		t.Fatalf("resolved check name not written on the job: %q", job.CheckName)
 	}
 
@@ -144,7 +144,7 @@ func TestRunnerHappyPath(t *testing.T) {
 	if len(created) != 1 {
 		t.Fatalf("expected one Check Run, got %d", len(created))
 	}
-	if created[0].Body["name"] != "Coolify CI" {
+	if created[0].Body["name"] != "openpreflight" {
 		t.Fatalf("check name should fall back to the global default: %v", created[0].Body["name"])
 	}
 	if created[0].Body["head_sha"] != sha {

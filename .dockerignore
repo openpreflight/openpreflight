@@ -4,5 +4,5 @@ data
 workspace
 *.pem
 .env
-coolify-github-ci
+openpreflight
 node_modules

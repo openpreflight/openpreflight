@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
 )
 
 const coolifyCols = `id, name, base_url, api_token_enc, team_id, team_name,

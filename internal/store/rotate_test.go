@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/coolify-github-ci/internal/secret"
+	"github.com/trivedi-vatsal/openpreflight/internal/secret"
 )
 
 func TestRotateSecretsRebindsColumns(t *testing.T) {

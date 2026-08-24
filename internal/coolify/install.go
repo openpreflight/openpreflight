@@ -23,7 +23,7 @@ type ComposeApplicationInput struct {
 // is mounted so jobs can `docker run` on that server.
 func WorkerCompose() string {
 	return `services:
-  coolify-github-ci:
+  openpreflight:
     build: .
     environment:
       CI_SECRET_KEY: ${CI_SECRET_KEY}
@@ -60,7 +60,7 @@ func (c *Client) CreateComposeApplication(ctx context.Context, in ComposeApplica
 		in.EnvironmentName = "production"
 	}
 	if in.Name == "" {
-		in.Name = "coolify-github-ci"
+		in.Name = "openpreflight"
 	}
 	if in.Compose == "" {
 		in.Compose = WorkerCompose()

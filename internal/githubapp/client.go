@@ -119,7 +119,7 @@ func (c *Client) do(ctx context.Context, method, path, authz string, body any, o
 	req.Header.Set("Authorization", authz)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "coolify-github-ci")
+	req.Header.Set("User-Agent", "openpreflight")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
