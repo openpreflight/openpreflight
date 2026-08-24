@@ -16,8 +16,23 @@ func TestSealOpenRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("seal: %v", err)
 		}
-		if pt != "" && strings.Contains(sealed, pt) {
-			t.Fatalf("plaintext leaked into sealed value")
+		if pt == "" {
+			if sealed != "" {
+				t.Fatalf("empty plaintext should seal to empty, got %q", sealed)
+			}
+		} else {
+			if !strings.HasPrefix(sealed, "v1:") {
+				t.Fatalf("sealed value missing v1: prefix: %q", sealed)
+			}
+			if sealed == pt {
+				t.Fatalf("sealed value equals plaintext")
+			}
+			// Short plaintext (e.g. "x") can appear inside base64 by chance.
+			// Only treat a long, structured blob as a leak if it is embedded
+			// wholesale.
+			if len(pt) > 8 && strings.Contains(sealed, pt) {
+				t.Fatalf("plaintext leaked into sealed value")
+			}
 		}
 		got, err := b.Open(sealed)
 		if err != nil {

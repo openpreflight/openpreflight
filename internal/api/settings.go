@@ -44,7 +44,7 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 	next.MaxLogBytes = int64(in.Int("max_log_bytes", int(current.MaxLogBytes)))
 	next.MaxWorkspaceBytes = int64(in.Int("max_workspace_bytes", int(current.MaxWorkspaceBytes)))
 	next.LogRetentionDays = in.Int("log_retention_days", current.LogRetentionDays)
-	// Fork PRs are always skipped in v1 (PLAN.md); the field exists so the
+	// Fork PRs are always skipped in v1 (README "Not in v1"); the field exists so the
 	// setting is visible, not adjustable.
 	next.SkipForkPRs = true
 

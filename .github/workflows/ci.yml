@@ -24,3 +24,11 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build .

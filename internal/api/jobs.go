@@ -69,7 +69,7 @@ func (s *Server) getJobLogs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// rerunJob queues a fresh job for the same commit. Per PLAN.md this is a new job
+// rerunJob queues a fresh job for the same commit. Per the README this is a new job
 // and a new Check Run, never a mutation of the old one.
 func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request, _ store.User) {
 	old, err := s.store.Job(r.PathValue("id"))

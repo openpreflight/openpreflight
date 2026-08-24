@@ -26,7 +26,7 @@ func checkTitle(conclusion string) string {
 	}
 }
 
-// summarise renders the step table from PLAN.md:
+// summarise renders the step table shown in the README:
 //
 //	✓ install   8s
 //	✓ test     21s

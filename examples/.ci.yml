@@ -1,0 +1,5 @@
+runtime: node:24     # recorded but ignored until there is a Docker executor
+install: npm ci
+test: npm test
+build: npm run build
+timeout: 15m
