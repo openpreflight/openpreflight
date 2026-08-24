@@ -1,0 +1,11 @@
+{
+  "name": "coolify-github-ci-web",
+  "private": true,
+  "scripts": {
+    "css": "tailwindcss -i styles/input.css -o static/app.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.12",
+    "tailwindcss": "^4.1.12"
+  }
+}

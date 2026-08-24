@@ -80,6 +80,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/coolify", s.guard(s.listCoolify))
 	mux.HandleFunc("POST /api/v1/coolify", s.guard(s.createCoolify))
 	mux.HandleFunc("PATCH /api/v1/coolify/{id}", s.guard(s.updateCoolify))
+	mux.HandleFunc("POST /api/v1/coolify/{id}", s.guard(s.updateCoolify))
 	mux.HandleFunc("POST /api/v1/coolify/{id}/test", s.guard(s.testCoolify))
 	mux.HandleFunc("GET /api/v1/coolify/{id}/servers", s.guard(s.coolifyServers))
 	mux.HandleFunc("GET /api/v1/coolify/{id}/github-apps", s.guard(s.coolifyConnectors))
@@ -90,6 +91,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/github-apps", s.guard(s.listApps))
 	mux.HandleFunc("POST /api/v1/github-apps", s.guard(s.createApp))
 	mux.HandleFunc("PATCH /api/v1/github-apps/{id}", s.guard(s.updateApp))
+	mux.HandleFunc("POST /api/v1/github-apps/{id}", s.guard(s.updateApp))
 	mux.HandleFunc("POST /api/v1/github-apps/{id}/test", s.guard(s.testApp))
 	mux.HandleFunc("GET /api/v1/github-apps/{id}/repos", s.guard(s.appRepos))
 	mux.HandleFunc("DELETE /api/v1/github-apps/{id}", s.guard(s.deleteApp))
@@ -542,8 +544,12 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	var pageUser *store.User
+	if user, _, ok := s.authenticate(r); ok {
+		pageUser = &user
+	}
 	w.WriteHeader(http.StatusInternalServerError)
-	s.render(w, "error", s.page(w, r, nil, "Error", "", map[string]string{
+	s.render(w, "error", s.page(w, r, pageUser, "Error", "", map[string]string{
 		"Heading": "Something went wrong",
 		"Message": err.Error(),
 	}))

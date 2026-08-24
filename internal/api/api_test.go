@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/logs"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
 )
@@ -332,8 +333,19 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 	token := ts.login(t)
 	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
 	ts.store.EnqueueJob(store.JobInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "abc1234", Ref: "main"})
+	inst, err := ts.store.CreateCoolifyInstance(store.CoolifyInput{
+		Name: "prod", BaseURL: "https://coolify.example.com", APIToken: "1|secret-token-value",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	for _, path := range []string{"/", "/settings", "/coolify", "/github-apps", "/repos", "/jobs"} {
+	paths := []string{
+		"/", "/settings", "/coolify", "/github-apps", "/repos", "/jobs",
+		"/github-apps?edit=" + itoa(ts.app.ID),
+		"/coolify?edit=" + itoa(inst.ID),
+	}
+	for _, path := range paths {
 		req := htmlReq(http.MethodGet, path)
 		req.Header.Set("Authorization", "Bearer "+token)
 		rec := ts.do(req)
@@ -347,6 +359,21 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		}
 		if strings.Contains(body, webhookSecret) {
 			t.Errorf("%s: leaks the webhook secret", path)
+		}
+		if strings.Contains(body, "-----END RSA PRIVATE KEY-----") {
+			t.Errorf("%s: leaks a private key", path)
+		}
+		if strings.Contains(body, "1|secret-token-value") {
+			t.Errorf("%s: leaks the Coolify token", path)
+		}
+	}
+
+	req := htmlReq(http.MethodGet, "/")
+	req.Header.Set("Authorization", "Bearer "+token)
+	home := ts.do(req).Body.String()
+	for _, want := range []string{"Setup", "Public base URL", "CI GitHub App", "Enabled repo", "Coolify"} {
+		if !strings.Contains(home, want) {
+			t.Errorf("overview missing %q", want)
 		}
 	}
 }
@@ -455,6 +482,255 @@ func TestJobLogsAPIHonoursShareableLogs(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("missing job: %d %s", rec.Code, rec.Body.String())
 	}
+}
+
+func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
+	ts := newTestServer(t)
+	rec := ts.do(htmlReq(http.MethodGet, "/setup"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("setup: %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[420px]") {
+		t.Fatalf("setup is missing brand chrome: %s", body)
+	}
+	if strings.Contains(body, "Sign out") {
+		t.Fatal("setup must not show sign-out")
+	}
+
+	ts.login(t)
+	rec = ts.do(htmlReq(http.MethodGet, "/login"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login: %d", rec.Code)
+	}
+	body = rec.Body.String()
+	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[420px]") {
+		t.Fatalf("login is missing brand chrome")
+	}
+	if strings.Contains(body, "Sign out") || strings.Contains(body, ">Overview<") {
+		t.Fatal("login must not show the signed-in nav")
+	}
+}
+
+func TestHTMLPostRenamesGitHubAppWithoutPEM(t *testing.T) {
+	ts := newTestServer(t)
+	session, csrf := ts.cookieAuth(t)
+	pemBefore, err := ts.store.DecryptPEM(ts.app)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := htmlForm(http.MethodPost, "/api/v1/github-apps/"+itoa(ts.app.ID),
+		"name=renamed-ci&slug=ci&app_id="+itoa(appNumericID)+"&api_url=https://api.github.com&csrf="+csrf,
+		session, csrf)
+	rec := ts.do(req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+
+	app, err := ts.store.GitHubApp(ts.app.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.Name != "renamed-ci" {
+		t.Fatalf("name not updated: %+v", app)
+	}
+	pemAfter, err := ts.store.DecryptPEM(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pemAfter != pemBefore {
+		t.Fatal("an empty PEM field rotated the stored key")
+	}
+
+	get := htmlReq(http.MethodGet, "/github-apps?edit="+itoa(ts.app.ID))
+	get.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
+	page := ts.do(get)
+	body := page.Body.String()
+	if page.Code != http.StatusOK || !strings.Contains(body, "renamed-ci") {
+		t.Fatalf("edit page: %d", page.Code)
+	}
+	if !strings.Contains(body, "Leave blank to keep the stored key") {
+		t.Fatal("edit form is missing the keep-PEM hint")
+	}
+	if !strings.Contains(body, "Changing the slug changes the webhook URL") {
+		t.Fatal("edit form is missing the slug-change hint")
+	}
+	if strings.Contains(body, webhookSecret) || strings.Contains(body, "-----END RSA PRIVATE KEY-----") {
+		t.Fatal("edit page leaks secret material")
+	}
+}
+
+func TestJSONPatchGitHubAppStillWorks(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	pemBefore, _ := ts.store.DecryptPEM(ts.app)
+	rec := ts.authed(t, token, http.MethodPatch, "/api/v1/github-apps/"+itoa(ts.app.ID),
+		`{"name":"via-json"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	app, _ := ts.store.GitHubApp(ts.app.ID)
+	if app.Name != "via-json" {
+		t.Fatalf("json patch: %+v", app)
+	}
+	pemAfter, _ := ts.store.DecryptPEM(app)
+	if pemAfter != pemBefore {
+		t.Fatal("json patch rotated the PEM")
+	}
+}
+
+func TestHTMLPostUpdatesCoolifyWithoutToken(t *testing.T) {
+	ts := newTestServer(t)
+	session, csrf := ts.cookieAuth(t)
+	inst, err := ts.store.CreateCoolifyInstance(store.CoolifyInput{
+		Name: "prod", BaseURL: "https://coolify.example.com", APIToken: "1|secret-token-value",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokenBefore, err := ts.store.DecryptCoolifyToken(inst)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := htmlForm(http.MethodPost, "/api/v1/coolify/"+itoa(inst.ID),
+		"name=prod-2&base_url=https://coolify.example.com&csrf="+csrf,
+		session, csrf)
+	rec := ts.do(req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	updated, err := ts.store.CoolifyInstance(inst.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Name != "prod-2" {
+		t.Fatalf("name not updated: %+v", updated)
+	}
+	tokenAfter, err := ts.store.DecryptCoolifyToken(updated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokenAfter != tokenBefore {
+		t.Fatal("an empty token field rotated the stored token")
+	}
+}
+
+func TestRunPageOperatorSurface(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+
+	running, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "abc1234deadbeef", Ref: "main",
+		ShareableLogs: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "def5678deadbeef",
+		ShareableLogs: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	steps, err := json.Marshal([]executor.Result{
+		{Name: "install", Command: "npm ci", ExitCode: 0},
+		{Name: "test", Command: "npm test", ExitCode: 1},
+		{Name: "build", Skipped: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.store.FinishJob(done.ID, store.JobFailure, "failure", string(steps), ""); err != nil {
+		t.Fatal(err)
+	}
+
+	req := htmlReq(http.MethodGet, "/runs/"+running.ID)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("authed running: %d", rec.Code)
+	}
+	if !strings.Contains(body, `http-equiv="refresh"`) {
+		t.Fatal("in-flight run page is missing meta refresh")
+	}
+	if !strings.Contains(body, "/api/v1/jobs/"+running.ID+"/rerun") ||
+		!strings.Contains(body, "/api/v1/jobs/"+running.ID+"/cancel") {
+		t.Fatal("authed run page is missing re-run/cancel")
+	}
+	if !strings.Contains(body, "https://github.com/winpra/api/commit/abc1234deadbeef") {
+		t.Fatal("github.com commit link missing")
+	}
+
+	anon := ts.do(htmlReq(http.MethodGet, "/runs/"+running.ID))
+	anonBody := anon.Body.String()
+	if anon.Code != http.StatusOK {
+		t.Fatalf("shareable running: %d", anon.Code)
+	}
+	if !strings.Contains(anonBody, `http-equiv="refresh"`) {
+		t.Fatal("anonymous in-flight view should still refresh")
+	}
+	if strings.Contains(anonBody, "/rerun") || strings.Contains(anonBody, "/cancel") {
+		t.Fatal("anonymous shareable view must not offer re-run or cancel")
+	}
+
+	donePage := ts.do(htmlReq(http.MethodGet, "/runs/"+done.ID))
+	doneBody := donePage.Body.String()
+	if donePage.Code != http.StatusOK {
+		t.Fatalf("shareable finished: %d", donePage.Code)
+	}
+	if strings.Contains(doneBody, `http-equiv="refresh"`) {
+		t.Fatal("finished job should not refresh")
+	}
+	if !strings.Contains(doneBody, "✓") || !strings.Contains(doneBody, "✗") || !strings.Contains(doneBody, "–") {
+		t.Fatalf("step marks missing from %s", doneBody)
+	}
+}
+
+func TestGitHubCommitURL(t *testing.T) {
+	job := store.Job{Repo: "winpra/api", SHA: "abc1234deadbeef"}
+	if got := githubCommitURL(job, ""); got != "https://github.com/winpra/api/commit/abc1234deadbeef" {
+		t.Fatalf("empty api: %s", got)
+	}
+	if got := githubCommitURL(job, "https://api.github.com"); got != "https://github.com/winpra/api/commit/abc1234deadbeef" {
+		t.Fatalf("dotcom: %s", got)
+	}
+	if got := githubCommitURL(job, "https://ghe.example.com/api/v3"); got != "" {
+		t.Fatalf("ghe should not link: %s", got)
+	}
+}
+
+// cookieAuth signs in through the HTML form and returns the session cookie.
+func (ts *testServer) cookieAuth(t *testing.T) (session, csrf string) {
+	t.Helper()
+	ts.login(t)
+	form := httptest.NewRequest(http.MethodPost, "/api/v1/login",
+		strings.NewReader("username=admin&password=a-long-enough-password"))
+	form.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	form.Header.Set("Accept", "text/html")
+	rec := ts.do(form)
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == sessionCookie {
+			session = c.Value
+		}
+	}
+	if session == "" {
+		t.Fatal("no session cookie issued")
+	}
+	csrf = "test-csrf"
+	return session, csrf
+}
+
+func htmlForm(method, path, body, session, csrf string) *http.Request {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "text/html")
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
+	req.AddCookie(&http.Cookie{Name: csrfCookie, Value: csrf})
+	return req
 }
 
 // itoa keeps the request-literal helpers readable.

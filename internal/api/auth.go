@@ -19,10 +19,12 @@ func (s *Server) pageSetup(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	s.render(w, "setup", s.page(w, r, nil, "Setup", "", map[string]any{
+	p := s.page(w, r, nil, "Setup", "", map[string]any{
 		// Seed the field from the env hint so a Coolify deployment can prefill it.
 		"PublicBaseURL": s.cfg.PublicBaseURL,
-	}))
+	})
+	p.Narrow = true
+	s.render(w, "setup", p)
 }
 
 // handleSetup creates the admin user. It is only reachable while no user exists,
@@ -87,7 +89,9 @@ func (s *Server) pageLogin(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	s.render(w, "login", s.page(w, r, nil, "Sign in", "", nil))
+	p := s.page(w, r, nil, "Sign in", "", nil)
+	p.Narrow = true
+	s.render(w, "login", p)
 }
 
 // handleLogin exchanges credentials for a session. The JSON surface gets the

@@ -19,12 +19,12 @@ ignored, even if its webhook signature is valid.</p>
       <td class="small mono">{{if .Binding.Branches}}{{.Binding.Branches}}{{else}}<span class="muted">all</span>{{end}}</td>
       <td class="small">{{if .Binding.CheckName}}{{.Binding.CheckName}}{{else}}<span class="muted">inherited</span>{{end}}</td>
       <td class="small">{{if .Binding.ShareableLogs}}<span class="pill warn">shareable</span>{{else}}<span class="pill off">private</span>{{end}}</td>
-      <td>
+      <td class="actions-cell">
         <a href="/repos?edit={{.Binding.ID}}">Edit</a>
-        <form method="post" action="/api/v1/bindings/{{.Binding.ID}}/toggle" style="display:inline">
+        <form method="post" action="/api/v1/bindings/{{.Binding.ID}}/toggle">
           {{$.CSRFField}}<button class="link" type="submit">{{if .Binding.Enabled}}Disable{{else}}Enable{{end}}</button>
         </form>
-        <form method="post" action="/api/v1/bindings/{{.Binding.ID}}/delete" style="display:inline"
+        <form method="post" action="/api/v1/bindings/{{.Binding.ID}}/delete"
           onsubmit="return confirm('Remove this binding? The repo stops being checked.')">
           {{$.CSRFField}}<button class="danger" type="submit">Remove</button>
         </form>
@@ -69,16 +69,16 @@ ignored, even if its webhook signature is valid.</p>
         <div class="hint">A Coolify connector's repo list is inventory only; the App above still does
           the webhook, the check and the clone.</div>
       </div>
-      <div style="align-self:end">
+      <div class="end">
         <button type="submit">Load repositories</button>
       </div>
     </div>
   </form>
 
-  {{if .Data.PickerError}}<p class="pill bad" style="margin-top:14px">{{.Data.PickerError}}</p>{{end}}
+  {{if .Data.PickerError}}<p class="pill bad mt">{{.Data.PickerError}}</p>{{end}}
 
   {{if .Data.PickerRepos}}
-  <form method="post" action="/api/v1/bindings/bulk" style="margin-top:18px">
+  <form method="post" action="/api/v1/bindings/bulk" class="mt">
     {{.CSRFField}}
     <input type="hidden" name="github_app_id" value="{{.Data.SelectedAppID}}">
     <input type="hidden" name="coolify_instance_id" value="{{.Data.SelectedCoolifyID}}">
@@ -86,7 +86,7 @@ ignored, even if its webhook signature is valid.</p>
     <div class="checkrow">
       <input type="checkbox" id="repo-{{.FullName}}" name="repo" value="{{.FullName}}"
         {{if .Bound}}checked{{end}}>
-      <label for="repo-{{.FullName}}" style="margin:0" class="mono">{{.FullName}}</label>
+      <label for="repo-{{.FullName}}" class="mono">{{.FullName}}</label>
       {{if .Private}}<span class="pill off small">private</span>{{end}}
       {{if .Bound}}<span class="pill ok small">bound</span>{{end}}
     </div>
@@ -176,15 +176,15 @@ ignored, even if its webhook signature is valid.</p>
           value="{{if .Data.Edit}}{{.Data.Edit.BuildCmd}}{{end}}">
       </div>
     </div>
-    <div class="checkrow" style="margin-top:14px">
+    <div class="checkrow mt">
       <input id="b_enabled" name="enabled" type="checkbox" value="1"
         {{if .Data.Edit}}{{if .Data.Edit.Enabled}}checked{{end}}{{else}}checked{{end}}>
-      <label for="b_enabled" style="margin:0">Enabled</label>
+      <label for="b_enabled">Enabled</label>
     </div>
     <div class="checkrow">
       <input id="b_shareable" name="shareable_logs" type="checkbox" value="1"
         {{if .Data.Edit}}{{if .Data.Edit.ShareableLogs}}checked{{end}}{{end}}>
-      <label for="b_shareable" style="margin:0">Shareable logs</label>
+      <label for="b_shareable">Shareable logs</label>
     </div>
     <div class="hint">Off by default. On, anyone with a job's <code>/runs/{id}</code> link can read its
       full build output without signing in. Job ids are random, but treat the link as a secret.</div>

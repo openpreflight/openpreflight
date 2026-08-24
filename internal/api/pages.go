@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/coolify"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
@@ -75,6 +76,13 @@ func (s *Server) pageCoolify(w http.ResponseWriter, r *http.Request, user store.
 	}
 	data := map[string]any{"Instances": instances}
 
+	if raw := r.URL.Query().Get("edit"); raw != "" {
+		id, _ := strconv.ParseInt(raw, 10, 64)
+		if inst, err := s.store.CoolifyInstance(id); err == nil {
+			data["Edit"] = inst
+		}
+	}
+
 	// ?inspect=N fetches that instance's servers and connectors server-side, so
 	// the page needs no JavaScript.
 	if raw := r.URL.Query().Get("inspect"); raw != "" {
@@ -126,6 +134,13 @@ func (s *Server) pageGitHubApps(w http.ResponseWriter, r *http.Request, user sto
 		return
 	}
 	data := map[string]any{"Apps": apps, "Settings": settings}
+
+	if raw := r.URL.Query().Get("edit"); raw != "" {
+		id, _ := strconv.ParseInt(raw, 10, 64)
+		if app, err := s.store.GitHubApp(id); err == nil {
+			data["Edit"] = app
+		}
+	}
 
 	if raw := r.URL.Query().Get("inspect"); raw != "" {
 		id, convErr := strconv.ParseInt(raw, 10, 64)
@@ -352,12 +367,43 @@ func (s *Server) pageRun(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"job": job, "steps": steps, "log": body})
 		return
 	}
-	s.render(w, "run", s.page(w, r, pageUser, job.Repo, "jobs", map[string]any{
-		"Job":    job,
-		"Steps":  steps,
-		"Log":    body,
-		"Shared": !authed,
-	}))
+	p := s.page(w, r, pageUser, job.Repo, "jobs", map[string]any{
+		"Job":       job,
+		"Steps":     steps,
+		"Log":       body,
+		"Shared":    !authed,
+		"CommitURL": githubCommitURL(job, s.appAPIURL(job.GitHubAppID)),
+	})
+	if job.InFlight() {
+		p.RefreshSeconds = 3
+	}
+	s.render(w, "run", p)
+}
+
+// appAPIURL is the GitHub API base for the App that owns a job. Missing Apps
+// (deleted after the job ran) return "" which githubCommitURL treats as github.com.
+func (s *Server) appAPIURL(appID int64) string {
+	if appID == 0 {
+		return ""
+	}
+	app, err := s.store.GitHubApp(appID)
+	if err != nil {
+		return ""
+	}
+	return app.APIURL
+}
+
+// githubCommitURL links a SHA on github.com only. GitHub Enterprise hosts are
+// left as plain text because the HTML URL is not the API URL.
+func githubCommitURL(job store.Job, apiURL string) string {
+	if job.Repo == "" || job.SHA == "" {
+		return ""
+	}
+	apiURL = strings.TrimRight(strings.TrimSpace(apiURL), "/")
+	if apiURL != "" && apiURL != "https://api.github.com" {
+		return ""
+	}
+	return "https://github.com/" + job.Repo + "/commit/" + job.SHA
 }
 
 func orUnknown(v, fallback string) string {

@@ -1,5 +1,6 @@
-// Package web renders the server-side HTML configurator. There is no separate
-// frontend and no JavaScript beyond a select that submits its own form.
+// Package web renders the server-side HTML configurator. Styles are Tailwind,
+// compiled into static/app.css and inlined at render time. There is no separate
+// frontend and no JavaScript beyond tiny attributes (onchange, onsubmit, onfocus).
 package web
 
 import (
@@ -10,11 +11,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/trivedi-vatsal/coolify-github-ci/internal/executor"
 	"github.com/trivedi-vatsal/coolify-github-ci/internal/store"
 )
 
+//go:generate npm run css
+
 //go:embed templates/*.html
 var files embed.FS
+
+//go:embed static/app.css
+var appCSS string
 
 // pages are the content templates, each compiled together with the layout.
 var pages = []string{
@@ -29,13 +36,16 @@ type Renderer struct {
 
 // Page is the data every template receives.
 type Page struct {
-	Title     string
-	Nav       string
-	User      *store.User
-	Flash     string
-	FlashKind string // ok | err
-	CSRFField template.HTML
-	Data      any
+	Title          string
+	Nav            string
+	User           *store.User
+	Flash          string
+	FlashKind      string // ok | err
+	CSRFField      template.HTML
+	CSS            template.CSS // compiled Tailwind; set by Render
+	Data           any
+	Narrow         bool // login / setup: narrower main column
+	RefreshSeconds int  // meta-refresh while a job is in flight
 }
 
 // New compiles the templates. It fails at startup rather than on first request.
@@ -58,6 +68,7 @@ func (r *Renderer) Render(w io.Writer, page string, data Page) error {
 	if !ok {
 		return fmt.Errorf("web: no template %q", page)
 	}
+	data.CSS = template.CSS(appCSS)
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		return fmt.Errorf("web: render %s: %w", page, err)
 	}
@@ -74,6 +85,7 @@ func funcs() template.FuncMap {
 		},
 		"ago":      ago,
 		"duration": humanDuration,
+		"stepMark": stepMark,
 		"statusPill": func(j store.Job) template.HTML {
 			class, label := "off", j.Status
 			switch j.Status {
@@ -124,6 +136,19 @@ func ago(t time.Time) string {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	default:
 		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
+
+// stepMark matches queue/summary.go so the run page and the GitHub check
+// output use the same ✓ / ✗ / – marks.
+func stepMark(r executor.Result) string {
+	switch {
+	case r.Skipped:
+		return "–"
+	case r.OK():
+		return "✓"
+	default:
+		return "✗"
 	}
 }
 
