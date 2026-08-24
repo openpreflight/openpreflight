@@ -1,0 +1,27 @@
+name: Feature
+description: A gap in v1, or a change to existing behaviour
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check **Not in v1** in the README first. Those items are deferred on purpose.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is painful or missing today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: A concrete change, not a rewrite. Stay inside one process and SQLite unless you are arguing for a new ADR.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

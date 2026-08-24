@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/trivedi-vatsal/coolify-github-ci/security/advisories/new
+    about: Private disclosure only. Do not file a public issue for secrets, auth, or webhook bypasses.
+  - name: Documentation
+    url: https://github.com/trivedi-vatsal/coolify-github-ci/blob/main/docs/architecture.md
+    about: Architecture, configuration, development, and deployment notes.

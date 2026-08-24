@@ -1,0 +1,36 @@
+name: Bug
+description: Something does not work as documented
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If this is about leaked secrets, auth bypass, or webhook verification, stop and use a [private advisory](https://github.com/trivedi-vatsal/coolify-github-ci/security/advisories/new).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "main @ abc123, or image tag"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Process logs or a Check Run summary. Redact PEMs, tokens, and CI_SECRET_KEY.
+      render: text

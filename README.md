@@ -8,6 +8,14 @@ on the exact commit, report one Check Run with full logs).
 This is not GitHub Actions and not `actions/runner`. It writes the same commit
 checks you already see on a PR, using your own GitHub App.
 
+## Documentation
+
+- [Architecture](docs/architecture.md) and [ADRs](docs/adr/)
+- [Configuration](docs/configuration.md)
+- [Development](docs/development.md) · [Contributing](CONTRIBUTING.md)
+- [Deployment](docs/deployment.md)
+- [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
+
 ```text
 Coolify CI
 ────────────────────
@@ -238,6 +246,8 @@ artifacts, and `CI_SECRET_KEY` rotation.
 
 ## Development
 
+See [docs/development.md](docs/development.md) for CSS rebuilds and layout rules.
+
 ```bash
 go build ./...
 go test ./...
@@ -250,3 +260,7 @@ CI_SECRET_KEY="$(openssl rand -base64 48)" DATA_DIR=./data WORKSPACE_DIR=./works
 Tests need no network and no credentials: the Coolify and GitHub APIs are faked,
 and clone/pipeline tests run against a real `git-http-backend` server over a
 fixture repository.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
