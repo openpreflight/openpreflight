@@ -177,7 +177,7 @@ func (s *Store) InFlightJobForDelivery(deliveryID string) (Job, error) {
 // InFlightJobForSuite finds the queued or running job for one commit of one
 // App. GitHub creates at most one check suite per (App, commit), so this is the
 // "is the suite already running" question, keyed on data we always have —
-// unlike check_suite_id, which is recorded but may be absent (ADR 004).
+// unlike check_suite_id, which is recorded but may be absent (ADR 005).
 //
 // Keyed on (github_app_id, repo, sha) and not on ref: the same commit can arrive
 // on a second branch, which is exactly the duplicate InFlightJobsForRef cannot

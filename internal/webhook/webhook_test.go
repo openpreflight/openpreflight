@@ -177,7 +177,7 @@ func TestParseCheckRunRerequestedCarriesAppID(t *testing.T) {
 }
 
 // A payload with no suite id must parse and stay actionable: the id is recorded
-// for traceability, never load-bearing (ADR 004).
+// for traceability, never load-bearing (ADR 005).
 func TestParseMissingCheckSuiteIDIsStillActionable(t *testing.T) {
 	body := []byte(`{
 	  "action": "rerequested",

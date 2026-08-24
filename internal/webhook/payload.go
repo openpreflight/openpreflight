@@ -77,7 +77,7 @@ type Event struct {
 	CheckRunAppID int64
 	// CheckSuiteID is GitHub's id for the suite this delivery belongs to. It is
 	// recorded for traceability only — the one-live-run-per-commit guard keys on
-	// (app, repo, sha), so a zero id here cannot weaken it (ADR 004).
+	// (app, repo, sha), so a zero id here cannot weaken it (ADR 005).
 	CheckSuiteID int64
 	IsFork       bool
 	PullNumber   int
