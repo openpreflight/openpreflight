@@ -226,7 +226,7 @@ func TestCreateAndCompleteCheckRun(t *testing.T) {
 	c := newTestClient(t, f.srv.URL)
 
 	run, err := c.CreateCheckRun(context.Background(), 101, CreateCheckRunInput{
-		Repo: "winpra/api", Name: "Coolify CI", HeadSHA: "abc123",
+		Repo: "winpra/api", Name: "openpreflight", HeadSHA: "abc123",
 		DetailsURL: "https://ci.example.com/runs/job-1",
 		Output:     &CheckOutput{Title: "Running", Summary: "starting"},
 	})

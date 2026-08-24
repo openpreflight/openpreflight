@@ -9,7 +9,7 @@ import (
 )
 
 const jobCols = `id, COALESCE(binding_id, 0), github_app_id, repo, sha, ref, event, delivery_id,
-	installation_id, check_run_id, check_name, status, conclusion, steps_json, error,
+	installation_id, check_suite_id, check_run_id, check_name, status, conclusion, steps_json, error,
 	log_bytes, shareable_logs, is_fork, pull_number, created_at, started_at, finished_at`
 
 func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
@@ -21,7 +21,7 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 		started, finished sql.NullString
 	)
 	if err := sc.Scan(&j.ID, &j.BindingID, &j.GitHubAppID, &j.Repo, &j.SHA, &j.Ref, &j.Event,
-		&j.DeliveryID, &j.InstallationID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
+		&j.DeliveryID, &j.InstallationID, &j.CheckSuiteID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
 		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &created, &started, &finished); err != nil {
 		return Job{}, err
 	}
@@ -58,6 +58,7 @@ type JobInput struct {
 	Event          string
 	DeliveryID     string
 	InstallationID int64
+	CheckSuiteID   int64
 	CheckName      string
 	ShareableLogs  bool
 	IsFork         bool
@@ -71,11 +72,12 @@ func (s *Store) EnqueueJob(in JobInput) (Job, error) {
 	}
 	id := NewJobID()
 	_, err := s.db.Exec(`INSERT INTO jobs (id, binding_id, github_app_id, repo, sha, ref, event,
-		delivery_id, installation_id, check_name, status, shareable_logs, is_fork, pull_number, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		delivery_id, installation_id, check_suite_id, check_name, status, shareable_logs, is_fork,
+		pull_number, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullInt64(in.BindingID), in.GitHubAppID, in.Repo, in.SHA, in.Ref, in.Event,
-		in.DeliveryID, in.InstallationID, in.CheckName, JobQueued, boolInt(in.ShareableLogs),
-		boolInt(in.IsFork), in.PullNumber, formatTime(now()))
+		in.DeliveryID, in.InstallationID, in.CheckSuiteID, in.CheckName, JobQueued,
+		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, formatTime(now()))
 	if err != nil {
 		return Job{}, fmt.Errorf("store: enqueue job: %w", err)
 	}
@@ -168,6 +170,30 @@ func (s *Store) InFlightJobForDelivery(deliveryID string) (Job, error) {
 	}
 	if err != nil {
 		return Job{}, fmt.Errorf("store: delivery lookup: %w", err)
+	}
+	return j, nil
+}
+
+// InFlightJobForSuite finds the queued or running job for one commit of one
+// App. GitHub creates at most one check suite per (App, commit), so this is the
+// "is the suite already running" question, keyed on data we always have —
+// unlike check_suite_id, which is recorded but may be absent (ADR 005).
+//
+// Keyed on (github_app_id, repo, sha) and not on ref: the same commit can arrive
+// on a second branch, which is exactly the duplicate InFlightJobsForRef cannot
+// see.
+func (s *Store) InFlightJobForSuite(appID int64, repo, sha string) (Job, error) {
+	if repo == "" || sha == "" {
+		return Job{}, ErrNotFound
+	}
+	j, err := scanJob(s.db.QueryRow(`SELECT `+jobCols+` FROM jobs
+		WHERE github_app_id = ? AND repo = ? AND sha = ? AND status IN (?, ?)
+		ORDER BY created_at DESC LIMIT 1`, appID, repo, sha, JobQueued, JobInProgress))
+	if errors.Is(err, sql.ErrNoRows) {
+		return Job{}, ErrNotFound
+	}
+	if err != nil {
+		return Job{}, fmt.Errorf("store: suite lookup: %w", err)
 	}
 	return j, nil
 }

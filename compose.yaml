@@ -1,5 +1,5 @@
 services:
-  coolify-github-ci:
+  openpreflight:
     build: .
     # Coolify sets this from the service domain; it is also how webhook URLs and
     # the details_url on commit checks are built.
