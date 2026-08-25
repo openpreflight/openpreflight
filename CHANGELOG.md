@@ -31,7 +31,7 @@ v1 of the configurator and worker in one Go binary.
 - One live run per `(app, repo, sha)`. A `check_suite.requested` delivery for a
   commit already in flight is answered `already queued`; a `rerequested` one
   cancels that run and enqueues a fresh one.
-- [ADR 005](docs/adr/005-check-suite-gating.md) records the trigger model:
+- [ADR 005](https://docs.openpreflight.xyz/adr/005-check-suite-gating/) records the trigger model:
   `check_suite`/`check_run` only, one Check Run per job, Zuul as the referenced
   model with its architecture rejected.
 

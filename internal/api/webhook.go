@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
-	"github.com/trivedi-vatsal/openpreflight/internal/webhook"
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/webhook"
 )
 
 // maxWebhookBody caps what we read. GitHub payloads are well under this; the

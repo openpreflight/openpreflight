@@ -1,4 +1,4 @@
-module github.com/trivedi-vatsal/openpreflight
+module github.com/openpreflight/openpreflight
 
 go 1.26.5
 

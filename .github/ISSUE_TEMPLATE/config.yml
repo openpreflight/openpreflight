@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security report
-    url: https://github.com/trivedi-vatsal/coolify-github-ci/blob/main/SECURITY.md
+    url: https://github.com/openpreflight/openpreflight/blob/main/SECURITY.md
     about: Private disclosure only (email while this repo is private). Do not file a public issue for secrets, auth, or webhook bypasses.
   - name: Documentation
-    url: https://github.com/trivedi-vatsal/coolify-github-ci/blob/main/docs/architecture.md
+    url: https://docs.openpreflight.xyz/understanding/architecture/
     about: Architecture, configuration, development, and deployment notes.

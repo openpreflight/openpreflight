@@ -11,7 +11,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/secret"
 )
 
 // ErrNotFound is returned by the Get* helpers when a row is absent.

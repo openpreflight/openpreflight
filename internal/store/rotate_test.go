@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/secret"
 )
 
 func TestRotateSecretsRebindsColumns(t *testing.T) {

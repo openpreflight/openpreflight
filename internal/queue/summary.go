@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/executor"
 )
 
 // checkTitle is the one-line title GitHub shows next to the check name.

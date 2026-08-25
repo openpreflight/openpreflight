@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 func (s *Server) getSettings(w http.ResponseWriter, r *http.Request, _ store.User) {

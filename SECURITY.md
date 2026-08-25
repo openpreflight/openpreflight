@@ -13,7 +13,7 @@ instead.
 
 If the repository is later made public, use GitHub Security Advisories:
 
-https://github.com/trivedi-vatsal/coolify-github-ci/security/advisories/new
+https://github.com/openpreflight/openpreflight/security/advisories/new
 
 Include enough to reproduce: the endpoint or UI path, what you sent, and what
 you observed. Do not attach live PEMs, tokens, or a copy of `ci.db`.
