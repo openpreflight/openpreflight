@@ -7,13 +7,12 @@ tokens. Treat a running instance as a secrets store, not just a CI worker.
 
 Do **not** open a public issue.
 
-This repository is private. GitHub private vulnerability reporting and
-Security Advisories are not available on it. Email **trivedivatsal005@gmail.com**
-instead.
-
-If the repository is later made public, use GitHub Security Advisories:
+Prefer GitHub Security Advisories:
 
 https://github.com/openpreflight/openpreflight/security/advisories/new
+
+If you cannot use advisories (for example while the repository is private),
+email **trivedivatsal005@gmail.com** instead.
 
 Include enough to reproduce: the endpoint or UI path, what you sent, and what
 you observed. Do not attach live PEMs, tokens, or a copy of `ci.db`.
