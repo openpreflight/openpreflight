@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 // errNoApp is returned when the picker posts without an App: a binding cannot

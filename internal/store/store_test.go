@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/secret"
 )
 
 // testKey is a fixture key: tests never depend on a real CI_SECRET_KEY.

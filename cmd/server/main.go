@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/api"
-	"github.com/trivedi-vatsal/openpreflight/internal/config"
-	"github.com/trivedi-vatsal/openpreflight/internal/queue"
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/api"
+	"github.com/openpreflight/openpreflight/internal/config"
+	"github.com/openpreflight/openpreflight/internal/queue"
+	"github.com/openpreflight/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 func main() {

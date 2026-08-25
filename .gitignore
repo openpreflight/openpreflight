@@ -1,8 +1,16 @@
+# Runtime state
 /data/
 /workspace/
 .env
 *.pem
 /openpreflight
 /tmp/
+
+# Local planning notes
 .plans/*
+
+# Node — internal/web (Tailwind for the Go UI)
 node_modules/
+dist/
+
+.DS_Store

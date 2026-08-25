@@ -14,10 +14,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/config"
-	"github.com/trivedi-vatsal/openpreflight/internal/queue"
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/config"
+	"github.com/openpreflight/openpreflight/internal/queue"
+	"github.com/openpreflight/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 const (

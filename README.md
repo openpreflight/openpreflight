@@ -13,15 +13,19 @@ systems; this one is a binary and a SQLite file on a box you already pay for.
 
 Runs are gated on the commit, the way Zuul does it — trigger on the check suite,
 build the immutable SHA, one live run per commit, result written back as a Check
-Run. See [ADR 005](docs/adr/005-check-suite-gating.md) for what that borrows,
+Run. See [ADR 005](https://docs.openpreflight.xyz/adr/005-check-suite-gating/) for what that borrows,
 what it rejects, and where the ceiling is.
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) and [ADRs](docs/adr/)
-- [Configuration](docs/configuration.md)
-- [Development](docs/development.md) · [Contributing](CONTRIBUTING.md)
-- [Deployment](docs/deployment.md)
+Published at **[docs.openpreflight.xyz](https://docs.openpreflight.xyz)** and
+written in [openpreflight/docs](https://github.com/openpreflight/docs). A change
+here that alters behaviour needs a pull request there alongside it.
+
+- [Architecture](https://docs.openpreflight.xyz/understanding/architecture/) and [ADRs](https://docs.openpreflight.xyz/adr/005-check-suite-gating/)
+- [Configuration](https://docs.openpreflight.xyz/start/configuration/)
+- [Development](https://docs.openpreflight.xyz/contributing/development/) · [Contributing](CONTRIBUTING.md)
+- [Deployment](https://docs.openpreflight.xyz/understanding/deployment/)
 - [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ```text
@@ -35,6 +39,31 @@ Passed in 42s
 
 View full logs →
 ```
+
+## Repository layout
+
+This repository is the binary and nothing else. The prose and the two sites are
+their own repositories under the [openpreflight](https://github.com/openpreflight)
+org.
+
+```text
+cmd/server/          entrypoint
+internal/            the whole implementation — no pkg/, nothing importable
+  web/               templates, Tailwind styles, and the embedded static assets
+examples/            a sample .ci.yml
+.github/workflows/   ci.yml — Go vet, test, and a Docker build; gates merges
+```
+
+| Repo | What it is |
+|---|---|
+| **openpreflight** (here) | The Go binary — configurator and worker |
+| [docs](https://github.com/openpreflight/docs) | Astro Starlight → [docs.openpreflight.xyz](https://docs.openpreflight.xyz) |
+| [website](https://github.com/openpreflight/website) | Astro marketing → [openpreflight.xyz](https://openpreflight.xyz) |
+| [.github](https://github.com/openpreflight/.github) | The org landing page |
+
+`internal/web` carries the one `package.json` in this repo, and it exists only
+to compile Tailwind for the Go UI. The Dockerfile installs it in an isolated
+stage, so it must stay standalone rather than becoming part of a workspace.
 
 ## Where Coolify fits
 
@@ -286,7 +315,10 @@ caches, and artifacts. Jobs on another machine use `CI_DOCKER_HOST` /
 
 ## Development
 
-See [docs/development.md](docs/development.md) for CSS rebuilds and layout rules.
+See [Development](https://docs.openpreflight.xyz/contributing/development/) for
+CSS rebuilds and layout rules. The two Astro sites build from their own
+repositories — [docs](https://github.com/openpreflight/docs) and
+[website](https://github.com/openpreflight/website).
 
 ```bash
 go build ./...

@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/config"
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
-	"github.com/trivedi-vatsal/openpreflight/internal/queue"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
-	"github.com/trivedi-vatsal/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/config"
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/queue"
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/web"
 )
 
 const (

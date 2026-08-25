@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/config"
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
-	"github.com/trivedi-vatsal/openpreflight/internal/githubapp"
-	"github.com/trivedi-vatsal/openpreflight/internal/logs"
-	"github.com/trivedi-vatsal/openpreflight/internal/pipeline"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
-	"github.com/trivedi-vatsal/openpreflight/internal/workspace"
+	"github.com/openpreflight/openpreflight/internal/config"
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/githubapp"
+	"github.com/openpreflight/openpreflight/internal/logs"
+	"github.com/openpreflight/openpreflight/internal/pipeline"
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/workspace"
 )
 
 // pollInterval is the fallback for the notify channel: a job enqueued while the

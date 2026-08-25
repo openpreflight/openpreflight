@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/config"
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
-	"github.com/trivedi-vatsal/openpreflight/internal/logs"
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
-	"github.com/trivedi-vatsal/openpreflight/internal/testsupport"
+	"github.com/openpreflight/openpreflight/internal/config"
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/logs"
+	"github.com/openpreflight/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/testsupport"
 )
 
 type harness struct {

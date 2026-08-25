@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/secret"
+	"github.com/openpreflight/openpreflight/internal/secret"
 )
 
 const ghCols = `id, name, slug, app_id, pem_enc, webhook_secret_enc, api_url, check_name,

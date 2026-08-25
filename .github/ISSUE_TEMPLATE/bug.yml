@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        If this is about leaked secrets, auth bypass, or webhook verification, stop and use a [private advisory](https://github.com/trivedi-vatsal/coolify-github-ci/security/advisories/new).
+        If this is about leaked secrets, auth bypass, or webhook verification, stop and use a [private advisory](https://github.com/openpreflight/openpreflight/security/advisories/new).
   - type: textarea
     id: what
     attributes:

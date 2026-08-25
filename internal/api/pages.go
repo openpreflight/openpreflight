@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/coolify"
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
-	"github.com/trivedi-vatsal/openpreflight/internal/githubapp"
-	"github.com/trivedi-vatsal/openpreflight/internal/logs"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/coolify"
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/githubapp"
+	"github.com/openpreflight/openpreflight/internal/logs"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user store.User) {

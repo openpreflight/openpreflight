@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/executor"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 //go:generate npm run css

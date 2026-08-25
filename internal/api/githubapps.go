@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/trivedi-vatsal/openpreflight/internal/githubapp"
-	"github.com/trivedi-vatsal/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/githubapp"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 // appClient builds a GitHub client for a stored App row.
