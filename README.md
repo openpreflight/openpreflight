@@ -1,10 +1,16 @@
 <div align="center">
 
-<img src="https://openpreflight.xyz/apple-touch-icon.png" alt="openpreflight" width="72" height="72" />
-
-# openpreflight
-
-**A small CI provider for private repos.**
+<picture>
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="https://openpreflight.xyz/banner-dark.png"
+  />
+  <img
+    src="https://openpreflight.xyz/banner-light.png"
+    alt="openpreflight — a small CI provider for private repos. One Go binary, one SQLite file, one Check Run per commit."
+    width="880"
+  />
+</picture>
 
 [![Website](https://img.shields.io/badge/website-openpreflight.xyz-2f6f4f?style=flat-square)](https://openpreflight.xyz)
 [![Docs](https://img.shields.io/badge/docs-docs.openpreflight.xyz-2f6f4f?style=flat-square)](https://docs.openpreflight.xyz)
@@ -12,18 +18,6 @@
 [![Go](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
 
 One Go binary that is both a **configurator** — GitHub Apps and repo bindings in a web UI or over JSON — and a **worker** that receives webhooks, runs install/test/build on the exact commit, and reports one Check Run with full logs.
-
-```text
-openpreflight
-────────────────────
-✓ install    8s
-✓ test      21s
-✓ build     13s
-
-Passed in 42s
-
-View full logs →
-```
 
 [Website](https://openpreflight.xyz) · [Documentation](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/start/quickstart/)
 
