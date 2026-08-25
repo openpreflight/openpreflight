@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package coolify talks to one Coolify instance with one team-scoped API token.
 //
 // Every token is scoped to a single team, so a Client sees that team's servers

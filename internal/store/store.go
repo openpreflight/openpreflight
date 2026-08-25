@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package store is the SQLite persistence layer. The driver is
 // modernc.org/sqlite (pure Go) so the image can stay CGO_ENABLED=0.
 package store

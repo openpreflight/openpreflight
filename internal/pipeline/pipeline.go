@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package pipeline decides what commands a job runs: the repo's pipeline file,
 // else the binding's command overrides, else Node defaults inferred from
 // package.json.

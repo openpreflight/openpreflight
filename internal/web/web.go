@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package web renders the server-side HTML configurator. Styles are Tailwind,
 // compiled into static/app.css and inlined at render time. There is no separate
 // frontend and no JavaScript beyond tiny attributes (onchange, onsubmit, onfocus).

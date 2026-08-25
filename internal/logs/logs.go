@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package logs owns the per-job log file: a size-capped writer plus reading and
 // pruning.
 package logs

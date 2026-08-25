@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package executor runs pipeline steps as local processes or as `docker run`.
 package executor
 

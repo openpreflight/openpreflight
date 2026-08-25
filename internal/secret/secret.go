@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package secret encrypts the secret columns (GitHub PEMs, webhook secrets,
 // Coolify API tokens) so a stolen ci.db is not a full compromise.
 package secret

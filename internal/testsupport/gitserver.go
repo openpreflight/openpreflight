@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package testsupport provides fixtures shared by tests in several packages: a
 // real git-over-HTTP server and a fake GitHub API. It is test-only scaffolding
 // and is never imported by the server binary.

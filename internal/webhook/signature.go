@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package webhook verifies GitHub App webhook deliveries and normalises the
 // events we act on (check_suite, check_run).
 package webhook

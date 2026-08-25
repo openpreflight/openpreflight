@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package queue runs queued jobs: Check Run, clone, pipeline, logs, cleanup.
 package queue
 

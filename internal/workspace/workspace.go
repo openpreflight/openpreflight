@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package workspace prepares a per-job checkout and clones the exact SHA.
 package workspace
 

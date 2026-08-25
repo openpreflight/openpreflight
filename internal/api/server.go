@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package api serves both surfaces: the HTML configurator and the JSON API,
 // plus the public webhook and log endpoints.
 package api

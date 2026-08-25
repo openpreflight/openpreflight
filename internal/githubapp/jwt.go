@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package githubapp authenticates as a GitHub App: App JWT for app-level calls,
 // installation access tokens for repo-level ones (Checks, clone).
 package githubapp
