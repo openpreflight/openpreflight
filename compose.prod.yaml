@@ -7,6 +7,12 @@
 #
 # compose.yaml in the repository builds from source instead, and is what
 # contributors use.
+
+# Fixes the Compose project name so the volumes are always
+# openpreflight_ci-data and openpreflight_ci-workspace, whatever the
+# directory is called. Backup and restore commands depend on that.
+name: openpreflight
+
 services:
   openpreflight:
     # Pin a release with OPENPREFLIGHT_VERSION=1.0.0 rather than editing this

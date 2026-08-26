@@ -3,6 +3,12 @@
 #
 # End users want compose.prod.yaml, which pulls the published image and needs
 # no checkout at all.
+
+# Fixes the Compose project name so the volumes are always
+# openpreflight_ci-data and openpreflight_ci-workspace, whatever the
+# directory is called. Backup and restore commands depend on that.
+name: openpreflight
+
 services:
   openpreflight:
     build: .
