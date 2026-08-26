@@ -11,8 +11,7 @@ Prefer GitHub Security Advisories:
 
 https://github.com/openpreflight/openpreflight/security/advisories/new
 
-If you cannot use advisories (for example while the repository is private),
-email **trivedivatsal005@gmail.com** instead.
+If you cannot use advisories, email **security@openpreflight.xyz** instead.
 
 Include enough to reproduce: the endpoint or UI path, what you sent, and what
 you observed. Do not attach live PEMs, tokens, or a copy of `ci.db`.

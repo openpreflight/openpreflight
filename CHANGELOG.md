@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-26
+
 v1 of the configurator and worker in one Go binary.
 
 ### Added
@@ -54,3 +56,6 @@ v1 of the configurator and worker in one Go binary.
   stripped before pipeline steps run.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
+
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.0.0
