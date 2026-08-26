@@ -26,6 +26,10 @@ v1 of the configurator and worker in one Go binary.
 - `POST /api/v1/coolify/{id}/install-worker` creates a Coolify compose
   application with `instant_deploy: false`.
 - `CI_SECRET_KEY_OLD` re-seals secret columns under `CI_SECRET_KEY` on boot.
+- Graceful shutdown waits up to 30 seconds for in-flight jobs to record
+  themselves cancelled before the process exits, so a redeploy leaves a
+  cancelled Check Run rather than a job stranded `in_progress`. A job still
+  running past that, or a hard kill, is requeued on the next boot.
 - Settings `default_runtime`. `skip_fork_prs` is writable when Docker is
   reachable and a default runtime is set; fork jobs always use Docker.
 - `check_suite_id` recorded on every job, from both the `check_suite` and the

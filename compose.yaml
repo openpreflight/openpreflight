@@ -52,6 +52,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # The process waits up to 30s for in-flight jobs to mark themselves
+    # cancelled before exiting. Docker's default grace period is 10s, which
+    # would SIGKILL through that wait.
+    stop_grace_period: 30s
     restart: unless-stopped
 
 volumes:
