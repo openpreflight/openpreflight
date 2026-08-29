@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `runtime:` jobs using the host `docker.sock` mount the checkout from the
+  host path behind `WORKSPACE_DIR` (via `/proc/self/mountinfo`, or
+  `CI_WORKSPACE_HOST`). Sibling containers no longer see an empty `/work`.
+
 ## [1.0.0] - 2026-08-29
 
 v1 of the configurator and worker in one Go binary.
