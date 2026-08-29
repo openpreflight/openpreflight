@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `install-worker` falls back to Coolify `POST /api/v1/services` when
+  `/api/v1/applications/dockercompose` is missing (self-hosted 4.3.x).
+
 ## [1.0.0] - 2026-08-26
 
 v1 of the configurator and worker in one Go binary.

@@ -10,7 +10,14 @@ import (
 	"fmt"
 )
 
-// ComposeApplicationInput is POST /api/v1/applications/dockercompose.
+const (
+	// pathDockerCompose is the older Coolify create-compose endpoint.
+	pathDockerCompose = "/api/v1/applications/dockercompose"
+	// pathServices is Coolify 4.3+ (dockercompose is gone; compose is a service).
+	pathServices = "/api/v1/services"
+)
+
+// ComposeApplicationInput is the payload for creating a compose stack.
 type ComposeApplicationInput struct {
 	Name            string
 	ProjectUUID     string
@@ -52,8 +59,13 @@ volumes:
 `
 }
 
-// CreateComposeApplication is POST /api/v1/applications/dockercompose.
-// InstantDeploy is left false so the operator can set CI_SECRET_KEY first.
+// CreateComposeApplication creates a compose stack with instant_deploy as given
+// (install-worker hard-codes false so CI_SECRET_KEY can be set first).
+//
+// Coolify Cloud / newer instances accept POST /api/v1/applications/dockercompose.
+// Self-hosted 4.3.x dropped that path; compose stacks are POST /api/v1/services
+// and require base64 docker_compose_raw. We try dockercompose first, then
+// services on 404.
 func (c *Client) CreateComposeApplication(ctx context.Context, in ComposeApplicationInput) (string, error) {
 	if in.ProjectUUID == "" || in.ServerUUID == "" {
 		return "", fmt.Errorf("coolify: project_uuid and server_uuid are required")
@@ -67,21 +79,29 @@ func (c *Client) CreateComposeApplication(ctx context.Context, in ComposeApplica
 	if in.Compose == "" {
 		in.Compose = WorkerCompose()
 	}
+	encoded := base64.StdEncoding.EncodeToString([]byte(in.Compose))
 	payload := map[string]any{
-		"project_uuid":     in.ProjectUUID,
-		"server_uuid":      in.ServerUUID,
-		"environment_name": in.EnvironmentName,
-		"name":             in.Name,
-		"instant_deploy":   in.InstantDeploy,
+		"project_uuid":       in.ProjectUUID,
+		"server_uuid":        in.ServerUUID,
+		"environment_name":   in.EnvironmentName,
+		"name":               in.Name,
+		"instant_deploy":     in.InstantDeploy,
 		"docker_compose_raw": in.Compose,
 	}
 	var raw json.RawMessage
-	err := c.post(ctx, "/api/v1/applications/dockercompose", payload, &raw)
+	err := c.post(ctx, pathDockerCompose, payload, &raw)
 	if err != nil {
 		var apiErr *APIError
 		if errors.As(err, &apiErr) && apiErr.Status == 422 {
-			payload["docker_compose_raw"] = base64.StdEncoding.EncodeToString([]byte(in.Compose))
-			err = c.post(ctx, "/api/v1/applications/dockercompose", payload, &raw)
+			payload["docker_compose_raw"] = encoded
+			err = c.post(ctx, pathDockerCompose, payload, &raw)
+		}
+	}
+	if err != nil {
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.NotFound() {
+			payload["docker_compose_raw"] = encoded
+			err = c.post(ctx, pathServices, payload, &raw)
 		}
 	}
 	if err != nil {
@@ -92,6 +112,9 @@ func (c *Client) CreateComposeApplication(ctx context.Context, in ComposeApplica
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return "", fmt.Errorf("coolify: create application: %w", err)
+	}
+	if resp.UUID == "" {
+		return "", fmt.Errorf("coolify: create application: response had no uuid")
 	}
 	return resp.UUID, nil
 }
