@@ -6,12 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
-
-- `install-worker` falls back to Coolify `POST /api/v1/services` when
-  `/api/v1/applications/dockercompose` is missing (self-hosted 4.3.x).
-
-## [1.0.0] - 2026-08-26
+## [1.0.0] - 2026-08-29
 
 v1 of the configurator and worker in one Go binary.
 
@@ -45,6 +40,11 @@ v1 of the configurator and worker in one Go binary.
 - [ADR 005](https://docs.openpreflight.xyz/adr/005-check-suite-gating/) records the trigger model:
   `check_suite`/`check_run` only, one Check Run per job, Zuul as the referenced
   model with its architecture rejected.
+
+### Changed
+
+- `install-worker` falls back to Coolify `POST /api/v1/services` when
+  `/api/v1/applications/dockercompose` is missing (self-hosted 4.3.x).
 
 ### Fixed
 
