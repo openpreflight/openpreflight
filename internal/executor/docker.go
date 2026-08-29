@@ -66,12 +66,14 @@ func (d Docker) Run(ctx context.Context, step Step, out io.Writer) Result {
 		res.Duration = time.Since(start)
 		return res
 	}
+	// The engine sees host paths. hostPath rewrites this process's checkout
+	// directory when we are a container using the host docker.sock.
 
 	args := []string{
 		"run", "--rm",
 		"--network", "bridge",
 		"--workdir", "/work",
-		"--volume", dir + ":/work",
+		"--volume", hostPath(dir) + ":/work",
 		"--user", strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid()),
 		"--security-opt", "no-new-privileges",
 		"--cap-drop", "ALL",
