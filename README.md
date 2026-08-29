@@ -7,11 +7,12 @@
   />
   <img
     src="https://openpreflight.xyz/banner-light.png"
-    alt="openpreflight — a small CI provider for private repos. One Go binary, one SQLite file, one Check Run per commit."
+    alt="openpreflight — A small CI provider for private repos. One Go binary, one SQLite file: register a GitHub App, enable your repos, and get one Check Run per commit."
     width="880"
   />
 </picture>
 
+[![CI](https://github.com/openpreflight/openpreflight/actions/workflows/ci.yml/badge.svg)](https://github.com/openpreflight/openpreflight/actions/workflows/ci.yml)
 [![Website](https://img.shields.io/badge/website-openpreflight.xyz-2f6f4f?style=flat-square)](https://openpreflight.xyz)
 [![Docs](https://img.shields.io/badge/docs-docs.openpreflight.xyz-2f6f4f?style=flat-square)](https://docs.openpreflight.xyz)
 [![License](https://img.shields.io/badge/license-Apache--2.0-8a8a84?style=flat-square)](LICENSE)
@@ -51,13 +52,31 @@ Published at **[docs.openpreflight.xyz](https://docs.openpreflight.xyz)** ([open
 
 ## Run it
 
+`CI_SECRET_KEY` is the only variable you must set. Everything else has a default or is asked for in the setup wizard.
+
 ```bash
-export CI_SECRET_KEY="$(openssl rand -base64 48)"   # required, keep it forever
-export CI_PUBLIC_BASE_URL="https://ci.example.com"  # optional seed
+curl -O https://raw.githubusercontent.com/openpreflight/openpreflight/main/compose.prod.yaml
+export CI_SECRET_KEY="$(openssl rand -base64 48)"   # keep it forever
+docker compose -f compose.prod.yaml up -d
+```
+
+That pulls the published image; no checkout is needed. Open <http://localhost:8080>, complete the wizard, register your GitHub App, and enable bindings. Full walkthrough: [Quickstart](https://docs.openpreflight.xyz/start/quickstart/).
+
+To build from source instead:
+
+```bash
+git clone https://github.com/openpreflight/openpreflight
+cd openpreflight
+export CI_SECRET_KEY="$(openssl rand -base64 48)"
 docker compose up --build
 ```
 
-Open the UI, complete the wizard, register your GitHub App, and enable bindings. Full walkthrough: [Quickstart](https://docs.openpreflight.xyz/start/quickstart/).
+| File | For | Image |
+| --- | --- | --- |
+| `compose.prod.yaml` | Running it | Pulls `ghcr.io/openpreflight/openpreflight` |
+| `compose.yaml` | Working on it | Builds from the checkout |
+
+`runtime:` jobs and fork PRs also need `DOCKER_GID` set to the docker socket's group **as the container sees it** — `0` on Docker Desktop, usually `998` or `999` on Linux. Read it with `docker compose exec openpreflight stat -c %g /var/run/docker.sock`. Nothing else requires it.
 
 ### Requirements
 
@@ -76,7 +95,7 @@ cmd/server/          entrypoint
 internal/            the whole implementation — no pkg/, nothing importable
   web/               templates, Tailwind styles, and the embedded static assets
 examples/            a sample .ci.yml
-.github/workflows/   ci.yml — Go vet, test, and a Docker build; gates merges
+.github/workflows/   ci.yml gates merges; release.yml publishes on a v* tag
 ```
 
 | Repo | What it is |

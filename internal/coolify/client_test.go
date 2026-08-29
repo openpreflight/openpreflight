@@ -4,6 +4,8 @@ package coolify
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -162,6 +164,48 @@ func TestCreateComposeApplication(t *testing.T) {
 	}
 	if uuid != "app-9" {
 		t.Fatalf("uuid %q", uuid)
+	}
+}
+
+func TestCreateComposeApplicationFallsBackToServices(t *testing.T) {
+	// Coolify 4.3.x has no dockercompose path; compose stacks are services
+	// and require base64 docker_compose_raw.
+	var gotRaw string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer t" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v1/services" {
+			var body struct {
+				DockerComposeRaw string `json:"docker_compose_raw"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			gotRaw = body.DockerComposeRaw
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"uuid":"svc-4"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"message":"Not found."}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := New(srv.URL, "t")
+	uuid, err := c.CreateComposeApplication(context.Background(), ComposeApplicationInput{
+		ProjectUUID: "proj", ServerUUID: "srv", Name: "ci", Compose: "services:\n  x:\n    image: y\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if uuid != "svc-4" {
+		t.Fatalf("uuid %q", uuid)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(gotRaw)
+	if err != nil {
+		t.Fatalf("services payload was not base64: %q", gotRaw)
+	}
+	if !strings.Contains(string(decoded), "image: y") {
+		t.Fatalf("decoded compose %q", decoded)
 	}
 }
 

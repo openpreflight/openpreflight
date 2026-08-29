@@ -1,0 +1,124 @@
+name: Release
+
+# Tag-driven. Nothing here runs on a branch push: cutting a release is
+# `git tag v1.2.3 && git push origin v1.2.3`, and the tag name is the only
+# input. The CHANGELOG section for that version becomes the release body, so a
+# tag with no matching section fails early rather than publishing an empty one.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  IMAGE: ghcr.io/openpreflight/openpreflight
+
+jobs:
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # arm64 is built under emulation. The Go stage is CGO_ENABLED=0 so only
+      # the Tailwind stage really pays for it.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # v1.2.3 -> :1.2.3, :1.2, :latest. A prerelease tag (v1.2.3-rc1) gets
+      # only its full version; `latest=auto` keeps it off the floating tags.
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=auto
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: internal/web/package-lock.json
+
+      - name: Resolve version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      # The CHANGELOG heading is the source of truth for the release body.
+      # Bail before anything is published if the tag has no section.
+      - name: Extract the changelog section
+        run: |
+          awk -v v="${{ steps.version.outputs.version }}" '
+            $0 ~ "^## \\[" v "\\]"      { found = 1; next }
+            found && /^## \[/            { exit }
+            found && /^\[[^]]+\]: /      { next }
+            found                        { print }
+          ' CHANGELOG.md > release-body.md
+          if [ ! -s release-body.md ]; then
+            echo "::error::CHANGELOG.md has no '## [${{ steps.version.outputs.version }}]' section"
+            exit 1
+          fi
+          cat release-body.md
+
+      # The binary embeds internal/web/static/app.css. Recompile it the way the
+      # Dockerfile does so the released binaries and the released image cannot
+      # disagree about the stylesheet.
+      - name: Compile CSS
+        working-directory: internal/web
+        run: |
+          npm ci
+          npm run css
+
+      - name: Cross-compile
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            GOARCH="$arch" go build -trimpath -ldflags="-s -w" \
+              -o "dist/openpreflight_${{ steps.version.outputs.version }}_linux_${arch}" \
+              ./cmd/server
+          done
+          cd dist && sha256sum ./* > SHA256SUMS && cat SHA256SUMS
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-body.md \
+            --verify-tag \
+            ./dist/*

@@ -29,6 +29,11 @@ func main() {
 	}
 }
 
+// shutdownTimeout bounds both the HTTP drain and the wait for in-flight jobs.
+// Compose sets stop_grace_period to match; a shorter grace period upstream just
+// means the runtime kills us first and the next boot requeues.
+const shutdownTimeout = 30 * time.Second
+
 func run(log *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -77,7 +82,16 @@ func run(log *slog.Logger) error {
 	defer stop()
 
 	runner := queue.New(st, cfg, log)
-	go runner.Start(ctx)
+	// Closed once the runner has stopped claiming and every job it started has
+	// finished unwinding. Shutdown waits on it: without that, the process
+	// exited as soon as the HTTP server drained and a job was left half-marked,
+	// so whether it ended `cancelled` or was requeued on the next boot came
+	// down to a race.
+	runnerDone := make(chan struct{})
+	go func() {
+		defer close(runnerDone)
+		runner.Start(ctx)
+	}()
 
 	server, err := api.New(st, cfg, runner, log)
 	if err != nil {
@@ -111,10 +125,21 @@ func run(log *slog.Logger) error {
 
 	// Stop accepting requests first, then let in-flight jobs notice the
 	// cancelled context and mark themselves cancelled.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		log.Error("http shutdown", "error", err)
+	}
+
+	// A job writes its `cancelled` status and PATCHes its Check Run while
+	// unwinding, so exiting here would strand it in_progress. Bounded, because
+	// the container runtime will SIGKILL us regardless: past the deadline the
+	// stale-job requeue on the next boot is the backstop.
+	select {
+	case <-runnerDone:
+	case <-shutdownCtx.Done():
+		log.Warn("gave up waiting for running jobs; they will be requeued on the next boot",
+			"timeout", shutdownTimeout)
 	}
 	return nil
 }

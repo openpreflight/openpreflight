@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- `install-worker` falls back to Coolify `POST /api/v1/services` when
+  `/api/v1/applications/dockercompose` is missing (self-hosted 4.3.x).
+
+## [1.0.0] - 2026-08-26
+
 v1 of the configurator and worker in one Go binary.
 
 ### Added
@@ -24,6 +31,10 @@ v1 of the configurator and worker in one Go binary.
 - `POST /api/v1/coolify/{id}/install-worker` creates a Coolify compose
   application with `instant_deploy: false`.
 - `CI_SECRET_KEY_OLD` re-seals secret columns under `CI_SECRET_KEY` on boot.
+- Graceful shutdown waits up to 30 seconds for in-flight jobs to record
+  themselves cancelled before the process exits, so a redeploy leaves a
+  cancelled Check Run rather than a job stranded `in_progress`. A job still
+  running past that, or a hard kill, is requeued on the next boot.
 - Settings `default_runtime`. `skip_fork_prs` is writable when Docker is
   reachable and a default runtime is set; fork jobs always use Docker.
 - `check_suite_id` recorded on every job, from both the `check_suite` and the
@@ -54,3 +65,6 @@ v1 of the configurator and worker in one Go binary.
   stripped before pipeline steps run.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
+
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.0.0

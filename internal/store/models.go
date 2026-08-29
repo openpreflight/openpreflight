@@ -13,7 +13,6 @@ type Settings struct {
 	DefaultTimeoutSeconds int    `json:"default_timeout_seconds"`
 	MaxConcurrentJobs     int    `json:"max_concurrent_jobs"`
 	MaxLogBytes           int64  `json:"max_log_bytes"`
-	MaxWorkspaceBytes     int64  `json:"max_workspace_bytes"`
 	LogRetentionDays      int    `json:"log_retention_days"`
 	SkipForkPRs           bool   `json:"skip_fork_prs"`
 	DefaultRuntime        string `json:"default_runtime"`

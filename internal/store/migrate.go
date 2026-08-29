@@ -143,6 +143,13 @@ ALTER TABLE jobs ADD COLUMN pull_number INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE jobs ADD COLUMN check_suite_id INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX idx_jobs_app_repo_sha ON jobs(github_app_id, repo, sha, status);
 `},
+	// max_workspace_bytes was accepted, stored and editable, and nothing ever
+	// read it: no code path measured a checkout. Keeping a setting that does
+	// nothing is worse than not offering it, so the column goes rather than
+	// growing an enforcement path nobody asked for.
+	{"0004_drop_max_workspace_bytes", `
+ALTER TABLE settings DROP COLUMN max_workspace_bytes;
+`},
 }
 
 func (s *Store) migrate() error {

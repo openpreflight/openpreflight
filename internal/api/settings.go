@@ -46,7 +46,6 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 	next.DefaultTimeoutSeconds = in.Int("default_timeout_seconds", current.DefaultTimeoutSeconds)
 	next.MaxConcurrentJobs = in.Int("max_concurrent_jobs", current.MaxConcurrentJobs)
 	next.MaxLogBytes = int64(in.Int("max_log_bytes", int(current.MaxLogBytes)))
-	next.MaxWorkspaceBytes = int64(in.Int("max_workspace_bytes", int(current.MaxWorkspaceBytes)))
 	next.LogRetentionDays = in.Int("log_retention_days", current.LogRetentionDays)
 	if in.json != nil {
 		if in.Has("skip_fork_prs") {
