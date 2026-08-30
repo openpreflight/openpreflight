@@ -1,4 +1,4 @@
 runtime: golang:1.26
-install: go mod download
+install: apt-get update && apt-get install -y --no-install-recommends nodejs npm && go mod download
 test: go vet ./... && go test ./...
 timeout: 15m
