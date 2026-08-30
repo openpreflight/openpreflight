@@ -1,4 +1,4 @@
-runtime: golang:1.26
-install: apt-get update && apt-get install -y --no-install-recommends nodejs npm && go mod download
-test: go vet ./... && go test ./...
+runtime: node:22
+install: mkdir -p /work/.ci-go && curl -fsSL https://go.dev/dl/go1.26.5.linux-amd64.tar.gz | tar -C /work/.ci-go -xz && /work/.ci-go/go/bin/go mod download
+test: export PATH="/work/.ci-go/go/bin:$PATH" && go vet ./... && go test ./...
 timeout: 15m
