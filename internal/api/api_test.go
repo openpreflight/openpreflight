@@ -410,7 +410,7 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 	req := htmlReq(http.MethodGet, "/")
 	req.Header.Set("Authorization", "Bearer "+token)
 	home := ts.do(req).Body.String()
-	for _, want := range []string{"Setup", "Public base URL", "CI GitHub App", "Enabled repo", "Coolify"} {
+	for _, want := range []string{"Setup", "Public base URL", "CI GitHub App", "Enabled repo", "Coolify", "Workspace"} {
 		if !strings.Contains(home, want) {
 			t.Errorf("overview missing %q", want)
 		}
@@ -530,7 +530,7 @@ func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
 		t.Fatalf("setup: %d", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[420px]") {
+	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[440px]") {
 		t.Fatalf("setup is missing brand chrome: %s", body)
 	}
 	if strings.Contains(body, "Sign out") {
@@ -543,7 +543,7 @@ func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
 		t.Fatalf("login: %d", rec.Code)
 	}
 	body = rec.Body.String()
-	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[420px]") {
+	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[440px]") {
 		t.Fatalf("login is missing brand chrome")
 	}
 	if strings.Contains(body, "Sign out") || strings.Contains(body, ">Overview<") {

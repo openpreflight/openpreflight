@@ -11,12 +11,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/openpreflight/openpreflight/internal/config"
@@ -24,6 +24,8 @@ import (
 	"github.com/openpreflight/openpreflight/internal/queue"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components"
+	"github.com/openpreflight/openpreflight/internal/web/pages"
 )
 
 const (
@@ -40,6 +42,10 @@ type Server struct {
 	renderer *web.Renderer
 	log      *slog.Logger
 	dockerOK func() bool
+
+	dockerMu     sync.Mutex
+	dockerCached bool
+	dockerAt     time.Time
 }
 
 // New builds the server.
@@ -59,6 +65,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health", s.health)
 	mux.HandleFunc("POST /webhook/{slug}", s.handleWebhook)
 	mux.HandleFunc("GET /runs/{id}", s.pageRun)
+	mux.Handle("GET /assets/css/output.css", web.CSSHandler())
+	mux.Handle("GET /components/{bundle}", components.ScriptsHandler())
 
 	// Unauthenticated entry points.
 	mux.HandleFunc("GET /setup", s.pageSetup)
@@ -123,7 +131,14 @@ func (s *Server) dockerAvailable() bool {
 	if s.dockerOK != nil {
 		return s.dockerOK()
 	}
-	return executor.Docker{Host: s.cfg.DockerHost}.Ping()
+	s.dockerMu.Lock()
+	defer s.dockerMu.Unlock()
+	if time.Since(s.dockerAt) < 15*time.Second {
+		return s.dockerCached
+	}
+	s.dockerCached = executor.Docker{Host: s.cfg.DockerHost}.Ping()
+	s.dockerAt = time.Now()
+	return s.dockerCached
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
@@ -529,22 +544,32 @@ func (s *Server) takeFlash(w http.ResponseWriter, r *http.Request) (string, stri
 func (s *Server) page(w http.ResponseWriter, r *http.Request, user *store.User, title, nav string, data any) web.Page {
 	flash, kind := s.takeFlash(w, r)
 	token := s.csrfToken(w, r)
-	return web.Page{
+	p := web.Page{
 		Title:     title,
 		Nav:       nav,
 		User:      user,
 		Flash:     flash,
 		FlashKind: kind,
-		CSRFField: template.HTML(fmt.Sprintf(`<input type="hidden" name="csrf" value="%s">`,
-			template.HTMLEscapeString(token))),
-		Data: data,
+		CSRFToken: token,
+		Data:      data,
 	}
+	if c, err := r.Cookie("sidebar_state"); err == nil && c.Value == "false" {
+		p.SidebarCollapsed = true
+	}
+	if user != nil {
+		if n, err := s.store.CountInFlight(); err == nil {
+			p.InFlightCount = n
+		}
+		p.DockerAvailable = s.dockerAvailable()
+		p.DockerHost = s.cfg.DockerHost
+	}
+	return p
 }
 
 func (s *Server) render(w http.ResponseWriter, page string, data web.Page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := s.renderer.Render(w, page, data); err != nil {
+	if err := pages.Render(w, page, data); err != nil {
 		s.log.Error("render", "page", page, "error", err)
 	}
 }

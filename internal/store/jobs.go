@@ -129,6 +129,35 @@ func (s *Store) ListJobs(limit int) ([]Job, error) {
 	return out, rows.Err()
 }
 
+// CountInFlight returns how many jobs are queued or running.
+func (s *Store) CountInFlight() (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT count(*) FROM jobs WHERE status IN (?, ?)`, JobQueued, JobInProgress).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("store: count in-flight: %w", err)
+	}
+	return n, nil
+}
+
+// ListInFlight returns queued and running jobs, newest first.
+func (s *Store) ListInFlight() ([]Job, error) {
+	rows, err := s.db.Query(`SELECT `+jobCols+` FROM jobs WHERE status IN (?, ?) ORDER BY created_at DESC, id`,
+		JobQueued, JobInProgress)
+	if err != nil {
+		return nil, fmt.Errorf("store: list in-flight: %w", err)
+	}
+	defer rows.Close()
+	var out []Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, fmt.Errorf("store: scan in-flight: %w", err)
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
 // ClaimNextJob marks the oldest queued job in_progress and returns it. The
 // single-writer connection makes the select-then-update atomic enough.
 func (s *Store) ClaimNextJob() (Job, error) {

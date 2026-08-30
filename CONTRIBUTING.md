@@ -25,10 +25,12 @@ CI_SECRET_KEY="$(openssl rand -base64 48)" DATA_DIR=./data WORKSPACE_DIR=./works
 Tests need no network and no credentials. Coolify and GitHub are faked; clone
 and pipeline tests talk to a local `git-http-backend`.
 
-If you change `internal/web/templates` or `internal/web/styles`, rebuild CSS
-before committing (the Dockerfile does this at image-build time):
+If you change `internal/web/layouts`, `internal/web/pages`, or
+`internal/web/assets/css`, regenerate templ and rebuild CSS before committing
+(the Dockerfile does both at image-build time):
 
 ```bash
+templ generate ./internal/web/...
 cd internal/web && npm ci && npm run css
 ```
 

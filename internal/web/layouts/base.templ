@@ -1,0 +1,115 @@
+package layouts
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components"
+	"github.com/openpreflight/openpreflight/internal/web/components/alert"
+)
+
+templ Base(p web.Page) {
+	<!doctype html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ p.Title } · openpreflight</title>
+			<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6f4f'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M8 17l5 5 11-12'/%3E%3C/svg%3E"/>
+			if p.RefreshSeconds > 0 {
+				<meta http-equiv="refresh" content={ itoa(p.RefreshSeconds) }/>
+			}
+			<script>
+				(function () {
+					try {
+						var t = localStorage.getItem("theme") || "system";
+						var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+						document.documentElement.classList.toggle("dark", dark);
+					} catch (e) {}
+				})();
+			</script>
+			<link rel="stylesheet" href="/assets/css/output.css"/>
+			@components.Scripts()
+		</head>
+		<body class="min-h-svh bg-background text-foreground">
+			<a class="bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5" href="#main">Skip to content</a>
+			{ children... }
+			<script>
+				(function () {
+					function apply(t) {
+						var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+						document.documentElement.classList.toggle("dark", dark);
+					}
+					function caption(t) {
+						if (t === "light") return "Light";
+						if (t === "dark") return "Dark";
+						return "System";
+					}
+					function sync(t) {
+						apply(t);
+						document.querySelectorAll("[data-theme-cycle]").forEach(function (btn) {
+							btn.setAttribute("data-theme", t);
+							btn.setAttribute("aria-label", "Theme: " + t);
+							var el = btn.querySelector(".theme-label");
+							if (el) el.textContent = caption(t);
+						});
+					}
+					var cur = "system";
+					try { cur = localStorage.getItem("theme") || "system"; } catch (err) {}
+					sync(cur);
+					document.addEventListener("click", function (e) {
+						var btn = e.target.closest("[data-theme-cycle]");
+						if (!btn) return;
+						var order = ["system", "light", "dark"];
+						var next = order[(order.indexOf(cur) + 1) % order.length];
+						cur = next;
+						try { localStorage.setItem("theme", next); } catch (err) {}
+						sync(next);
+					});
+					try {
+						window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+							if (cur === "system") apply("system");
+						});
+					} catch (e) {}
+				})();
+			</script>
+		</body>
+	</html>
+}
+
+templ CSRF(token string) {
+	<input type="hidden" name="csrf" value={ token }/>
+}
+
+templ Flash(p web.Page) {
+	if p.Flash != "" {
+		{{ var variant alert.Variant }}
+		if p.FlashKind == "err" {
+			{{ variant = alert.VariantDestructive }}
+		}
+		@alert.Alert(alert.Props{Class: "mb-4", Variant: variant}) {
+			@alert.Title() {
+				{ p.Flash }
+			}
+		}
+	}
+}
+
+templ Brand() {
+	<a class="brand" href="/">
+		<span class="inline-flex size-7 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">op</span>
+		openpreflight
+	</a>
+}
+
+templ PageHead(title, lede string) {
+	<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+		<div class="min-w-0">
+			<h1 class="text-2xl font-semibold tracking-tight">{ title }</h1>
+			if lede != "" {
+				<p class="text-muted-foreground mt-1 text-sm">{ lede }</p>
+			}
+		</div>
+		<div class="flex flex-wrap items-center gap-2">
+			{ children... }
+		</div>
+	</div>
+}

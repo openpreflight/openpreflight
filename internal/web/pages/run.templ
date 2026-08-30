@@ -1,0 +1,205 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/components/table"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+templ Run(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ job := jobOf(m) }}
+	{{ steps := stepsOf(m) }}
+	{{ logBody := str(m, "Log") }}
+	{{ shared := asBool(m, "Shared") }}
+	{{ commitURL := str(m, "CommitURL") }}
+	if p.User != nil {
+		@layouts.Shell(p) {
+			@runBody(p, job, steps, logBody, shared, commitURL)
+		}
+	} else {
+		@layouts.Guest(p) {
+			@runBody(p, job, steps, logBody, shared, commitURL)
+		}
+	}
+}
+
+templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string, shared bool, commitURL string) {
+	@layouts.PageHead(job.Repo, "") {
+		if p.User != nil {
+			<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + job.ID + "/rerun") } class="m-0">
+				@layouts.CSRF(p.CSRFToken)
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+					Re-run
+				}
+			</form>
+			if job.InFlight() {
+				<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + job.ID + "/cancel") } class="m-0">
+					@layouts.CSRF(p.CSRFToken)
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive, Size: button.SizeSm}) {
+						Cancel
+					}
+				</form>
+			}
+		}
+	}
+	<div class="text-muted-foreground mb-6 flex flex-wrap items-center gap-2 text-sm">
+		@StatusBadge(job)
+		if commitURL != "" {
+			<a class="text-primary font-mono hover:underline" href={ templ.SafeURL(commitURL) }>{ web.ShortSHA(job.SHA) }</a>
+		} else {
+			<span class="font-mono">{ web.ShortSHA(job.SHA) }</span>
+		}
+		if job.Ref != "" {
+			<span>on <span class="font-mono">{ job.Ref }</span></span>
+		}
+		<span>· { job.Event }</span>
+		if job.StartedAt != nil {
+			<span>· { web.HumanDuration(job.Duration()) }</span>
+		}
+		<span>· { web.Ago(job.CreatedAt) }</span>
+		if job.CheckName != "" {
+			<span>· { job.CheckName }</span>
+		}
+		if job.ShareableLogs {
+			@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+				shareable
+			}
+		} else {
+			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+				private
+			}
+		}
+		if job.IsFork {
+			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+				fork
+				if job.PullNumber != 0 {
+					#{ itoa(job.PullNumber) }
+				}
+			}
+		}
+	</div>
+	@card.Card(card.Props{Class: "mb-6"}) {
+		@card.Header() {
+			@card.Title() {
+				Run
+			}
+		}
+		@card.Content() {
+			<dl class="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+				<dt class="text-muted-foreground">Job</dt>
+				<dd class="font-mono text-xs">{ job.ID }</dd>
+				<dt class="text-muted-foreground">Check run</dt>
+				<dd class="font-mono text-xs">
+					if job.CheckRunID != 0 {
+						{ itoa64(job.CheckRunID) }
+					} else {
+						{ "-" }
+					}
+				</dd>
+				<dt class="text-muted-foreground">Delivery</dt>
+				<dd class="font-mono text-xs">
+					if job.DeliveryID != "" {
+						{ job.DeliveryID }
+					} else {
+						{ "-" }
+					}
+				</dd>
+				<dt class="text-muted-foreground">Check name</dt>
+				<dd class="text-xs">
+					if job.CheckName != "" {
+						{ job.CheckName }
+					} else {
+						inherited
+					}
+				</dd>
+				<dt class="text-muted-foreground">Log size</dt>
+				<dd class="text-xs">{ itoa64(job.LogBytes) } bytes</dd>
+				if job.Error != "" {
+					<dt class="text-muted-foreground">Error</dt>
+					<dd class="text-xs">{ job.Error }</dd>
+				}
+			</dl>
+		}
+	}
+	if len(steps) > 0 {
+		@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Header() {
+				@card.Title() {
+					Steps
+				}
+			}
+			@card.Content() {
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() {
+								<span class="sr-only">Result</span>
+							}
+							@table.Head() {
+								Step
+							}
+							@table.Head() {
+								Command
+							}
+							@table.Head() {
+								Took
+							}
+						}
+					}
+					@table.Body() {
+						for _, s := range steps {
+							@table.Row() {
+								@table.Cell(table.CellProps{Class: "font-mono"}) {
+									{ web.StepMark(s) }
+								}
+								@table.Cell() {
+									{ s.Name }
+								}
+								@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+									{ s.Command }
+								}
+								@table.Cell(table.CellProps{Class: "text-xs"}) {
+									if s.Skipped {
+										{ "-" }
+									} else {
+										{ web.HumanDuration(s.Duration) }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if logBody != "" {
+		@card.Card(card.Props{Class: "bg-muted"}) {
+			@card.Header() {
+				@card.Title() {
+					Log
+				}
+			}
+			@card.Content() {
+				<pre class="max-h-[32rem] overflow-auto font-mono text-xs whitespace-pre-wrap">{ logBody }</pre>
+			}
+		}
+	} else {
+		@empty.Empty(empty.Props{Class: "bg-muted"}) {
+			@empty.Header() {
+				@empty.Title() {
+					No log yet
+				}
+			}
+		}
+	}
+	if shared {
+		<p class="text-muted-foreground mt-3 text-xs">You are viewing this with a shareable link. Anyone holding the URL can read this build output.</p>
+	}
+}

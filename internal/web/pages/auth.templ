@@ -1,0 +1,162 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/input"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+templ Login(p web.Page) {
+	@layouts.Auth(p) {
+		@card.Card() {
+			@card.Header(card.HeaderProps{Class: "border-b"}) {
+				@card.Title() {
+					<h1 class="text-xl font-semibold tracking-tight">Sign in</h1>
+				}
+				@card.Description() {
+					Operator for this worker. The account lives on this host.
+				}
+			}
+			@card.Content() {
+				<form method="post" action="/api/v1/login" class="flex flex-col gap-4">
+					@layouts.CSRF(p.CSRFToken)
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "username"}) {
+							Username
+						}
+						@input.Input(input.Props{
+							ID:         "username",
+							Name:       "username",
+							Type:       "text",
+							Class:      "h-10",
+							Required:   true,
+							Attributes: templ.Attributes{"autocomplete": "username", "autofocus": ""},
+						})
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "password"}) {
+							Password
+						}
+						@input.Input(input.Props{
+							ID:         "password",
+							Name:       "password",
+							Type:       "password",
+							Class:      "h-10",
+							Required:   true,
+							Attributes: templ.Attributes{"autocomplete": "current-password"},
+						})
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit, Class: "mt-1 w-full", Size: button.SizeLg}) {
+						Sign in
+					}
+				</form>
+			}
+		}
+	}
+}
+
+templ Setup(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	@layouts.Auth(p) {
+		@card.Card() {
+			@card.Header(card.HeaderProps{Class: "border-b"}) {
+				@card.Title() {
+					<h1 class="text-xl font-semibold tracking-tight">Create the admin account</h1>
+				}
+				@card.Description() {
+					One username, one password, and the URL GitHub will call. Apps and repos are next.
+				}
+			}
+			@card.Content() {
+				<form method="post" action="/api/v1/setup" class="flex flex-col gap-5">
+					@layouts.CSRF(p.CSRFToken)
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "username"}) {
+							Admin username
+						}
+						@input.Input(input.Props{
+							ID:         "username",
+							Name:       "username",
+							Type:       "text",
+							Class:      "h-10",
+							Value:      "admin",
+							Required:   true,
+							Attributes: templ.Attributes{"autocomplete": "username"},
+						})
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "password"}) {
+							Password
+						}
+						@input.Input(input.Props{
+							ID:         "password",
+							Name:       "password",
+							Type:       "password",
+							Class:      "h-10",
+							Required:   true,
+							Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password", "autofocus": ""},
+						})
+						@field.Description() {
+							{ setupPasswordHint }
+						}
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "public_base_url"}) {
+							Public base URL
+						}
+						@input.Input(input.Props{
+							ID:          "public_base_url",
+							Name:        "public_base_url",
+							Type:        "url",
+							Class:       "h-10 font-mono",
+							Placeholder: "https://ci.example.com",
+							Value:       str(m, "PublicBaseURL"),
+							Required:    true,
+						})
+						@field.Description() {
+							{ setupURLHint }
+						}
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit, Class: "mt-1 w-full", Size: button.SizeLg}) {
+						Create admin and continue
+					}
+				</form>
+			}
+		}
+		<p class="text-muted-foreground mt-4 text-center text-xs">You can change the public URL later in Settings.</p>
+	}
+}
+
+templ Error(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	if p.User != nil {
+		@layouts.Shell(p) {
+			@layouts.PageHead(str(m, "Heading"), str(m, "Message")) {
+				@button.Button(button.Props{Href: "/", Size: button.SizeSm, Variant: button.VariantOutline}) {
+					Back to overview
+				}
+			}
+		}
+	} else {
+		@layouts.Guest(p) {
+			@card.Card(card.Props{Class: "mx-auto max-w-[440px]"}) {
+				@card.Header() {
+					@card.Title() {
+						<h1 class="text-xl font-semibold tracking-tight">{ str(m, "Heading") }</h1>
+					}
+					@card.Description() {
+						{ str(m, "Message") }
+					}
+				}
+				@card.Content() {
+					@button.Button(button.Props{Href: "/login", Size: button.SizeSm}) {
+						Sign in
+					}
+				}
+			}
+		}
+	}
+}

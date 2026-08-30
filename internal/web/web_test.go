@@ -8,11 +8,11 @@ import (
 )
 
 func TestCompiledCSSIsEmbedded(t *testing.T) {
-	if len(appCSS) < 500 {
+	if len(outputCSS) < 500 {
 		t.Fatal("embedded CSS is empty; from internal/web run: npm install && npm run css")
 	}
-	for _, want := range []string{"--color-accent", ".panel", ".pill", ".nav-link"} {
-		if !strings.Contains(appCSS, want) {
+	for _, want := range []string{"--primary", "--sidebar", ".dark"} {
+		if !strings.Contains(outputCSS, want) {
 			t.Errorf("compiled CSS missing %q", want)
 		}
 	}

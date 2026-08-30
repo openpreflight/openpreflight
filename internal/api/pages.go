@@ -15,6 +15,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/githubapp"
 	"github.com/openpreflight/openpreflight/internal/logs"
 	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/web"
 )
 
 func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user store.User) {
@@ -38,15 +39,30 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		s.fail(w, r, err)
 		return
 	}
+	inflight, err := s.store.ListInFlight()
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	jobs, err := s.store.ListJobs(8)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
+	recent, err := s.store.ListJobs(100)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	latest := latestJobByRepo(recent)
 	enabled := 0
+	var cards []dashRepo
 	for _, b := range bindings {
 		if b.Enabled {
 			enabled++
+			if len(cards) < 12 {
+				cards = append(cards, dashRepo{Repo: b.Repo, LastJob: latest[b.Repo]})
+			}
 		}
 	}
 	s.render(w, "dashboard", s.page(w, r, &user, "Overview", "home", map[string]any{
@@ -56,6 +72,8 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		"Bindings":        bindings,
 		"EnabledBindings": enabled,
 		"Jobs":            jobs,
+		"InFlight":        inflight,
+		"RepoCards":       cards,
 	}))
 }
 
@@ -182,6 +200,22 @@ type bindingRow struct {
 	Binding     store.RepoBinding
 	AppName     string
 	CoolifyName string
+	LastJob     store.Job
+}
+
+type dashRepo struct {
+	Repo    string
+	LastJob store.Job
+}
+
+func latestJobByRepo(jobs []store.Job) map[string]store.Job {
+	out := map[string]store.Job{}
+	for _, j := range jobs {
+		if _, ok := out[j.Repo]; !ok {
+			out[j.Repo] = j
+		}
+	}
+	return out
 }
 
 func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.User) {
@@ -215,11 +249,18 @@ func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.Us
 		instNames[i.ID] = i.Name
 	}
 	rows := make([]bindingRow, 0, len(bindings))
+	recent, err := s.store.ListJobs(100)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	latest := latestJobByRepo(recent)
 	for _, b := range bindings {
 		rows = append(rows, bindingRow{
 			Binding:     b,
 			AppName:     orUnknown(appNames[b.GitHubAppID], "(deleted app)"),
 			CoolifyName: instNames[b.CoolifyInstanceID],
+			LastJob:     latest[b.Repo],
 		})
 	}
 
@@ -378,6 +419,17 @@ func (s *Server) pageRun(w http.ResponseWriter, r *http.Request) {
 		"Shared":    !authed,
 		"CommitURL": githubCommitURL(job, s.appAPIURL(job.GitHubAppID)),
 	})
+	if authed {
+		sha := job.SHA
+		if len(sha) > 8 {
+			sha = sha[:8]
+		}
+		p.Crumbs = []web.Crumb{
+			{Label: "Jobs", Href: "/jobs"},
+			{Label: job.Repo},
+			{Label: sha},
+		}
+	}
 	if job.InFlight() {
 		p.RefreshSeconds = 3
 	}

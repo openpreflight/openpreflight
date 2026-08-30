@@ -359,6 +359,32 @@ func TestJobLifecycleAndDeliveryDedup(t *testing.T) {
 	}
 }
 
+func TestCountAndListInFlight(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	queued, _ := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/r", SHA: "aaa"})
+	running, _ := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/s", SHA: "bbb"})
+	st.ClaimNextJob() // claims oldest queued
+	done, _ := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "o/t", SHA: "ccc"})
+	st.FinishJob(done.ID, JobSuccess, "success", "[]", "")
+
+	n, err := st.CountInFlight()
+	if err != nil || n != 2 {
+		t.Fatalf("count: %v n=%d", err, n)
+	}
+	list, err := st.ListInFlight()
+	if err != nil || len(list) != 2 {
+		t.Fatalf("list: %v n=%d", err, len(list))
+	}
+	ids := map[string]bool{queued.ID: false, running.ID: false}
+	for _, j := range list {
+		ids[j.ID] = true
+	}
+	if !ids[queued.ID] || !ids[running.ID] {
+		t.Fatalf("in-flight ids: %+v", list)
+	}
+}
+
 func TestRequeueStaleJobs(t *testing.T) {
 	st := newTestStore(t)
 	app := mustApp(t, st, "ci")

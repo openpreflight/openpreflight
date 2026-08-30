@@ -59,6 +59,7 @@ func newTestServer(t *testing.T) *testServer {
 	if err != nil {
 		t.Fatal(err)
 	}
+	srv.dockerOK = func() bool { return false }
 	app, err := st.CreateGitHubApp(store.GitHubAppInput{
 		Name: "ci", Slug: "ci", AppID: appNumericID,
 		PEM:           "-----BEGIN RSA PRIVATE KEY-----\nfixture\n-----END RSA PRIVATE KEY-----",

@@ -1,0 +1,40 @@
+package layouts
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web/components/alertdialog"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+)
+
+templ ConfirmDelete(id, token, action, triggerLabel, title, desc string) {
+	@alertdialog.AlertDialog(alertdialog.Props{ID: id}) {
+		@button.Button(button.Props{
+			Variant:    button.VariantGhost,
+			Size:       button.SizeSm,
+			Class:      "text-destructive",
+			Attributes: alertdialog.TriggerFor(id),
+		}) {
+			{ triggerLabel }
+		}
+		@alertdialog.Content() {
+			@alertdialog.Header() {
+				@alertdialog.Title() {
+					{ title }
+				}
+				@alertdialog.Description() {
+					{ desc }
+				}
+			}
+			@alertdialog.Footer() {
+				@alertdialog.Cancel() {
+					Cancel
+				}
+				<form method="post" action={ templ.SafeURL(action) } class="m-0">
+					@CSRF(token)
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive, Size: button.SizeSm}) {
+						Remove
+					}
+				</form>
+			}
+		}
+	}
+}

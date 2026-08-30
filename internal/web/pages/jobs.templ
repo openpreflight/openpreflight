@@ -1,0 +1,22 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+templ Jobs(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	{{ list := jobsOf(m) }}
+	{{ lede := "Every run this worker has taken, newest first. Retention is " + itoa(settings.LogRetentionDays) + " days." }}
+	@layouts.Shell(p) {
+		@layouts.PageHead("Jobs", lede)
+		@card.Card() {
+			@card.Content() {
+				@jobsTable(p, list)
+			}
+		}
+	}
+}

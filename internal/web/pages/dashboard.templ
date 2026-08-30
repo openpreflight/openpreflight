@@ -1,0 +1,217 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+templ Dashboard(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	{{ apps := appsOf(m) }}
+	{{ coolify := coolifyOf(m) }}
+	{{ bindings := bindingsOf(m) }}
+	{{ enabled := asInt(m, "EnabledBindings") }}
+	{{ inflight := inflightOf(m) }}
+	{{ jobs := jobsOf(m) }}
+	{{ cards := cardsOf(m) }}
+	@layouts.Shell(p) {
+		@layouts.PageHead("Overview", "Set the public URL, add your CI GitHub App, then enable the repos it should check. Coolify is optional.") {
+			if dashNeedApp(len(apps)) {
+				@button.Button(button.Props{Href: "/github-apps", Size: button.SizeSm}) {
+					Add GitHub App
+				}
+			}
+			if dashNeedRepo(len(apps), enabled) {
+				@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
+					Enable a repo
+				}
+			}
+			if dashHaveSetup(len(apps), enabled) {
+				@button.Button(button.Props{Href: "/jobs", Size: button.SizeSm}) {
+					View jobs
+				}
+			}
+		}
+		@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Header() {
+				@card.Title() {
+					Setup
+				}
+			}
+			@card.Content() {
+				<ul class="m-0 flex list-none flex-col divide-y p-0">
+					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3 first:pt-0">
+						if settings.PublicBaseURL != "" {
+							@badge.Badge() {
+								done
+							}
+							Public base URL
+							<span class="text-muted-foreground font-mono text-xs">{ settings.PublicBaseURL }</span>
+							@button.Button(button.Props{Href: "/settings", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Settings
+							}
+						} else {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								needed
+							}
+							Public base URL
+							@button.Button(button.Props{Href: "/settings", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Set it in Settings
+							}
+						}
+					</li>
+					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
+						if len(apps) > 0 {
+							@badge.Badge() {
+								done
+							}
+							CI GitHub App
+							<span class="text-muted-foreground text-xs">{ itoa(len(apps)) } configured</span>
+							@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Manage
+							}
+						} else {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								needed
+							}
+							CI GitHub App
+							@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Add one
+							}
+						}
+					</li>
+					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
+						if enabled > 0 {
+							@badge.Badge() {
+								done
+							}
+							Enabled repo
+							<span class="text-muted-foreground text-xs">{ itoa(enabled) } of { itoa(len(bindings)) } enabled</span>
+							@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Manage
+							}
+						} else {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								needed
+							}
+							Enabled repo
+							<span class="text-muted-foreground text-xs">
+								if len(bindings) > 0 {
+									{ itoa(len(bindings)) } bound, none enabled
+								} else {
+									the worker runs nothing without one
+								}
+							</span>
+							@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Enable a repo
+							}
+						}
+					</li>
+					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3 last:pb-0">
+						if len(coolify) > 0 {
+							@badge.Badge() {
+								done
+							}
+							Coolify
+							<span class="text-muted-foreground text-xs">{ itoa(len(coolify)) } configured · optional</span>
+							@button.Button(button.Props{Href: "/coolify", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Manage
+							}
+						} else {
+							@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+								optional
+							}
+							Coolify
+							<span class="text-muted-foreground text-xs">server inventory and a repo picker</span>
+							@button.Button(button.Props{Href: "/coolify", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Add an instance
+							}
+						}
+					</li>
+				</ul>
+			}
+		}
+		@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Header() {
+				@card.Title() {
+					Active runs
+				}
+			}
+			@card.Content() {
+				if len(inflight) > 0 {
+					@jobTable(inflight)
+				} else {
+					@empty.Empty() {
+						@empty.Header() {
+							@empty.Title() {
+								No jobs queued or running
+							}
+						}
+					}
+				}
+			}
+		}
+		@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Header() {
+				@card.Title() {
+					Recent jobs
+				}
+			}
+			@card.Content() {
+				if len(jobs) > 0 {
+					@jobTable(jobs)
+				} else {
+					@empty.Empty() {
+						@empty.Header() {
+							@empty.Title() {
+								No jobs yet
+							}
+							@empty.Description() {
+								A job appears when GitHub sends a check_suite for an enabled repo.
+							}
+						}
+					}
+				}
+			}
+		}
+		if len(cards) > 0 {
+			<div class="mb-3 flex items-baseline justify-between">
+				<h2 class="text-base font-semibold">Enabled repos</h2>
+				@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
+					View all
+				}
+			</div>
+			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+				for _, c := range cards {
+					@card.Card(card.Props{Size: card.SizeSm}) {
+						@card.Header() {
+							@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
+								if c.LastJob.ID != "" {
+									<a class="hover:underline" href={ templ.SafeURL("/runs/" + c.LastJob.ID) }>{ c.Repo }</a>
+								} else {
+									{ c.Repo }
+								}
+							}
+						}
+						@card.Content() {
+							if c.LastJob.ID != "" {
+								<div class="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+									@StatusBadge(c.LastJob)
+									<span class="font-mono">{ web.ShortSHA(c.LastJob.SHA) }</span>
+									<span>{ web.Ago(c.LastJob.CreatedAt) }</span>
+								</div>
+							} else {
+								<p class="text-muted-foreground text-xs">no runs</p>
+							}
+						}
+					}
+				}
+			</div>
+		}
+	}
+}

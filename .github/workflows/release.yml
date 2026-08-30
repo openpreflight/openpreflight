@@ -91,9 +91,9 @@ jobs:
           fi
           cat release-body.md
 
-      # The binary embeds internal/web/static/app.css. Recompile it the way the
-      # Dockerfile does so the released binaries and the released image cannot
-      # disagree about the stylesheet.
+      # The binary embeds internal/web/assets/css/output.css. Recompile it the
+      # way the Dockerfile does so the released binaries and the released image
+      # cannot disagree about the stylesheet.
       - name: Compile CSS
         working-directory: internal/web
         run: |

@@ -5,9 +5,10 @@ FROM node:22-alpine AS css
 WORKDIR /web
 COPY internal/web/package.json internal/web/package-lock.json ./
 RUN npm ci
-COPY internal/web/styles ./styles
-COPY internal/web/templates ./templates
-COPY internal/web/web.go ./web.go
+COPY internal/web/assets ./assets
+COPY internal/web/layouts ./layouts
+COPY internal/web/pages ./pages
+COPY internal/web/components ./components
 RUN npm run css
 
 # Build: pure Go, so the binary is static and the runtime image needs no libc
@@ -17,7 +18,9 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=css /web/static/app.css internal/web/static/app.css
+COPY --from=css /web/assets/css/output.css internal/web/assets/css/output.css
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
+RUN templ generate ./internal/web/...
 ENV CGO_ENABLED=0 GOOS=linux
 RUN go build -trimpath -ldflags="-s -w" -o /out/openpreflight ./cmd/server
 
@@ -36,7 +39,8 @@ USER ci
 WORKDIR /home/ci
 ENV DATA_DIR=/data \
     WORKSPACE_DIR=/workspace \
-    LISTEN_ADDR=:8080
+    LISTEN_ADDR=:8080 \
+    GO_ENV=production
 EXPOSE 8080
 VOLUME ["/data", "/workspace"]
 

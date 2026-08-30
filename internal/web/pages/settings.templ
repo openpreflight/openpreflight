@@ -1,0 +1,174 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/checkbox"
+	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/input"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+templ Settings(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	{{ dockerOK := asBool(m, "DockerAvailable") }}
+	{{ dockerHost := str(m, "DockerHost") }}
+	@layouts.Shell(p) {
+		@layouts.PageHead("Settings", "Global defaults. A repo binding overrides its GitHub App, which overrides these.") {
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Attributes: templ.Attributes{"form": "settings-form"}}) {
+				Save settings
+			}
+		}
+		<div class="grid gap-6 xl:grid-cols-[14rem_1fr]">
+			<nav class="text-sm xl:sticky xl:top-6 xl:self-start" aria-label="Settings sections">
+				<ul class="flex flex-col gap-1">
+					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#configuration">Configuration</a></li>
+					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#runner">Runner</a></li>
+					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#logs">Logs</a></li>
+					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#admin">Admin</a></li>
+				</ul>
+			</nav>
+			<div class="space-y-6">
+				<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
+					@layouts.CSRF(p.CSRFToken)
+					@card.Card(card.Props{ID: "configuration", Class: "scroll-mt-6"}) {
+						@card.Header() {
+							@card.Title() {
+								Configuration
+							}
+						}
+						@card.Content(card.ContentProps{Class: "space-y-4"}) {
+							@field.Field() {
+								@field.Label(field.LabelProps{For: "public_base_url"}) {
+									Public base URL
+								}
+								@input.Input(input.Props{ID: "public_base_url", Name: "public_base_url", Type: "url", Value: settings.PublicBaseURL, Placeholder: "https://ci.example.com"})
+								@field.Description() {
+									{ settingsURLHint() }
+								}
+							}
+							<div class="grid gap-4 sm:grid-cols-2">
+								@field.Field() {
+									@field.Label(field.LabelProps{For: "default_check_name"}) {
+										Default check name
+									}
+									@input.Input(input.Props{ID: "default_check_name", Name: "default_check_name", Type: "text", Value: settings.DefaultCheckName})
+								}
+								@field.Field() {
+									@field.Label(field.LabelProps{For: "default_pipeline_file"}) {
+										Default pipeline file
+									}
+									@input.Input(input.Props{ID: "default_pipeline_file", Name: "default_pipeline_file", Type: "text", Value: settings.DefaultPipelineFile})
+								}
+							</div>
+							@field.Field() {
+								@field.Label(field.LabelProps{For: "default_timeout_seconds"}) {
+									Default timeout (seconds)
+								}
+								@input.Input(input.Props{ID: "default_timeout_seconds", Name: "default_timeout_seconds", Type: "number", Value: itoa(settings.DefaultTimeoutSeconds), Attributes: templ.Attributes{"min": "30"}})
+							}
+						}
+					}
+					@card.Card(card.Props{ID: "runner", Class: "scroll-mt-6"}) {
+						@card.Header() {
+							@card.Title() {
+								Runner
+							}
+						}
+						@card.Content(card.ContentProps{Class: "space-y-4"}) {
+							<div class="grid gap-4 sm:grid-cols-2">
+								@field.Field() {
+									@field.Label(field.LabelProps{For: "max_concurrent_jobs"}) {
+										Max concurrent jobs
+									}
+									@input.Input(input.Props{ID: "max_concurrent_jobs", Name: "max_concurrent_jobs", Type: "number", Value: itoa(settings.MaxConcurrentJobs), Attributes: templ.Attributes{"min": "1", "max": "32"}})
+								}
+								@field.Field() {
+									@field.Label(field.LabelProps{For: "default_runtime"}) {
+										Default Docker runtime
+									}
+									@input.Input(input.Props{ID: "default_runtime", Name: "default_runtime", Type: "text", Value: settings.DefaultRuntime, Placeholder: "node:24"})
+									@field.Description() {
+										{ dockerHint(dockerOK, dockerHost) }
+									}
+								}
+							</div>
+							@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
+								@checkbox.Checkbox(checkbox.Props{ID: "skip_fork_prs", Name: "skip_fork_prs", Value: "1", DefaultChecked: settings.SkipForkPRs})
+								@field.Label(field.LabelProps{For: "skip_fork_prs"}) {
+									Skip fork pull requests
+								}
+							}
+							@field.Description() {
+								Leave on unless Docker is working and a default runtime is set. Fork jobs always run in Docker.
+							}
+						}
+					}
+					@card.Card(card.Props{ID: "logs", Class: "scroll-mt-6"}) {
+						@card.Header() {
+							@card.Title() {
+								Logs
+							}
+						}
+						@card.Content(card.ContentProps{Class: "space-y-4"}) {
+							<div class="grid gap-4 sm:grid-cols-2">
+								@field.Field() {
+									@field.Label(field.LabelProps{For: "max_log_bytes"}) {
+										Max log bytes per job
+									}
+									@input.Input(input.Props{ID: "max_log_bytes", Name: "max_log_bytes", Type: "number", Value: itoa64(settings.MaxLogBytes), Attributes: templ.Attributes{"min": "4096"}})
+									@field.Description() {
+										Logs stop growing at this size; the run continues.
+									}
+								}
+								@field.Field() {
+									@field.Label(field.LabelProps{For: "log_retention_days"}) {
+										Log retention (days)
+									}
+									@input.Input(input.Props{ID: "log_retention_days", Name: "log_retention_days", Type: "number", Value: itoa(settings.LogRetentionDays), Attributes: templ.Attributes{"min": "1", "max": "3650"}})
+									@field.Description() {
+										Job rows and log files older than this are pruned hourly.
+									}
+								}
+							</div>
+						}
+					}
+					<div class="flex justify-end">
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+							Save settings
+						}
+					</div>
+				</form>
+				@card.Card(card.Props{ID: "admin", Class: "scroll-mt-6"}) {
+					@card.Header() {
+						@card.Title() {
+							Change admin password
+						}
+					}
+					@card.Content() {
+						<form method="post" action="/api/v1/password" class="flex flex-col gap-4">
+							@layouts.CSRF(p.CSRFToken)
+							@field.Field() {
+								@field.Label(field.LabelProps{For: "password"}) {
+									New password
+								}
+								@input.Input(input.Props{
+									ID:         "password",
+									Name:       "password",
+									Type:       "password",
+									Required:   true,
+									Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password"},
+								})
+							}
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
+								Update password
+							}
+						</form>
+					}
+				}
+			</div>
+		</div>
+	}
+}

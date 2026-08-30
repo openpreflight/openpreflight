@@ -1,0 +1,221 @@
+package layouts
+
+import (
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/breadcrumb"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
+	"github.com/openpreflight/openpreflight/internal/web/components/separator"
+	"github.com/openpreflight/openpreflight/internal/web/components/sidebar"
+)
+
+templ Auth(p web.Page) {
+	@Base(p) {
+		<div class="bg-background relative flex min-h-svh flex-col">
+			<div class="from-primary/15 pointer-events-none absolute inset-0 bg-gradient-to-b to-transparent"></div>
+			<div class="absolute top-3 right-3 z-10">
+				@themeCycleIcon()
+			</div>
+			<main id="main" class="relative z-10 mx-auto flex w-full max-w-[440px] flex-1 flex-col justify-center px-5 py-16">
+				<div class="mb-8 flex justify-center">
+					@Brand()
+				</div>
+				@Flash(p)
+				{ children... }
+			</main>
+		</div>
+	}
+}
+
+templ themeCycleIcon() {
+	@button.Button(button.Props{
+		Variant:    button.VariantGhost,
+		Size:       button.SizeIcon,
+		Class:      "text-muted-foreground",
+		Attributes: templ.Attributes{"data-theme-cycle": true, "aria-label": "Theme: system", "type": "button"},
+	}) {
+		@icon.Sun(icon.Props{Class: "size-4 dark:hidden"})
+		@icon.Moon(icon.Props{Class: "size-4 hidden dark:block"})
+	}
+}
+
+templ Guest(p web.Page) {
+	@Base(p) {
+		<div class="bg-background flex min-h-svh flex-col">
+			<header class="flex h-12 shrink-0 items-center justify-between border-b px-5">
+				@Brand()
+				@themeCycleIcon()
+			</header>
+			<main id="main" class="mx-auto w-full min-w-0 max-w-[1080px] flex-1 px-5 pb-16 pt-8">
+				@Flash(p)
+				{ children... }
+			</main>
+		</div>
+	}
+}
+
+templ Shell(p web.Page) {
+	@Base(p) {
+		@sidebar.Provider(sidebar.ProviderProps{
+			ID:                 "op-sidebar",
+			DisableDefaultOpen: p.SidebarCollapsed,
+		}) {
+			@AppSidebar(p)
+			@sidebar.Inset() {
+				<header class="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+					@sidebar.Trigger()
+					@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-4"})
+					@Crumbs(p)
+				</header>
+				<div id="main" class="mx-auto w-full min-w-0 max-w-[1180px] px-5 pb-16 pt-6">
+					@Flash(p)
+					{ children... }
+				</div>
+			}
+		}
+	}
+}
+
+templ Crumbs(p web.Page) {
+	@breadcrumb.Breadcrumb() {
+		@breadcrumb.List() {
+			if len(p.Crumbs) == 0 {
+				@breadcrumb.Item() {
+					@breadcrumb.Page() {
+						{ p.Title }
+					}
+				}
+			} else {
+				for i, c := range p.Crumbs {
+					@breadcrumb.Item() {
+						if c.Href != "" {
+							@breadcrumb.Link(breadcrumb.LinkProps{Href: c.Href}) {
+								{ c.Label }
+							}
+						} else {
+							@breadcrumb.Page() {
+								{ c.Label }
+							}
+						}
+					}
+					if i < len(p.Crumbs)-1 {
+						@breadcrumb.Separator()
+					}
+				}
+			}
+		}
+	}
+}
+
+templ AppSidebar(p web.Page) {
+	@sidebar.Sidebar(sidebar.Props{
+		ID:          "op-sidebar",
+		Collapsible: sidebar.CollapsibleIcon,
+		Variant:     sidebar.VariantSidebar,
+	}) {
+		@sidebar.Header() {
+			<a href="/" class="flex h-10 items-center gap-2 px-2 font-semibold">
+				<span class="inline-flex size-7 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">op</span>
+				<span class="group-data-[collapsible=icon]:hidden">openpreflight</span>
+			</a>
+		}
+		@sidebar.Content() {
+			@sidebar.Group() {
+				@sidebar.GroupLabel() {
+					Workspace
+				}
+				@sidebar.GroupContent() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/", IsActive: p.Nav == "home", Tooltip: "Overview"}) {
+								@icon.LayoutDashboard()
+								<span>Overview</span>
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/jobs", IsActive: p.Nav == "jobs", Tooltip: "Jobs"}) {
+								@icon.Workflow()
+								<span>Jobs</span>
+							}
+							if p.InFlightCount > 0 {
+								@sidebar.MenuBadge() {
+									{ itoa(p.InFlightCount) }
+								}
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/repos", IsActive: p.Nav == "repos", Tooltip: "Repos"}) {
+								@icon.FolderGit()
+								<span>Repos</span>
+							}
+						}
+					}
+				}
+			}
+			@sidebar.Group() {
+				@sidebar.GroupLabel() {
+					Setup
+				}
+				@sidebar.GroupContent() {
+					@sidebar.Menu() {
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/github-apps", IsActive: p.Nav == "apps", Tooltip: "GitHub Apps"}) {
+								@icon.Github()
+								<span>GitHub Apps</span>
+							}
+						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/coolify", IsActive: p.Nav == "coolify", Tooltip: "Coolify"}) {
+								@icon.Server()
+								<span>Coolify</span>
+							}
+						}
+					}
+				}
+			}
+		}
+		@sidebar.Footer() {
+			@sidebar.Menu() {
+				@sidebar.MenuItem() {
+					@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/settings", IsActive: p.Nav == "settings", Tooltip: "Settings"}) {
+						@icon.Settings()
+						<span>Settings</span>
+					}
+				}
+			}
+			<div class="group-data-[collapsible=icon]:hidden text-muted-foreground mt-2 space-y-1 px-2 text-xs">
+				<div class="flex items-center gap-1.5">
+					@icon.Container(icon.Props{Class: "size-3.5"})
+					<span>Docker { dockerLabel(p.DockerAvailable) }</span>
+				</div>
+				if p.DockerHost != "" {
+					<div class="font-mono truncate">{ p.DockerHost }</div>
+				}
+				if p.User != nil {
+					<div>{ p.User.Username }</div>
+				}
+			</div>
+			<div class="mt-2 flex flex-col gap-1 px-1">
+				@button.Button(button.Props{
+					Variant:    button.VariantGhost,
+					Size:       button.SizeSm,
+					Class:      "w-full justify-start",
+					Attributes: templ.Attributes{"data-theme-cycle": true, "aria-label": "Theme: system", "type": "button"},
+				}) {
+					@icon.Sun(icon.Props{Class: "size-4 dark:hidden"})
+					@icon.Moon(icon.Props{Class: "size-4 hidden dark:block"})
+					<span class="theme-label group-data-[collapsible=icon]:hidden">System</span>
+				}
+				if p.User != nil {
+					<form method="post" action="/api/v1/logout" class="m-0">
+						@CSRF(p.CSRFToken)
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm, Class: "w-full justify-start"}) {
+							@icon.LogOut()
+							<span class="group-data-[collapsible=icon]:hidden">Sign out</span>
+						}
+					</form>
+				}
+			</div>
+		}
+	}
+}

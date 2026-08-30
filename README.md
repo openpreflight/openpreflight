@@ -93,7 +93,7 @@ This repository is the binary and nothing else. The prose and the two sites are 
 ```text
 cmd/server/          entrypoint
 internal/            the whole implementation — no pkg/, nothing importable
-  web/               templates, Tailwind styles, and the embedded static assets
+  web/               templ layouts/pages, copied shadcn-templ components, embedded CSS
 examples/            a sample .ci.yml
 .github/workflows/   ci.yml gates merges; release.yml publishes on a v* tag
 ```

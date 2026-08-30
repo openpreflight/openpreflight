@@ -2,7 +2,7 @@
   "name": "openpreflight-web",
   "private": true,
   "scripts": {
-    "css": "tailwindcss -i styles/input.css -o static/app.css --minify"
+    "css": "tailwindcss -i assets/css/globals.css -o assets/css/output.css --minify"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.12",

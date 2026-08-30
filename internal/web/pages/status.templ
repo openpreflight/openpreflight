@@ -1,0 +1,13 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+)
+
+templ StatusBadge(j store.Job) {
+	@badge.Badge(badge.Props{Variant: jobVariant(j)}) {
+		{ web.JobStatusLabel(j) }
+	}
+}

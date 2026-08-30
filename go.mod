@@ -3,6 +3,8 @@ module github.com/openpreflight/openpreflight
 go 1.26.5
 
 require (
+	github.com/Oudwins/tailwind-merge-go v0.2.2
+	github.com/a-h/templ v0.3.1020
 	golang.org/x/crypto v0.55.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.57.0

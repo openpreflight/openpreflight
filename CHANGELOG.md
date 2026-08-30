@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Configurator chrome is a shadcn-templ operator shell: Sidebar (Workspace /
+  Setup / Settings), resource cards, Inset breadcrumbs. **templ** + copied
+  shadcn-templ 2.0 components on Tailwind v4 (nova / olive, forest green). Theme
+  follows `localStorage.theme` (`system` default). Sidebar collapse persists in
+  the `sidebar_state` cookie.
+
 ### Fixed
 
 - `runtime:` jobs using the host `docker.sock` mount the checkout from the

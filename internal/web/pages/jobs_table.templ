@@ -1,0 +1,181 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/store"
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/components/table"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+templ jobsTable(p web.Page, list []store.Job) {
+	if len(list) == 0 {
+		@empty.Empty() {
+			@empty.Header() {
+				@empty.Title() {
+					No jobs yet
+				}
+				@empty.Description() {
+					GitHub creates one by sending a check_suite for a repo with an enabled binding.
+				}
+			}
+			@empty.Content() {
+				@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
+					Enable a repo
+				}
+			}
+		}
+	} else {
+		@table.Table() {
+			@table.Header() {
+				@table.Row() {
+					@table.Head() {
+						Repo
+					}
+					@table.Head() {
+						Ref
+					}
+					@table.Head() {
+						Commit
+					}
+					@table.Head() {
+						Event
+					}
+					@table.Head() {
+						Status
+					}
+					@table.Head() {
+						Took
+					}
+					@table.Head() {
+						When
+					}
+					@table.Head() {
+						<span class="sr-only">Actions</span>
+					}
+				}
+			}
+			@table.Body() {
+				for _, j := range list {
+					@jobsRow(p, j)
+				}
+			}
+		}
+	}
+}
+
+templ jobsRow(p web.Page, j store.Job) {
+	@table.Row() {
+		@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+			<a class="hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
+		}
+		@table.Cell(table.CellProps{Class: "text-xs"}) {
+			if j.Ref != "" {
+				{ j.Ref }
+			} else {
+				{ "-" }
+			}
+		}
+		@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+			{ web.ShortSHA(j.SHA) }
+		}
+		@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+			{ j.Event }
+		}
+		@table.Cell() {
+			@StatusBadge(j)
+			if j.Error != "" {
+				<div class="text-muted-foreground text-xs">{ j.Error }</div>
+			}
+		}
+		@table.Cell(table.CellProps{Class: "text-xs"}) {
+			if j.StartedAt != nil {
+				{ web.HumanDuration(j.Duration()) }
+			} else {
+				{ "-" }
+			}
+		}
+		@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+			{ web.Ago(j.CreatedAt) }
+		}
+		@table.Cell(table.CellProps{Class: "whitespace-normal"}) {
+			<div class="flex flex-wrap items-center gap-2">
+				@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantLink, Size: button.SizeSm}) {
+					Logs
+				}
+				<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + j.ID + "/rerun") } class="m-0">
+					@layouts.CSRF(p.CSRFToken)
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
+						Re-run
+					}
+				</form>
+				if jobInFlight(j) {
+					<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + j.ID + "/cancel") } class="m-0">
+						@layouts.CSRF(p.CSRFToken)
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm, Class: "text-destructive"}) {
+							Cancel
+						}
+					</form>
+				}
+			</div>
+		}
+	}
+}
+
+templ jobTable(jobs []store.Job) {
+	@table.Table() {
+		@table.Header() {
+			@table.Row() {
+				@table.Head() {
+					Repo
+				}
+				@table.Head() {
+					Ref
+				}
+				@table.Head() {
+					Commit
+				}
+				@table.Head() {
+					Status
+				}
+				@table.Head() {
+					When
+				}
+				@table.Head() {
+					<span class="sr-only">Actions</span>
+				}
+			}
+		}
+		@table.Body() {
+			for _, j := range jobs {
+				@table.Row() {
+					@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+						{ j.Repo }
+					}
+					@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+						if j.Ref != "" {
+							{ j.Ref }
+						} else {
+							{ "-" }
+						}
+					}
+					@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+						{ web.ShortSHA(j.SHA) }
+					}
+					@table.Cell() {
+						@StatusBadge(j)
+					}
+					@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+						{ web.Ago(j.CreatedAt) }
+					}
+					@table.Cell() {
+						@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantLink, Size: button.SizeSm}) {
+							Logs
+						}
+					}
+				}
+			}
+		}
+	}
+}

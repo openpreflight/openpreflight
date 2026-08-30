@@ -6,5 +6,5 @@
 
 - [ ] `go test ./...`
 - [ ] `go vet ./...`
-- [ ] If templates or `internal/web/styles` changed: `cd internal/web && npm run css`
+- [ ] If templ or `internal/web/assets/css` changed: `templ generate ./internal/web/...` and `cd internal/web && npm run css`
 - [ ] Manual path exercised (UI, webhook, or API), or N/A because tests cover it
