@@ -1,0 +1,4 @@
+runtime: golang:1.26
+install: go mod download
+test: go vet ./... && go test ./...
+timeout: 15m
