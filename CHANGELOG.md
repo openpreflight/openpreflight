@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-01
+
+Operator chrome and the docker.sock workspace mount rewrite. Image
+`ghcr.io/openpreflight/openpreflight:1.1.0`.
+
 ### Changed
 
 - Configurator chrome is a shadcn-templ operator shell: Sidebar (Workspace /
@@ -13,6 +18,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   shadcn-templ 2.0 components on Tailwind v4 (nova / olive, forest green). Theme
   follows `localStorage.theme` (`system` default). Sidebar collapse persists in
   the `sidebar_state` cookie.
+
+### Added
+
+- `.ci.yml` so this repository's Check Runs go through ci.openpreflight.xyz.
 
 ### Fixed
 
@@ -80,5 +89,6 @@ v1 of the configurator and worker in one Go binary.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.1.0
 [1.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.0.0
