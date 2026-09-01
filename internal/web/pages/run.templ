@@ -179,7 +179,7 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			}
 		}
 	}
-	if logBody != "" {
+	if job.InFlight() || logBody != "" {
 		@card.Card(card.Props{Class: "bg-muted"}) {
 			@card.Header() {
 				@card.Title() {
@@ -187,8 +187,11 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 				}
 			}
 			@card.Content() {
-				<pre class="max-h-[32rem] overflow-auto font-mono text-xs whitespace-pre-wrap">{ logBody }</pre>
+				<pre id="job-log" data-job-id={ job.ID } class="max-h-[32rem] overflow-auto font-mono text-xs whitespace-pre-wrap">{ logBody }</pre>
 			}
+		}
+		if job.InFlight() {
+			@runLogStream()
 		}
 	} else {
 		@empty.Empty(empty.Props{Class: "bg-muted"}) {
@@ -202,4 +205,25 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 	if shared {
 		<p class="text-muted-foreground mt-3 text-xs">You are viewing this with a shareable link. Anyone holding the URL can read this build output.</p>
 	}
+}
+
+templ runLogStream() {
+	<script>
+		(function () {
+			var pre = document.getElementById("job-log");
+			if (!pre || !window.EventSource) return;
+			var es = new EventSource("/api/v1/jobs/" + pre.getAttribute("data-job-id") + "/logs/stream");
+			es.onopen = function () {
+				pre.textContent = "";
+				var m = document.querySelector('meta[http-equiv="refresh"]');
+				if (m) m.remove();
+			};
+			es.onmessage = function (ev) {
+				pre.appendChild(document.createTextNode(ev.data));
+				pre.scrollTop = pre.scrollHeight;
+			};
+			es.addEventListener("finished", function () { es.close(); });
+			es.onerror = function () { es.close(); };
+		})();
+	</script>
 }

@@ -42,21 +42,31 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request, _ store.User) {
 	writeJSON(w, http.StatusOK, map[string]any{"job": job})
 }
 
-// getJobLogs is the JSON equivalent of GET /runs/{id}. Unguarded so a shareable
-// job is readable without a session, matching that page's rule.
-func (s *Server) getJobLogs(w http.ResponseWriter, r *http.Request) {
+// jobLogAccess loads a job and enforces the same rule as GET /runs/{id}:
+// session, or the binding opted into shareable logs.
+func (s *Server) jobLogAccess(w http.ResponseWriter, r *http.Request) (store.Job, bool) {
 	job, err := s.store.Job(r.PathValue("id"))
 	if err != nil {
 		s.notFound(w, r, err)
-		return
+		return store.Job{}, false
 	}
 	_, _, authed := s.authenticate(r)
 	if !authed && !job.ShareableLogs {
 		if wantsJSON(r) {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
-			return
+			return store.Job{}, false
 		}
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return store.Job{}, false
+	}
+	return job, true
+}
+
+// getJobLogs is the JSON equivalent of GET /runs/{id}. Unguarded so a shareable
+// job is readable without a session, matching that page's rule.
+func (s *Server) getJobLogs(w http.ResponseWriter, r *http.Request) {
+	job, ok := s.jobLogAccess(w, r)
+	if !ok {
 		return
 	}
 	body, err := logs.Read(s.cfg.LogDir(), job.ID)

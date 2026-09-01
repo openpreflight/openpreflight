@@ -91,3 +91,43 @@ func TestMissingLogIsNotAnError(t *testing.T) {
 		t.Fatalf("delete: %v", err)
 	}
 }
+
+func TestReadFromMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	data, next, err := ReadFrom(dir, "nope", 0)
+	if err != nil || len(data) != 0 || next != 0 {
+		t.Fatalf("missing: data=%q next=%d err=%v", data, next, err)
+	}
+}
+
+func TestReadFromOffset(t *testing.T) {
+	dir := t.TempDir()
+	w, err := Create(dir, "job-4", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("hello\nworld\n")); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+
+	all, next, err := ReadFrom(dir, "job-4", 0)
+	if err != nil || string(all) != "hello\nworld\n" || next != int64(len(all)) {
+		t.Fatalf("offset 0: %q next=%d err=%v", all, next, err)
+	}
+
+	rest, next, err := ReadFrom(dir, "job-4", 6)
+	if err != nil || string(rest) != "world\n" || next != 12 {
+		t.Fatalf("mid-file: %q next=%d err=%v", rest, next, err)
+	}
+
+	past, next, err := ReadFrom(dir, "job-4", 99)
+	if err != nil || len(past) != 0 || next != 99 {
+		t.Fatalf("past EOF: %q next=%d err=%v", past, next, err)
+	}
+
+	end, next, err := ReadFrom(dir, "job-4", 12)
+	if err != nil || len(end) != 0 || next != 12 {
+		t.Fatalf("at EOF: %q next=%d err=%v", end, next, err)
+	}
+}

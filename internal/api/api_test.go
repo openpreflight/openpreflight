@@ -3,12 +3,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/logs"
@@ -523,6 +525,84 @@ func TestJobLogsAPIHonoursShareableLogs(t *testing.T) {
 	}
 }
 
+func TestJobLogStreamHonoursShareableLogs(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	private, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa", ShareableLogs: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "bbb", ShareableLogs: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{private.ID, shared.ID} {
+		w, err := logs.Create(ts.cfg.LogDir(), id, 1<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Printf("secret build output for %s\n", id)
+		w.Close()
+		if err := ts.store.FinishJob(id, store.JobSuccess, "success", "[]", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rec := ts.do(jsonReq(http.MethodGet, "/api/v1/jobs/"+private.ID+"/logs/stream", ""))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("private stream leaked: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.do(jsonReq(http.MethodGet, "/api/v1/jobs/"+shared.ID+"/logs/stream", ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("shareable stream: %d %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "secret build output for "+shared.ID) {
+		t.Fatalf("shareable stream missing log: %s", body)
+	}
+	if !strings.Contains(body, "event: finished") {
+		t.Fatalf("shareable stream missing finished: %s", body)
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/"+private.ID+"/logs/stream", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "secret build output for "+private.ID) {
+		t.Fatalf("authenticated stream: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/1e6b1f9c-0000-4000-8000-000000000000/logs/stream", "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing job stream: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestJobLogStreamStopsWhenClientLeaves(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	job, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "ccc", ShareableLogs: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := jsonReq(http.MethodGet, "/api/v1/jobs/"+job.ID+"/logs/stream", "")
+	req.Header.Set("Authorization", "Bearer "+token)
+	ctx, cancel := context.WithCancel(req.Context())
+	req = req.WithContext(ctx)
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	rec := ts.do(req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("in-flight stream: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
 	ts := newTestServer(t)
 	rec := ts.do(htmlReq(http.MethodGet, "/setup"))
@@ -696,6 +776,9 @@ func TestRunPageOperatorSurface(t *testing.T) {
 	if !strings.Contains(body, `http-equiv="refresh"`) {
 		t.Fatal("in-flight run page is missing meta refresh")
 	}
+	if !strings.Contains(body, `id="job-log"`) || !strings.Contains(body, "EventSource") {
+		t.Fatal("in-flight run page is missing the live log stream")
+	}
 	if !strings.Contains(body, "/api/v1/jobs/"+running.ID+"/rerun") ||
 		!strings.Contains(body, "/api/v1/jobs/"+running.ID+"/cancel") {
 		t.Fatal("authed run page is missing re-run/cancel")
@@ -723,6 +806,9 @@ func TestRunPageOperatorSurface(t *testing.T) {
 	}
 	if strings.Contains(doneBody, `http-equiv="refresh"`) {
 		t.Fatal("finished job should not refresh")
+	}
+	if strings.Contains(doneBody, "EventSource") {
+		t.Fatal("finished job should not open EventSource")
 	}
 	if !strings.Contains(doneBody, "✓") || !strings.Contains(doneBody, "✗") || !strings.Contains(doneBody, "–") {
 		t.Fatalf("step marks missing from %s", doneBody)
