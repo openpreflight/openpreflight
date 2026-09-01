@@ -89,7 +89,7 @@ func TestTrailingSlashInBaseURL(t *testing.T) {
 
 func TestGitHubApps(t *testing.T) {
 	srv := fakeCoolify(t, "t", map[string]string{
-		"/api/v1/github-apps": `[{"uuid":"gh-1","name":"winpra","app_id":123,"installation_id":456}]`,
+		"/api/v1/github-apps": `[{"uuid":"gh-1","name":"acme","app_id":123,"installation_id":456}]`,
 	})
 	c := New(srv.URL, "t")
 	apps, err := c.GitHubApps(context.Background())
@@ -104,14 +104,14 @@ func TestGitHubApps(t *testing.T) {
 func TestRepositoriesProbesKnownPaths(t *testing.T) {
 	// Only the second candidate path exists on this instance.
 	srv := fakeCoolify(t, "t", map[string]string{
-		"/api/v1/github-apps/gh-1/repos": `{"repositories":[{"full_name":"winpra/api","private":true}]}`,
+		"/api/v1/github-apps/gh-1/repos": `{"repositories":[{"full_name":"acme/api","private":true}]}`,
 	})
 	c := New(srv.URL, "t")
 	repos, err := c.Repositories(context.Background(), "gh-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(repos) != 1 || repos[0].FullName != "winpra/api" || !repos[0].Private {
+	if len(repos) != 1 || repos[0].FullName != "acme/api" || !repos[0].Private {
 		t.Fatalf("repos: %+v", repos)
 	}
 }

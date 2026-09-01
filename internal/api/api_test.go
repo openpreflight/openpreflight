@@ -134,7 +134,7 @@ func TestBearerTokenIsAcceptedForAPI(t *testing.T) {
 func TestSettingsPatchIsPartial(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
-	rec := ts.authed(t, token, http.MethodPatch, "/api/v1/settings", `{"default_check_name":"Winpra CI"}`)
+	rec := ts.authed(t, token, http.MethodPatch, "/api/v1/settings", `{"default_check_name":"Acme CI"}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
@@ -142,7 +142,7 @@ func TestSettingsPatchIsPartial(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.DefaultCheckName != "Winpra CI" {
+	if settings.DefaultCheckName != "Acme CI" {
 		t.Fatalf("check name not applied: %+v", settings)
 	}
 	// The fields the PATCH did not mention must survive.
@@ -246,7 +246,7 @@ func TestBindingsUpsertAndDeleteOverAPI(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
 	rec := ts.authed(t, token, http.MethodPut, "/api/v1/bindings",
-		`{"github_app_id":`+itoa(ts.app.ID)+`,"repo":"winpra/api","enabled":true,"branches":"main","shareable_logs":true}`)
+		`{"github_app_id":`+itoa(ts.app.ID)+`,"repo":"acme/api","enabled":true,"branches":"main","shareable_logs":true}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
@@ -267,7 +267,7 @@ func TestBindingsUpsertAndDeleteOverAPI(t *testing.T) {
 func TestBindingRequiresAnApp(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
-	rec := ts.authed(t, token, http.MethodPut, "/api/v1/bindings", `{"repo":"winpra/api","enabled":true}`)
+	rec := ts.authed(t, token, http.MethodPut, "/api/v1/bindings", `{"repo":"acme/api","enabled":true}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
@@ -278,13 +278,13 @@ func TestRunPageRequiresSessionUnlessShareable(t *testing.T) {
 	token := ts.login(t)
 
 	private, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "aaa", ShareableLogs: false,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa", ShareableLogs: false,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	shared, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "bbb", ShareableLogs: true,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "bbb", ShareableLogs: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -338,7 +338,7 @@ func TestRerunRequiresEnabledBinding(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
 	job, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "aaa", InstallationID: 101,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa", InstallationID: 101,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -349,7 +349,7 @@ func TestRerunRequiresEnabledBinding(t *testing.T) {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
 
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	rec = ts.authed(t, token, http.MethodPost, "/api/v1/jobs/"+job.ID+"/rerun", "")
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("rerun: %d %s", rec.Code, rec.Body.String())
@@ -370,8 +370,8 @@ func TestRerunRequiresEnabledBinding(t *testing.T) {
 func TestAuthenticatedPagesRender(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
-	ts.store.EnqueueJob(store.JobInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "abc1234", Ref: "main"})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
+	ts.store.EnqueueJob(store.JobInput{GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "abc1234", Ref: "main"})
 	inst, err := ts.store.CreateCoolifyInstance(store.CoolifyInput{
 		Name: "prod", BaseURL: "https://coolify.example.com", APIToken: "1|secret-token-value",
 	})
@@ -437,7 +437,7 @@ func TestCSRFRequiredForCookieWrites(t *testing.T) {
 	}
 	// A cross-site form post carries the cookie but not the CSRF token.
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/bindings",
-		strings.NewReader("repo=winpra/api&enabled=1&github_app_id="+itoa(ts.app.ID)))
+		strings.NewReader("repo=acme/api&enabled=1&github_app_id="+itoa(ts.app.ID)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "text/html")
 	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
@@ -450,7 +450,7 @@ func TestCSRFRequiredForCookieWrites(t *testing.T) {
 
 	// The same request with the token succeeds.
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/bindings",
-		strings.NewReader("repo=winpra/api&enabled=1&csrf=the-real-token&github_app_id="+itoa(ts.app.ID)))
+		strings.NewReader("repo=acme/api&enabled=1&csrf=the-real-token&github_app_id="+itoa(ts.app.ID)))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "text/html")
 	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
@@ -482,13 +482,13 @@ func TestJobLogsAPIHonoursShareableLogs(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
 	private, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "aaa", ShareableLogs: false,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa", ShareableLogs: false,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	shared, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "bbb", ShareableLogs: true,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "bbb", ShareableLogs: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -661,14 +661,14 @@ func TestRunPageOperatorSurface(t *testing.T) {
 	token := ts.login(t)
 
 	running, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "abc1234deadbeef", Ref: "main",
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "abc1234deadbeef", Ref: "main",
 		ShareableLogs: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	done, err := ts.store.EnqueueJob(store.JobInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", SHA: "def5678deadbeef",
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "def5678deadbeef",
 		ShareableLogs: true,
 	})
 	if err != nil {
@@ -700,7 +700,7 @@ func TestRunPageOperatorSurface(t *testing.T) {
 		!strings.Contains(body, "/api/v1/jobs/"+running.ID+"/cancel") {
 		t.Fatal("authed run page is missing re-run/cancel")
 	}
-	if !strings.Contains(body, "https://github.com/winpra/api/commit/abc1234deadbeef") {
+	if !strings.Contains(body, "https://github.com/acme/api/commit/abc1234deadbeef") {
 		t.Fatal("github.com commit link missing")
 	}
 
@@ -730,11 +730,11 @@ func TestRunPageOperatorSurface(t *testing.T) {
 }
 
 func TestGitHubCommitURL(t *testing.T) {
-	job := store.Job{Repo: "winpra/api", SHA: "abc1234deadbeef"}
-	if got := githubCommitURL(job, ""); got != "https://github.com/winpra/api/commit/abc1234deadbeef" {
+	job := store.Job{Repo: "acme/api", SHA: "abc1234deadbeef"}
+	if got := githubCommitURL(job, ""); got != "https://github.com/acme/api/commit/abc1234deadbeef" {
 		t.Fatalf("empty api: %s", got)
 	}
-	if got := githubCommitURL(job, "https://api.github.com"); got != "https://github.com/winpra/api/commit/abc1234deadbeef" {
+	if got := githubCommitURL(job, "https://api.github.com"); got != "https://github.com/acme/api/commit/abc1234deadbeef" {
 		t.Fatalf("dotcom: %s", got)
 	}
 	if got := githubCommitURL(job, "https://ghe.example.com/api/v3"); got != "" {

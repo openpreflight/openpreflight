@@ -16,7 +16,7 @@ import (
 
 func TestCloneExactSHA(t *testing.T) {
 	root := t.TempDir()
-	sha := testsupport.NewRepo(t, root, "winpra/api", map[string]string{
+	sha := testsupport.NewRepo(t, root, "acme/api", map[string]string{
 		"package.json": `{"name":"api","scripts":{"test":"echo ok"}}`,
 		"README.md":    "hello",
 	})
@@ -28,7 +28,7 @@ func TestCloneExactSHA(t *testing.T) {
 	}
 	var out bytes.Buffer
 	if err := ws.Clone(context.Background(), CloneOptions{
-		Repo: "winpra/api", SHA: sha, Token: "ghs-installation-token", BaseURL: git.URL,
+		Repo: "acme/api", SHA: sha, Token: "ghs-installation-token", BaseURL: git.URL,
 	}, &out); err != nil {
 		t.Fatalf("clone: %v\n%s", err, out.String())
 	}

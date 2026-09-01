@@ -131,7 +131,7 @@ func (ts *testServer) jobCount(t *testing.T) int {
 
 func TestWebhookRejectsBadSignature(t *testing.T) {
 	ts := newTestServer(t)
-	body := checkSuiteBody("winpra/api", "abc1234", "main")
+	body := checkSuiteBody("acme/api", "abc1234", "main")
 	req := httptest.NewRequest(http.MethodPost, "/webhook/ci", strings.NewReader(body))
 	req.Header.Set("X-GitHub-Event", "check_suite")
 	req.Header.Set("X-Hub-Signature-256", "sha256=deadbeef")
@@ -147,7 +147,7 @@ func TestWebhookRejectsBadSignature(t *testing.T) {
 
 func TestWebhookUnknownSlugIsUnauthorized(t *testing.T) {
 	ts := newTestServer(t)
-	rec := ts.post(t, "no-such-app", "check_suite", "d-1", checkSuiteBody("winpra/api", "abc", "main"))
+	rec := ts.post(t, "no-such-app", "check_suite", "d-1", checkSuiteBody("acme/api", "abc", "main"))
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status %d body %q", rec.Code, rec.Body.String())
 	}
@@ -155,7 +155,7 @@ func TestWebhookUnknownSlugIsUnauthorized(t *testing.T) {
 
 func TestWebhookWithoutBindingIsIgnored(t *testing.T) {
 	ts := newTestServer(t)
-	rec := ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "abc1234", "main"))
+	rec := ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("acme/api", "abc1234", "main"))
 	// 202 keeps GitHub's delivery log green: the signature was fine, we just
 	// have nothing to do.
 	if rec.Code != http.StatusAccepted {
@@ -172,11 +172,11 @@ func TestWebhookWithoutBindingIsIgnored(t *testing.T) {
 func TestWebhookDisabledBindingIsIgnored(t *testing.T) {
 	ts := newTestServer(t)
 	if _, err := ts.store.UpsertBinding(store.BindingInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: false,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: false,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "abc1234", "main"))
+	ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("acme/api", "abc1234", "main"))
 	if ts.jobCount(t) != 0 {
 		t.Fatal("a disabled binding must not run")
 	}
@@ -185,12 +185,12 @@ func TestWebhookDisabledBindingIsIgnored(t *testing.T) {
 func TestWebhookEnabledBindingEnqueues(t *testing.T) {
 	ts := newTestServer(t)
 	binding, err := ts.store.UpsertBinding(store.BindingInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true, ShareableLogs: true,
+		GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true, ShareableLogs: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "abc1234", "main"))
+	rec := ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("acme/api", "abc1234", "main"))
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status %d body %q", rec.Code, rec.Body.String())
 	}
@@ -202,7 +202,7 @@ func TestWebhookEnabledBindingEnqueues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if job.Repo != "winpra/api" || job.SHA != "abc1234" || job.Ref != "main" {
+	if job.Repo != "acme/api" || job.SHA != "abc1234" || job.Ref != "main" {
 		t.Fatalf("job: %+v", job)
 	}
 	if job.BindingID != binding.ID || job.InstallationID != 101 {
@@ -218,8 +218,8 @@ func TestWebhookEnabledBindingEnqueues(t *testing.T) {
 
 func TestWebhookDeliveryDedupOnlyWhileInFlight(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
-	body := checkSuiteBody("winpra/api", "abc1234", "main")
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
+	body := checkSuiteBody("acme/api", "abc1234", "main")
 
 	first := decodeBody(t, ts.post(t, "ci", "check_suite", "delivery-1", body))["job"]
 	if ts.jobCount(t) != 1 {
@@ -250,16 +250,16 @@ func TestWebhookDeliveryDedupOnlyWhileInFlight(t *testing.T) {
 
 func TestWebhookSkipsForkPRs(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	body := fmt.Sprintf(`{
 	  "action": "requested",
 	  "check_suite": {
 	    "head_sha": "abc1234", "head_branch": "patch-1",
 	    "pull_requests": [{"head": {"repo": {"id": 99, "full_name": "outsider/api"}},
-	                       "base": {"repo": {"id": 10, "full_name": "winpra/api"}}}],
+	                       "base": {"repo": {"id": 10, "full_name": "acme/api"}}}],
 	    "app": {"id": %d}
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 101}
 	}`, appNumericID)
 
@@ -287,16 +287,16 @@ func TestWebhookRunsForkWhenEnabled(t *testing.T) {
 	if err := ts.store.SaveSettings(settings); err != nil {
 		t.Fatal(err)
 	}
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	body := fmt.Sprintf(`{
 	  "action": "requested",
 	  "check_suite": {
 	    "head_sha": "abc1234", "head_branch": "patch-1",
 	    "pull_requests": [{"number": 12, "head": {"ref": "patch-1", "repo": {"id": 99, "full_name": "outsider/api"}},
-	                       "base": {"repo": {"id": 10, "full_name": "winpra/api"}}}],
+	                       "base": {"repo": {"id": 10, "full_name": "acme/api"}}}],
 	    "app": {"id": %d}
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 101}
 	}`, appNumericID)
 	rec := ts.post(t, "ci", "check_suite", "d-fork-run", body)
@@ -324,16 +324,16 @@ func TestWebhookForkRequiresDockerEvenWhenEnabled(t *testing.T) {
 	if err := ts.store.SaveSettings(settings); err != nil {
 		t.Fatal(err)
 	}
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	body := fmt.Sprintf(`{
 	  "action": "requested",
 	  "check_suite": {
 	    "head_sha": "abc1234", "head_branch": "patch-1",
 	    "pull_requests": [{"number": 12, "head": {"repo": {"id": 99, "full_name": "outsider/api"}},
-	                       "base": {"repo": {"id": 10, "full_name": "winpra/api"}}}],
+	                       "base": {"repo": {"id": 10, "full_name": "acme/api"}}}],
 	    "app": {"id": %d}
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 101}
 	}`, appNumericID)
 	rec := ts.post(t, "ci", "check_suite", "d-fork-nodocker", body)
@@ -348,15 +348,15 @@ func TestWebhookForkRequiresDockerEvenWhenEnabled(t *testing.T) {
 func TestWebhookBranchAllowList(t *testing.T) {
 	ts := newTestServer(t)
 	ts.store.UpsertBinding(store.BindingInput{
-		GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true, Branches: "main, release/*",
+		GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true, Branches: "main, release/*",
 	})
-	if rec := ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "a1", "develop")); rec.Code != http.StatusAccepted {
+	if rec := ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("acme/api", "a1", "develop")); rec.Code != http.StatusAccepted {
 		t.Fatalf("status %d", rec.Code)
 	}
 	if ts.jobCount(t) != 0 {
 		t.Fatal("a branch outside the allow-list must not run")
 	}
-	ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("winpra/api", "a2", "release/2026"))
+	ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("acme/api", "a2", "release/2026"))
 	if ts.jobCount(t) != 1 {
 		t.Fatal("a branch matching release/* should run")
 	}
@@ -364,12 +364,12 @@ func TestWebhookBranchAllowList(t *testing.T) {
 
 func TestWebhookIgnoresOtherAppsCheckRunRerequest(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	body := `{
 	  "action": "rerequested",
 	  "check_run": {"id": 1, "head_sha": "abc1234", "app": {"id": 999999},
 	                "check_suite": {"head_sha":"abc1234","head_branch": "main", "pull_requests": []}},
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 101}
 	}`
 	rec := ts.post(t, "ci", "check_run", "d-1", body)
@@ -383,12 +383,12 @@ func TestWebhookIgnoresOtherAppsCheckRunRerequest(t *testing.T) {
 
 func TestWebhookOwnCheckRunRerequestEnqueues(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	body := fmt.Sprintf(`{
 	  "action": "rerequested",
 	  "check_run": {"id": 1, "head_sha": "abc1234", "app": {"id": %d},
 	                "check_suite": {"head_sha":"abc1234","head_branch": "main", "pull_requests": []}},
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 101}
 	}`, appNumericID)
 	rec := ts.post(t, "ci", "check_run", "d-1", body)
@@ -407,9 +407,9 @@ func TestWebhookPing(t *testing.T) {
 
 func TestWebhookNewCommitCancelsOlderJobOnSameRef(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
-	first := decodeBody(t, ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "aaa1111", "main")))["job"]
-	ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("winpra/api", "bbb2222", "main"))
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
+	first := decodeBody(t, ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("acme/api", "aaa1111", "main")))["job"]
+	ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("acme/api", "bbb2222", "main"))
 
 	older, err := ts.store.Job(first)
 	if err != nil {
@@ -441,8 +441,8 @@ func TestWebhookMalformedPayloadIsAccepted(t *testing.T) {
 // the commit would carry two Check Runs with the same name (ADR 005).
 func TestWebhookDuplicateSuiteRequestIsNotRunTwice(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
-	body := checkSuiteBody("winpra/api", "abc1234", "main")
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
+	body := checkSuiteBody("acme/api", "abc1234", "main")
 
 	first := decodeBody(t, ts.post(t, "ci", "check_suite", "delivery-1", body))["job"]
 	if ts.jobCount(t) != 1 {
@@ -467,13 +467,13 @@ func TestWebhookDuplicateSuiteRequestIsNotRunTwice(t *testing.T) {
 // fresh run — never two live ones.
 func TestWebhookRerequestCancelsInFlightRunForSameSHA(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 
 	first := decodeBody(t, ts.post(t, "ci", "check_suite", "d-1",
-		checkSuiteBody("winpra/api", "abc1234", "main")))["job"]
+		checkSuiteBody("acme/api", "abc1234", "main")))["job"]
 
 	rec := ts.post(t, "ci", "check_suite", "d-2",
-		checkSuiteBodyAction("winpra/api", "abc1234", "main", "rerequested"))
+		checkSuiteBodyAction("acme/api", "abc1234", "main", "rerequested"))
 	if got := decodeBody(t, rec)["status"]; got != "queued" {
 		t.Fatalf("a rerequest should enqueue: status %q body %q", got, rec.Body.String())
 	}
@@ -506,10 +506,10 @@ func TestWebhookRerequestCancelsInFlightRunForSameSHA(t *testing.T) {
 // cannot see this; the suite guard can.
 func TestWebhookSameSHAOnSecondRefDoesNotDuplicate(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 
-	ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("winpra/api", "abc1234", "main"))
-	rec := ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("winpra/api", "abc1234", "release/2026"))
+	ts.post(t, "ci", "check_suite", "d-1", checkSuiteBody("acme/api", "abc1234", "main"))
+	rec := ts.post(t, "ci", "check_suite", "d-2", checkSuiteBody("acme/api", "abc1234", "release/2026"))
 
 	if got := decodeBody(t, rec)["status"]; got != "already queued" {
 		t.Fatalf("status %q body %q", got, rec.Body.String())
@@ -522,9 +522,9 @@ func TestWebhookSameSHAOnSecondRefDoesNotDuplicate(t *testing.T) {
 // The suite id travels from the payload onto the job row.
 func TestWebhookRecordsCheckSuiteID(t *testing.T) {
 	ts := newTestServer(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "winpra/api", Enabled: true})
+	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
 	id := decodeBody(t, ts.post(t, "ci", "check_suite", "d-1",
-		checkSuiteBodyAction("winpra/api", "abc1234", "main", "requested")))["job"]
+		checkSuiteBodyAction("acme/api", "abc1234", "main", "requested")))["job"]
 	job, err := ts.store.Job(id)
 	if err != nil {
 		t.Fatal(err)

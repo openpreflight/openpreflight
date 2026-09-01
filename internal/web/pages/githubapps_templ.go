@@ -1496,7 +1496,7 @@ func GitHubApps(p web.Page) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "winpra-ci", Required: true, Value: edit.Name}).Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "openpreflight-ci", Required: true, Value: edit.Name}).Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -1544,7 +1544,7 @@ func GitHubApps(p web.Page) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = input.Input(input.Props{ID: "slug", Name: "slug", Type: "text", Placeholder: "winpra-ci", Value: edit.Slug}).Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = input.Input(input.Props{ID: "slug", Name: "slug", Type: "text", Placeholder: "openpreflight-ci", Value: edit.Slug}).Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
