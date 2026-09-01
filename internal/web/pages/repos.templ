@@ -71,6 +71,9 @@ templ reposBody(p web.Page) {
 								} else {
 									all branches
 								}
+								if row.Binding.Paths != "" {
+									{ " · " + row.Binding.Paths }
+								}
 							</p>
 							if row.LastJob.ID != "" {
 								<div class="flex flex-wrap items-center gap-2 text-xs">
@@ -299,6 +302,15 @@ templ reposEditor(p web.Page) {
 						@input.Input(input.Props{ID: "b_branches", Name: "branches", Type: "text", Placeholder: branchesPlaceholder, Value: edit.Branches})
 						@field.Description() {
 							Empty allows every branch.
+						}
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "b_paths"}) {
+							Paths
+						}
+						@input.Input(input.Props{ID: "b_paths", Name: "paths", Type: "text", Placeholder: "frontend/**, packages/api/**", Value: edit.Paths})
+						@field.Description() {
+							Empty allows every path. Skip (Check Run conclusion skipped) when no changed file matches.
 						}
 					}
 					@field.Field() {

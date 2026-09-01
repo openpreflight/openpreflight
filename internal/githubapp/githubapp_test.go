@@ -12,8 +12,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -313,5 +315,75 @@ func TestAPIErrorMessages(t *testing.T) {
 	// The operator's actual mistake is usually a mismatched App ID and key.
 	if !strings.Contains(err.Error(), "App ID") {
 		t.Fatalf("unhelpful 401 message: %v", err)
+	}
+}
+
+func TestCommitFiles(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /app/installations/{id}/access_tokens", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"token":      "ghs-installation-token",
+			"expires_at": time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+		})
+	})
+	mux.HandleFunc("GET /repos/{owner}/{repo}/commits/{sha}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer ghs-installation-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		switch r.PathValue("sha") {
+		case "good":
+			raw, err := os.ReadFile("testdata/commit_files.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.Write(raw)
+		case "truncated":
+			files := make([]map[string]any, maxCommitFiles)
+			for i := range files {
+				files[i] = map[string]any{"filename": fmt.Sprintf("f%d.go", i)}
+			}
+			json.NewEncoder(w).Encode(map[string]any{"files": files, "truncated": true})
+		case "capped":
+			files := make([]map[string]any, maxCommitFiles)
+			for i := range files {
+				files[i] = map[string]any{"filename": fmt.Sprintf("f%d.go", i)}
+			}
+			json.NewEncoder(w).Encode(map[string]any{"files": files})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+		}
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := newTestClient(t, srv.URL)
+
+	got, err := c.CommitFiles(context.Background(), 101, "acme/api", "good")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := got.ChangedPaths()
+	if got.Truncated || len(paths) != 3 {
+		t.Fatalf("files: truncated=%v paths=%v", got.Truncated, paths)
+	}
+	want := map[string]bool{"frontend/app.ts": true, "frontend/renamed.ts": true, "lib/old.ts": true}
+	for _, p := range paths {
+		if !want[p] {
+			t.Fatalf("unexpected path %q in %v", p, paths)
+		}
+	}
+
+	trunc, err := c.CommitFiles(context.Background(), 101, "acme/api", "truncated")
+	if err != nil || !trunc.Truncated {
+		t.Fatalf("truncated flag: %v %+v", err, trunc)
+	}
+	capped, err := c.CommitFiles(context.Background(), 101, "acme/api", "capped")
+	if err != nil || !capped.Truncated {
+		t.Fatalf("300-file cap should count as truncated: %v %+v", err, capped)
+	}
+	if _, err := c.CommitFiles(context.Background(), 101, "acme/api", "nope"); err == nil {
+		t.Fatal("missing commit should fail")
 	}
 }

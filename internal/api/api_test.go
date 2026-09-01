@@ -246,12 +246,12 @@ func TestBindingsUpsertAndDeleteOverAPI(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
 	rec := ts.authed(t, token, http.MethodPut, "/api/v1/bindings",
-		`{"github_app_id":`+itoa(ts.app.ID)+`,"repo":"acme/api","enabled":true,"branches":"main","shareable_logs":true}`)
+		`{"github_app_id":`+itoa(ts.app.ID)+`,"repo":"acme/api","enabled":true,"branches":"main","paths":"frontend/**","shareable_logs":true}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
 	}
 	bindings, _ := ts.store.ListBindings()
-	if len(bindings) != 1 || !bindings[0].Enabled || !bindings[0].ShareableLogs {
+	if len(bindings) != 1 || !bindings[0].Enabled || !bindings[0].ShareableLogs || bindings[0].Paths != "frontend/**" {
 		t.Fatalf("binding: %+v", bindings)
 	}
 	rec = ts.authed(t, token, http.MethodDelete, "/api/v1/bindings/"+itoa(bindings[0].ID), "")

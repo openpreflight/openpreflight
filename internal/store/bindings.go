@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const bindingCols = `id, github_app_id, COALESCE(coolify_instance_id, 0), repo, enabled, branches,
+const bindingCols = `id, github_app_id, COALESCE(coolify_instance_id, 0), repo, enabled, branches, paths,
 	check_name, pipeline_file, timeout_seconds, install_cmd, test_cmd, build_cmd,
 	shareable_logs, created_at, updated_at`
 
@@ -24,7 +24,7 @@ func scanBinding(sc interface{ Scan(...any) error }) (RepoBinding, error) {
 		enabled, shared int
 		ca, ua          string
 	)
-	if err := sc.Scan(&b.ID, &b.GitHubAppID, &b.CoolifyInstanceID, &b.Repo, &enabled, &b.Branches,
+	if err := sc.Scan(&b.ID, &b.GitHubAppID, &b.CoolifyInstanceID, &b.Repo, &enabled, &b.Branches, &b.Paths,
 		&b.CheckName, &b.PipelineFile, &b.TimeoutSeconds, &b.InstallCmd, &b.TestCmd, &b.BuildCmd,
 		&shared, &ca, &ua); err != nil {
 		return RepoBinding{}, err
@@ -88,6 +88,7 @@ type BindingInput struct {
 	Repo              string
 	Enabled           bool
 	Branches          string
+	Paths             string
 	CheckName         string
 	PipelineFile      string
 	TimeoutSeconds    int
@@ -100,6 +101,7 @@ type BindingInput struct {
 func (in *BindingInput) normalise() error {
 	in.Repo = strings.Trim(strings.TrimSpace(in.Repo), "/")
 	in.Branches = strings.TrimSpace(in.Branches)
+	in.Paths = strings.TrimSpace(in.Paths)
 	in.CheckName = strings.TrimSpace(in.CheckName)
 	in.PipelineFile = strings.TrimSpace(in.PipelineFile)
 	if in.GitHubAppID <= 0 {
@@ -133,13 +135,14 @@ func (s *Store) UpsertBinding(in BindingInput) (RepoBinding, error) {
 	}
 	ts := formatTime(now())
 	_, err := s.db.Exec(`INSERT INTO repo_bindings
-		(github_app_id, coolify_instance_id, repo, enabled, branches, check_name, pipeline_file,
+		(github_app_id, coolify_instance_id, repo, enabled, branches, paths, check_name, pipeline_file,
 		 timeout_seconds, install_cmd, test_cmd, build_cmd, shareable_logs, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (github_app_id, repo) DO UPDATE SET
 			coolify_instance_id = excluded.coolify_instance_id,
 			enabled = excluded.enabled,
 			branches = excluded.branches,
+			paths = excluded.paths,
 			check_name = excluded.check_name,
 			pipeline_file = excluded.pipeline_file,
 			timeout_seconds = excluded.timeout_seconds,
@@ -148,7 +151,7 @@ func (s *Store) UpsertBinding(in BindingInput) (RepoBinding, error) {
 			build_cmd = excluded.build_cmd,
 			shareable_logs = excluded.shareable_logs,
 			updated_at = excluded.updated_at`,
-		in.GitHubAppID, nullInt64(in.CoolifyInstanceID), in.Repo, boolInt(in.Enabled), in.Branches,
+		in.GitHubAppID, nullInt64(in.CoolifyInstanceID), in.Repo, boolInt(in.Enabled), in.Branches, in.Paths,
 		in.CheckName, in.PipelineFile, in.TimeoutSeconds, in.InstallCmd, in.TestCmd, in.BuildCmd,
 		boolInt(in.ShareableLogs), ts, ts)
 	if err != nil {
@@ -193,6 +196,45 @@ func (b RepoBinding) BranchAllowed(branch string) bool {
 		}
 	}
 	return false
+}
+
+// PathAllowed applies the optional path allow-list to the files changed in a
+// commit. An empty list allows everything. Empty changed with a non-empty list
+// is a miss — callers must not pass a truncated or failed file list here.
+func (b RepoBinding) PathAllowed(changed []string) bool {
+	patterns := splitList(b.Paths)
+	if len(patterns) == 0 {
+		return true
+	}
+	for _, file := range changed {
+		file = strings.TrimPrefix(strings.TrimSpace(file), "/")
+		if file == "" {
+			continue
+		}
+		for _, pattern := range patterns {
+			if pathMatches(pattern, file) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func pathMatches(pattern, file string) bool {
+	pattern = strings.TrimPrefix(strings.TrimSpace(pattern), "/")
+	if pattern == "" {
+		return false
+	}
+	if strings.HasSuffix(pattern, "/**") {
+		prefix := strings.TrimSuffix(pattern, "**")
+		if prefix == "/" || prefix == "" {
+			return true
+		}
+		dir := strings.TrimSuffix(prefix, "/")
+		return file == dir || strings.HasPrefix(file, prefix)
+	}
+	ok, err := path.Match(pattern, file)
+	return err == nil && ok
 }
 
 // splitList parses a comma or newline separated field.

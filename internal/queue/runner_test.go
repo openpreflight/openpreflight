@@ -242,6 +242,87 @@ func TestRunnerSkipsRepoWithNothingToRun(t *testing.T) {
 	}
 }
 
+func TestRunnerSkipsWhenNoPathMatches(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "install: echo installing\ntest: echo testing\nbuild: echo building\n",
+	})
+	h.github.SetCommitFiles(sha, []map[string]any{{"filename": "backend/main.go"}}, false)
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true, Paths: "frontend/**"})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSkipped {
+		t.Fatalf("path miss should skip, got %q %q", job.Status, job.Error)
+	}
+	if h.github.CompletedCheckRuns()[0].Body["conclusion"] != "skipped" {
+		t.Fatalf("required checks need a skipped conclusion: %+v", h.github.CompletedCheckRuns()[0].Body)
+	}
+	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
+	if !strings.Contains(body, "no changed path matched") {
+		t.Fatalf("log should say why it skipped:\n%s", body)
+	}
+	if strings.Contains(body, "checked out") {
+		t.Fatal("path miss cloned the repo")
+	}
+}
+
+func TestRunnerRunsWhenAPathMatches(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "install: echo installing\ntest: echo testing\nbuild: echo building\n",
+	})
+	h.github.SetCommitFiles(sha, []map[string]any{
+		{"filename": "frontend/app.ts"},
+		{"filename": "frontend/renamed.ts", "previous_filename": "lib/old.ts"},
+	}, false)
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true, Paths: "frontend/**"})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSuccess {
+		t.Fatalf("path hit should run, got %q %q", job.Status, job.Error)
+	}
+}
+
+func TestRunnerFailOpenWhenCommitFilesFail(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "install: echo installing\ntest: echo testing\nbuild: echo building\n",
+	})
+	h.github.FailNext("commit-files")
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true, Paths: "frontend/**"})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSuccess {
+		t.Fatalf("commit-files error should fail-open, got %q %q", job.Status, job.Error)
+	}
+	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
+	if !strings.Contains(body, "fail-open") {
+		t.Fatalf("log should say fail-open:\n%s", body)
+	}
+}
+
+func TestRunnerFailOpenWhenFileListIsTruncated(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "install: echo installing\ntest: echo testing\nbuild: echo building\n",
+	})
+	h.github.SetCommitFiles(sha, []map[string]any{{"filename": "docs/only.md"}}, true)
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true, Paths: "frontend/**"})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSuccess {
+		t.Fatalf("truncated list should fail-open, got %q %q", job.Status, job.Error)
+	}
+}
+
 func TestRunnerUsesBindingOverridesAndCheckName(t *testing.T) {
 	h := newHarness(t)
 	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{"README.md": "no pipeline file"})

@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Binding **paths** (`frontend/**`, comma or newline). Empty is every path. A
+  complete file list with no match skips the job (Check Run conclusion
+  `skipped`) before clone. A truncated or failed file list fail-opens and runs.
+
 ## [1.1.0] - 2026-09-01
 
 Operator chrome and the docker.sock workspace mount rewrite. Image

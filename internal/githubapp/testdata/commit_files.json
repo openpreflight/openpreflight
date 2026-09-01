@@ -1,0 +1,14 @@
+{
+  "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "files": [
+    {
+      "filename": "frontend/app.ts",
+      "status": "modified"
+    },
+    {
+      "filename": "frontend/renamed.ts",
+      "previous_filename": "lib/old.ts",
+      "status": "renamed"
+    }
+  ]
+}
