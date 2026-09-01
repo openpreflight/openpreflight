@@ -122,7 +122,7 @@ func decodeBody(t *testing.T, rec *httptest.ResponseRecorder) map[string]string 
 
 func (ts *testServer) jobCount(t *testing.T) int {
 	t.Helper()
-	jobs, err := ts.store.ListJobs(100)
+	jobs, err := ts.store.ListJobs(store.JobList{Limit: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestWebhookRunsForkWhenEnabled(t *testing.T) {
 	if got := decodeBody(t, rec)["status"]; got != "queued" {
 		t.Fatalf("status %q body %s", got, rec.Body.String())
 	}
-	jobs, err := ts.store.ListJobs(10)
+	jobs, err := ts.store.ListJobs(store.JobList{Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestWebhookRerequestCancelsInFlightRunForSameSHA(t *testing.T) {
 		t.Fatalf("the superseded run should be cancelled, status %q", older.Status)
 	}
 
-	jobs, err := ts.store.ListJobs(10)
+	jobs, err := ts.store.ListJobs(store.JobList{Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}

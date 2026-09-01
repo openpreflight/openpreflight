@@ -101,6 +101,22 @@ const (
 	JobError      = "error"
 )
 
+// JobStatuses is the closed set of job status values, in the order the Jobs
+// filter form lists them.
+var JobStatuses = []string{
+	JobQueued, JobInProgress, JobSuccess, JobFailure, JobSkipped, JobCancelled, JobError,
+}
+
+// ValidJobStatus reports whether s is one of the Job* constants. The empty
+// string is not a status; ListJobs treats it as "all".
+func ValidJobStatus(s string) bool {
+	switch s {
+	case JobQueued, JobInProgress, JobSuccess, JobFailure, JobSkipped, JobCancelled, JobError:
+		return true
+	}
+	return false
+}
+
 // Job is one pipeline run against one SHA.
 type Job struct {
 	ID             string     `json:"id"`
