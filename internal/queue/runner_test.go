@@ -122,13 +122,13 @@ func (h *harness) binding(t *testing.T, in store.BindingInput) store.RepoBinding
 
 func TestRunnerHappyPath(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
 		".ci.yml": "install: echo installing\ntest: echo testing\nbuild: echo building\n",
 	})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha,
 		Ref: "main", Event: "check_suite.requested", DeliveryID: "d-1", InstallationID: 101,
 	})
 
@@ -191,13 +191,13 @@ func TestRunnerHappyPath(t *testing.T) {
 
 func TestRunnerFailingStepStopsAndSkipsTheRest(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
 		".ci.yml": "install: echo ok\ntest: exit 3\nbuild: echo never\n",
 	})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha,
 		Ref: "main", InstallationID: 101,
 	})
 	if job.Status != store.JobFailure {
@@ -228,11 +228,11 @@ func TestRunnerFailingStepStopsAndSkipsTheRest(t *testing.T) {
 
 func TestRunnerSkipsRepoWithNothingToRun(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{"README.md": "just docs"})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{"README.md": "just docs"})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha, InstallationID: 101,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
 	})
 	if job.Status != store.JobSkipped {
 		t.Fatalf("a repo with no pipeline and no package.json should be skipped, got %q", job.Status)
@@ -244,22 +244,22 @@ func TestRunnerSkipsRepoWithNothingToRun(t *testing.T) {
 
 func TestRunnerUsesBindingOverridesAndCheckName(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{"README.md": "no pipeline file"})
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{"README.md": "no pipeline file"})
 	b := h.binding(t, store.BindingInput{
-		Repo: "winpra/api", Enabled: true, CheckName: "Winpra CI", TestCmd: "echo override-ran",
+		Repo: "acme/api", Enabled: true, CheckName: "Acme CI", TestCmd: "echo override-ran",
 	})
 
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha,
 		InstallationID: 101, CheckName: b.CheckName,
 	})
 	if job.Status != store.JobSuccess {
 		t.Fatalf("status %q error %q", job.Status, job.Error)
 	}
-	if name := h.github.CreatedCheckRuns()[0].Body["name"]; name != "Winpra CI" {
+	if name := h.github.CreatedCheckRuns()[0].Body["name"]; name != "Acme CI" {
 		t.Fatalf("binding check name should win: %v", name)
 	}
-	if job.CheckName != "Winpra CI" {
+	if job.CheckName != "Acme CI" {
 		t.Fatalf("binding check name not written on the job: %q", job.CheckName)
 	}
 	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
@@ -273,14 +273,14 @@ func TestRunnerUsesBindingOverridesAndCheckName(t *testing.T) {
 
 func TestRunnerNodeDefaults(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
 		// No lockfile and no install-worthy dependencies: npm install works
 		// offline for an empty dependency set.
 		"package.json": `{"name":"api","private":true,"scripts":{"test":"echo node-test-ran"}}`,
 	})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha, InstallationID: 101,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
 	})
 	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
 	if !strings.Contains(body, "Node defaults from package.json") {
@@ -296,12 +296,12 @@ func TestRunnerNodeDefaults(t *testing.T) {
 
 func TestRunnerTimeoutIsReported(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
 		".ci.yml": "test: sleep 60\ntimeout: 2s\n",
 	})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha, InstallationID: 101,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
 	})
 	if job.Status != store.JobCancelled || job.Conclusion != "timed_out" {
 		t.Fatalf("status %q conclusion %q", job.Status, job.Conclusion)
@@ -313,13 +313,13 @@ func TestRunnerTimeoutIsReported(t *testing.T) {
 
 func TestRunnerFailsWhenCheckRunCannotBeCreated(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{".ci.yml": "test: echo hi\n"})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{".ci.yml": "test: echo hi\n"})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 	// Without checks:write the App cannot report anything; the job must not
 	// silently look successful.
 	h.github.FailNext("create-check")
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha, InstallationID: 101,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
 	})
 	if job.Status != store.JobError {
 		t.Fatalf("status %q", job.Status)
@@ -331,10 +331,10 @@ func TestRunnerFailsWhenCheckRunCannotBeCreated(t *testing.T) {
 
 func TestRunnerCleansUpWorkspace(t *testing.T) {
 	h := newHarness(t)
-	sha := testsupport.NewRepo(t, h.repos, "winpra/api", map[string]string{".ci.yml": "test: echo hi\n"})
-	b := h.binding(t, store.BindingInput{Repo: "winpra/api", Enabled: true})
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{".ci.yml": "test: echo hi\n"})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
 	job := h.runOne(t, store.JobInput{
-		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "winpra/api", SHA: sha, InstallationID: 101,
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
 	})
 	entries, err := filepath.Glob(filepath.Join(h.cfg.WorkspaceDir(), job.ID))
 	if err != nil {

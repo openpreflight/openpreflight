@@ -113,7 +113,7 @@ func newFakeGitHub(t *testing.T) *fakeGitHub {
 			return
 		}
 		json.NewEncoder(w).Encode([]map[string]any{
-			{"id": 101, "account": map[string]any{"login": "winpra", "type": "Organization"},
+			{"id": 101, "account": map[string]any{"login": "acme", "type": "Organization"},
 				"repository_selection": "selected"},
 			{"id": 102, "account": map[string]any{"login": "vatsal", "type": "User"},
 				"repository_selection": "all"},
@@ -135,7 +135,7 @@ func newFakeGitHub(t *testing.T) *fakeGitHub {
 		json.NewEncoder(w).Encode(map[string]any{
 			"total_count": 1,
 			"repositories": []map[string]any{
-				{"id": 1, "full_name": "winpra/api", "name": "api", "private": true},
+				{"id": 1, "full_name": "acme/api", "name": "api", "private": true},
 			},
 		})
 	})
@@ -175,14 +175,14 @@ func TestInstallationsAndRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(installs) != 2 || installs[0].Account.Login != "winpra" {
+	if len(installs) != 2 || installs[0].Account.Login != "acme" {
 		t.Fatalf("installations: %+v", installs)
 	}
 	repos, err := c.InstallationRepositories(context.Background(), 101)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(repos) != 1 || repos[0].FullName != "winpra/api" {
+	if len(repos) != 1 || repos[0].FullName != "acme/api" {
 		t.Fatalf("repos: %+v", repos)
 	}
 }
@@ -228,7 +228,7 @@ func TestCreateAndCompleteCheckRun(t *testing.T) {
 	c := newTestClient(t, f.srv.URL)
 
 	run, err := c.CreateCheckRun(context.Background(), 101, CreateCheckRunInput{
-		Repo: "winpra/api", Name: "openpreflight", HeadSHA: "abc123",
+		Repo: "acme/api", Name: "openpreflight", HeadSHA: "abc123",
 		DetailsURL: "https://ci.example.com/runs/job-1",
 		Output:     &CheckOutput{Title: "Running", Summary: "starting"},
 	})
@@ -250,7 +250,7 @@ func TestCreateAndCompleteCheckRun(t *testing.T) {
 	}
 
 	if err := c.CompleteCheckRun(context.Background(), 101, CompleteCheckRunInput{
-		Repo: "winpra/api", CheckRunID: run.ID, Conclusion: "success",
+		Repo: "acme/api", CheckRunID: run.ID, Conclusion: "success",
 		Output: &CheckOutput{Title: "Passed", Summary: "all good"},
 	}); err != nil {
 		t.Fatal(err)

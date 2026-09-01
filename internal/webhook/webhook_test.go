@@ -47,7 +47,7 @@ const checkSuitePush = `{
     "pull_requests": [],
     "app": {"id": 4242}
   },
-  "repository": {"id": 10, "full_name": "winpra/api", "private": true},
+  "repository": {"id": 10, "full_name": "acme/api", "private": true},
   "installation": {"id": 777},
   "sender": {"login": "someone"}
 }`
@@ -57,7 +57,7 @@ func TestParseCheckSuite(t *testing.T) {
 	if err != nil || skip != "" {
 		t.Fatalf("parse: err=%v skip=%q", err, skip)
 	}
-	if ev.Repo != "winpra/api" || ev.Branch != "main" || ev.InstallationID != 777 {
+	if ev.Repo != "acme/api" || ev.Branch != "main" || ev.InstallationID != 777 {
 		t.Fatalf("unexpected event: %+v", ev)
 	}
 	if ev.SHA != "1111111111111111111111111111111111111111" {
@@ -98,9 +98,9 @@ func TestForkDetectionByHeadRepo(t *testing.T) {
 	    "head_sha": "abc1234",
 	    "head_branch": "patch-1",
 	    "pull_requests": [{"number": 3, "head": {"ref":"patch-1","repo": {"id": 99, "full_name": "outsider/api"}},
-	                       "base": {"ref":"main","repo": {"id": 10, "full_name": "winpra/api"}}}]
+	                       "base": {"ref":"main","repo": {"id": 10, "full_name": "acme/api"}}}]
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 5}
 	}`)
 	ev, skip, err := Parse(EventCheckSuite, body)
@@ -116,7 +116,7 @@ func TestForkDetectionByNullHeadBranch(t *testing.T) {
 	body := []byte(`{
 	  "action": "requested",
 	  "check_suite": {"head_sha": "abc1234", "head_branch": null, "pull_requests": []},
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 5}
 	}`)
 	ev, skip, err := Parse(EventCheckSuite, body)
@@ -136,10 +136,10 @@ func TestSameRepoPullRequestIsNotFork(t *testing.T) {
 	  "action": "requested",
 	  "check_suite": {
 	    "head_sha": "abc1234", "head_branch": "feature/x",
-	    "pull_requests": [{"head": {"repo": {"id": 10, "full_name": "winpra/api"}},
-	                       "base": {"repo": {"id": 10, "full_name": "winpra/api"}}}]
+	    "pull_requests": [{"head": {"repo": {"id": 10, "full_name": "acme/api"}},
+	                       "base": {"repo": {"id": 10, "full_name": "acme/api"}}}]
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 5}
 	}`)
 	ev, _, err := Parse(EventCheckSuite, body)
@@ -159,7 +159,7 @@ func TestParseCheckRunRerequestedCarriesAppID(t *testing.T) {
 	    "app": {"id": 4242},
 	    "check_suite": {"id": 6161, "head_sha":"cafe1234","head_branch": "main", "pull_requests": []}
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 777}
 	}`)
 	ev, skip, err := Parse(EventCheckRun, body)
@@ -188,7 +188,7 @@ func TestParseMissingCheckSuiteIDIsStillActionable(t *testing.T) {
 	    "app": {"id": 4242},
 	    "check_suite": {"head_sha":"cafe1234","head_branch": "main", "pull_requests": []}
 	  },
-	  "repository": {"id": 10, "full_name": "winpra/api"},
+	  "repository": {"id": 10, "full_name": "acme/api"},
 	  "installation": {"id": 777}
 	}`)
 	ev, skip, err := Parse(EventCheckRun, body)

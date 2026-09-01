@@ -218,8 +218,8 @@ func mustApp(t *testing.T, st *Store, name string) GitHubApp {
 
 func TestGitHubAppSecretsAndSlug(t *testing.T) {
 	st := newTestStore(t)
-	app := mustApp(t, st, "Winpra CI")
-	if app.Slug != "winpra-ci" {
+	app := mustApp(t, st, "Acme CI")
+	if app.Slug != "acme-ci" {
 		t.Fatalf("slug not derived: %q", app.Slug)
 	}
 	if strings.Contains(app.PEMRedacted, "fake") {
@@ -228,11 +228,11 @@ func TestGitHubAppSecretsAndSlug(t *testing.T) {
 	if secret, err := st.DecryptWebhookSecret(app); err != nil || secret != "webhook-secret-value" {
 		t.Fatalf("webhook secret round trip: %v %q", err, secret)
 	}
-	if _, err := st.GitHubAppBySlug("winpra-ci"); err != nil {
+	if _, err := st.GitHubAppBySlug("acme-ci"); err != nil {
 		t.Fatalf("lookup by slug: %v", err)
 	}
 	if _, err := st.CreateGitHubApp(GitHubAppInput{
-		Name: "Other", Slug: "winpra-ci", AppID: 1, PEM: "x", WebhookSecret: "y",
+		Name: "Other", Slug: "acme-ci", AppID: 1, PEM: "x", WebhookSecret: "y",
 	}); err == nil {
 		t.Fatal("duplicate slug must be rejected: the webhook path has to be unique")
 	}
@@ -255,7 +255,7 @@ func TestBindingUpsertAndAllowList(t *testing.T) {
 		t.Fatal("pipeline file outside the repo must be rejected")
 	}
 
-	b, err := st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "winpra/api", Enabled: true})
+	b, err := st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "acme/api", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestBindingUpsertAndAllowList(t *testing.T) {
 		t.Fatal("shareable logs must default to off")
 	}
 	// Upsert is keyed on (app, repo): a second call updates rather than adds.
-	again, err := st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "winpra/api", Enabled: false, Branches: "main"})
+	again, err := st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "acme/api", Enabled: false, Branches: "main"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,11 +275,11 @@ func TestBindingUpsertAndAllowList(t *testing.T) {
 		t.Fatalf("expected 1 binding, got %d", len(all))
 	}
 	// Disabled is not in the allow-list.
-	if _, err := st.EnabledBinding(app.ID, "winpra/api"); !errors.Is(err, ErrNotFound) {
+	if _, err := st.EnabledBinding(app.ID, "acme/api"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("disabled binding is still in the allow-list: %v", err)
 	}
-	st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "winpra/api", Enabled: true})
-	if _, err := st.EnabledBinding(app.ID, "WINPRA/API"); err != nil {
+	st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "acme/api", Enabled: true})
+	if _, err := st.EnabledBinding(app.ID, "ACME/API"); err != nil {
 		t.Fatalf("repo lookup should be case-insensitive: %v", err)
 	}
 	if _, err := st.EnabledBinding(app.ID, "someone/else"); !errors.Is(err, ErrNotFound) {

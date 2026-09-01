@@ -40,7 +40,7 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /app/installations", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]map[string]any{
-			{"id": 101, "account": map[string]any{"login": "winpra", "type": "Organization"},
+			{"id": 101, "account": map[string]any{"login": "acme", "type": "Organization"},
 				"repository_selection": "selected"},
 		})
 	})
@@ -63,7 +63,7 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 		json.NewEncoder(w).Encode(map[string]any{
 			"total_count": 1,
 			"repositories": []map[string]any{
-				{"id": 1, "full_name": "winpra/api", "name": "api", "private": true},
+				{"id": 1, "full_name": "acme/api", "name": "api", "private": true},
 			},
 		})
 	})

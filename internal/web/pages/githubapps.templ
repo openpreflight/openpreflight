@@ -232,13 +232,13 @@ templ GitHubApps(p web.Page) {
 							@field.Label(field.LabelProps{For: "name"}) {
 								Name
 							}
-							@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "winpra-ci", Required: true, Value: edit.Name})
+							@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "openpreflight-ci", Required: true, Value: edit.Name})
 						}
 						@field.Field() {
 							@field.Label(field.LabelProps{For: "slug"}) {
 								Slug (webhook path)
 							}
-							@input.Input(input.Props{ID: "slug", Name: "slug", Type: "text", Placeholder: "winpra-ci", Value: edit.Slug})
+							@input.Input(input.Props{ID: "slug", Name: "slug", Type: "text", Placeholder: "openpreflight-ci", Value: edit.Slug})
 							@field.Description() {
 								if editing {
 									Changing the slug changes the webhook URL GitHub must post to.
