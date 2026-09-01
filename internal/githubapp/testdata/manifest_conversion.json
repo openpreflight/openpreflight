@@ -1,0 +1,10 @@
+{
+  "id": 4242,
+  "slug": "openpreflight-ci",
+  "name": "openpreflight-ci",
+  "client_id": "Iv1.redacted",
+  "client_secret": "redacted",
+  "webhook_secret": "webhook-secret-from-github",
+  "pem": "-----BEGIN RSA PRIVATE KEY-----\nREDACTED — tests inject a generated key\n-----END RSA PRIVATE KEY-----\n",
+  "html_url": "https://github.com/apps/openpreflight-ci"
+}

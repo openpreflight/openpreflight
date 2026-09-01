@@ -1,6 +1,7 @@
 package pages
 
 import (
+	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
@@ -99,7 +100,7 @@ templ GitHubApps(p web.Page) {
 						None yet
 					}
 					@empty.Description() {
-						Register a GitHub App, then paste the credentials here.
+						Create with GitHub, or paste credentials under Advanced.
 					}
 				}
 				@empty.Content() {
@@ -210,118 +211,148 @@ templ GitHubApps(p web.Page) {
 			}
 			@card.Content() {
 				if !editing {
-					<p class="text-muted-foreground mb-3 text-xs">
-						Register it on GitHub first
-						(<a class="text-primary underline-offset-4 hover:underline" href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>),
-						then paste the credentials here. This service never creates Apps for you.
-					</p>
-					<p class="text-muted-foreground mb-4 text-xs">
-						Permissions: <code class="font-mono">checks: write</code>, <code class="font-mono">contents: read</code>,
-						<code class="font-mono">metadata: read</code>. Subscribe to <strong>Check suite</strong> and
-						<strong>Check run</strong> events. Webhook URL:
-						<code class="font-mono">
-							{ webhookHint(settings.PublicBaseURL) }
-						</code>
-						- the slug below.
-					</p>
+					if settings.PublicBaseURL != "" {
+						<form method="post" action="/api/v1/github-apps/manifest/start" class="mb-4">
+							@layouts.CSRF(p.CSRFToken)
+							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+								Create with GitHub
+							}
+						</form>
+						<p class="text-muted-foreground mb-4 text-xs">
+							GitHub shows a review screen with the permissions this worker needs. We store the App it returns.
+						</p>
+					} else {
+						<p class="text-muted-foreground mb-4 text-xs">
+							Set the public base URL in
+							@button.Button(button.Props{Href: "/settings", Variant: button.VariantLink, Size: button.SizeSm}) {
+								Settings
+							}
+							before creating an App with GitHub. GitHub must be able to reach this host.
+						</p>
+					}
 				}
-				<form method="post" action={ templ.SafeURL(appFormAction(editing, edit.ID)) } class="flex flex-col gap-4">
-					@layouts.CSRF(p.CSRFToken)
-					<div class="grid gap-4 sm:grid-cols-3">
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "name"}) {
-								Name
-							}
-							@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "openpreflight-ci", Required: true, Value: edit.Name})
-						}
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "slug"}) {
-								Slug (webhook path)
-							}
-							@input.Input(input.Props{ID: "slug", Name: "slug", Type: "text", Placeholder: "openpreflight-ci", Value: edit.Slug})
-							@field.Description() {
-								if editing {
-									Changing the slug changes the webhook URL GitHub must post to.
-								} else {
-									Lowercase letters, digits, dashes. Defaults from the name.
-								}
-							}
-						}
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "app_id"}) {
-								App ID
-							}
-							@input.Input(input.Props{ID: "app_id", Name: "app_id", Type: "number", Required: true, Value: appIDValue(editing, edit.AppID), Attributes: templ.Attributes{"min": "1"}})
-						}
-					</div>
-					<div class="grid gap-4 sm:grid-cols-2">
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "api_url"}) {
-								API URL
-							}
-							@input.Input(input.Props{ID: "api_url", Name: "api_url", Type: "url", Value: apiURLValue(editing, edit.APIURL)})
-							@field.Description() {
-								Change only for GitHub Enterprise.
-							}
-						}
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "check_name"}) {
-								Check name for this App
-							}
-							@input.Input(input.Props{ID: "check_name", Name: "check_name", Type: "text", Placeholder: settings.DefaultCheckName, Value: edit.CheckName})
-							@field.Description() {
-								Optional. Blank uses the global default.
-							}
-						}
-					</div>
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "webhook_secret"}) {
-							Webhook secret
-						}
-						@input.Input(input.Props{ID: "webhook_secret", Name: "webhook_secret", Type: "password", Required: !editing})
-						@field.Description() {
-							if editing {
-								Leave blank to keep the stored secret.
-							} else {
-								Must match the secret set on the App. Use a different one per App.
-							}
-						}
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "pem"}) {
-							Private key (PEM)
-						}
-						@textarea.Textarea(textarea.Props{
-							ID:          "pem",
-							Name:        "pem",
-							Class:       "font-mono text-sm",
-							Placeholder: "-----BEGIN RSA PRIVATE KEY-----",
-							Attributes:  pemAttrs(editing),
-						})
-						@field.Description() {
-							if editing {
-								Leave blank to keep the stored key. Never displayed.
-							} else {
-								Stored encrypted with <code class="font-mono">CI_SECRET_KEY</code>. Never displayed again.
-							}
-						}
-					}
-					<div class="flex flex-wrap items-center gap-2">
-						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-							if editing {
-								Save
-							} else {
-								Add and test
-							}
-						}
-						if editing {
-							@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantOutline, Size: button.SizeSm}) {
-								Cancel
-							}
-						}
-					</div>
-				</form>
+				if !editing {
+					<details class="mb-2">
+						<summary class="mb-4 cursor-pointer text-sm font-medium">Advanced — paste credentials</summary>
+						<p class="text-muted-foreground mb-3 text-xs">
+							Register the App on GitHub
+							(<a class="text-primary underline-offset-4 hover:underline" href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>),
+							then paste the credentials. GitHub Enterprise uses this path.
+						</p>
+						<p class="text-muted-foreground mb-4 text-xs">
+							Permissions: <code class="font-mono">checks: write</code>, <code class="font-mono">contents: read</code>,
+							<code class="font-mono">metadata: read</code>. Subscribe to <strong>Check suite</strong> and
+							<strong>Check run</strong> events. Webhook URL:
+							<code class="font-mono">
+								{ webhookHint(settings.PublicBaseURL) }
+							</code>
+							- the slug below.
+						</p>
+						@appCredentialsForm(p, settings, editing, edit)
+					</details>
+				} else {
+					@appCredentialsForm(p, settings, editing, edit)
+				}
 			}
 		}
 	}
+}
+
+templ appCredentialsForm(p web.Page, settings store.Settings, editing bool, edit store.GitHubApp) {
+	<form method="post" action={ templ.SafeURL(appFormAction(editing, edit.ID)) } class="flex flex-col gap-4">
+		@layouts.CSRF(p.CSRFToken)
+		<div class="grid gap-4 sm:grid-cols-3">
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "name"}) {
+					Name
+				}
+				@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "openpreflight-ci", Required: true, Value: edit.Name})
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "slug"}) {
+					Slug (webhook path)
+				}
+				@input.Input(input.Props{ID: "slug", Name: "slug", Type: "text", Placeholder: "openpreflight-ci", Value: edit.Slug})
+				@field.Description() {
+					if editing {
+						Changing the slug changes the webhook URL GitHub must post to.
+					} else {
+						Lowercase letters, digits, dashes. Defaults from the name.
+					}
+				}
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "app_id"}) {
+					App ID
+				}
+				@input.Input(input.Props{ID: "app_id", Name: "app_id", Type: "number", Required: true, Value: appIDValue(editing, edit.AppID), Attributes: templ.Attributes{"min": "1"}})
+			}
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2">
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "api_url"}) {
+					API URL
+				}
+				@input.Input(input.Props{ID: "api_url", Name: "api_url", Type: "url", Value: apiURLValue(editing, edit.APIURL)})
+				@field.Description() {
+					Change only for GitHub Enterprise.
+				}
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "check_name"}) {
+					Check name for this App
+				}
+				@input.Input(input.Props{ID: "check_name", Name: "check_name", Type: "text", Placeholder: settings.DefaultCheckName, Value: edit.CheckName})
+				@field.Description() {
+					Optional. Blank uses the global default.
+				}
+			}
+		</div>
+		@field.Field() {
+			@field.Label(field.LabelProps{For: "webhook_secret"}) {
+				Webhook secret
+			}
+			@input.Input(input.Props{ID: "webhook_secret", Name: "webhook_secret", Type: "password", Required: !editing})
+			@field.Description() {
+				if editing {
+					Leave blank to keep the stored secret.
+				} else {
+					Must match the secret set on the App. Use a different one per App.
+				}
+			}
+		}
+		@field.Field() {
+			@field.Label(field.LabelProps{For: "pem"}) {
+				Private key (PEM)
+			}
+			@textarea.Textarea(textarea.Props{
+				ID:          "pem",
+				Name:        "pem",
+				Class:       "font-mono text-sm",
+				Placeholder: "-----BEGIN RSA PRIVATE KEY-----",
+				Attributes:  pemAttrs(editing),
+			})
+			@field.Description() {
+				if editing {
+					Leave blank to keep the stored key. Never displayed.
+				} else {
+					Stored encrypted with <code class="font-mono">CI_SECRET_KEY</code>. Never displayed again.
+				}
+			}
+		}
+		<div class="flex flex-wrap items-center gap-2">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				if editing {
+					Save
+				} else {
+					Add and test
+				}
+			}
+			if editing {
+				@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantOutline, Size: button.SizeSm}) {
+					Cancel
+				}
+			}
+		</div>
+	</form>
 }

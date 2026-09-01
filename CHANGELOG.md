@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Create with GitHub** on the GitHub Apps page uses GitHub's App manifest
+  flow (`POST /api/v1/github-apps/manifest/start` and the callback). Paste
+  remains under Advanced, including for GitHub Enterprise.
+
 ## [1.1.0] - 2026-09-01
 
 Operator chrome and the docker.sock workspace mount rewrite. Image
