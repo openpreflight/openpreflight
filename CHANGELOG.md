@@ -11,6 +11,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `GET /api/v1/jobs/{id}/logs/stream` tails an in-flight log over SSE. The run
   page opens EventSource while the job is running; meta-refresh stays for
   no-JS. If a reverse proxy swallows events, disable buffering on this path.
+- `GET /jobs` and `GET /api/v1/jobs` accept `repo`, `status`, `limit`, and
+  `offset` query parameters. Unknown `status` is 400. The Jobs page has a
+  GET form for repo and status.
 
 ## [1.1.0] - 2026-09-01
 

@@ -356,7 +356,7 @@ func TestRerunRequiresEnabledBinding(t *testing.T) {
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("rerun: %d %s", rec.Code, rec.Body.String())
 	}
-	jobs, _ := ts.store.ListJobs(10)
+	jobs, _ := ts.store.ListJobs(store.JobList{Limit: 10})
 	if len(jobs) != 2 {
 		t.Fatalf("expected a new job, got %d", len(jobs))
 	}
@@ -416,6 +416,84 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		if !strings.Contains(home, want) {
 			t.Errorf("overview missing %q", want)
 		}
+	}
+}
+
+func TestJobsAPIFilters(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	if _, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/web", SHA: "bbb",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := ts.authed(t, token, http.MethodGet, "/api/v1/jobs?repo=acme/api", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("repo filter: %d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Jobs []store.Job `json:"jobs"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Jobs) != 1 || out.Jobs[0].Repo != "acme/api" {
+		t.Fatalf("repo filter jobs: %+v", out.Jobs)
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs?status=nope", "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unknown status: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestJobsIndexFilterForm(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	req := htmlReq(http.MethodGet, "/jobs")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `name="status"`) || !strings.Contains(body, `name="repo"`) {
+		t.Fatal("jobs page is missing the filter form")
+	}
+	if !strings.Contains(body, "No jobs yet") {
+		t.Fatal("unfiltered empty should still say no jobs yet")
+	}
+	if strings.Contains(body, "No jobs match this filter") {
+		t.Fatal("unfiltered empty is not a filter miss")
+	}
+}
+
+func TestJobsIndexFilteredEmpty(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	if _, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "abc1234",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	req := htmlReq(http.MethodGet, "/jobs?repo=nobody/else")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, body)
+	}
+	if !strings.Contains(body, "No jobs match this filter") {
+		t.Fatal("filtered empty should say no jobs match")
+	}
+	if strings.Contains(body, "Enable a repo") {
+		t.Fatal("filtered empty must not send the operator to enable a repo")
 	}
 }
 
