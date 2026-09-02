@@ -14,6 +14,7 @@ import (
 	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -313,5 +314,63 @@ func TestAPIErrorMessages(t *testing.T) {
 	// The operator's actual mistake is usually a mismatched App ID and key.
 	if !strings.Contains(err.Error(), "App ID") {
 		t.Fatalf("unhelpful 401 message: %v", err)
+	}
+}
+
+func TestConvertManifest(t *testing.T) {
+	_, pem := testKey(t)
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /app-manifests/{code}/conversions", func(w http.ResponseWriter, r *http.Request) {
+		if r.PathValue("code") != "good-code" {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+			return
+		}
+		raw, err := os.ReadFile("testdata/manifest_conversion.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(raw, &body); err != nil {
+			t.Fatal(err)
+		}
+		body["pem"] = pem
+		json.NewEncoder(w).Encode(body)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	got, err := ConvertManifest(context.Background(), srv.URL, "good-code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != 4242 || got.Slug != "openpreflight-ci" || got.PEM != pem {
+		t.Fatalf("conversion: %+v", got)
+	}
+	if _, err := ConvertManifest(context.Background(), srv.URL, "nope"); err == nil {
+		t.Fatal("bad code should fail")
+	}
+	if _, err := ConvertManifest(context.Background(), srv.URL, ""); err == nil {
+		t.Fatal("empty code should fail")
+	}
+}
+
+func TestSetHookConfig(t *testing.T) {
+	var gotURL string
+	mux := http.NewServeMux()
+	mux.HandleFunc("PATCH /app/hook/config", func(w http.ResponseWriter, r *http.Request) {
+		var in map[string]any
+		json.NewDecoder(r.Body).Decode(&in)
+		gotURL, _ = in["url"].(string)
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := newTestClient(t, srv.URL)
+	if err := c.SetHookConfig(context.Background(), "https://ci.example.com/webhook/openpreflight-ci"); err != nil {
+		t.Fatal(err)
+	}
+	if gotURL != "https://ci.example.com/webhook/openpreflight-ci" {
+		t.Fatalf("hook url: %q", gotURL)
 	}
 }

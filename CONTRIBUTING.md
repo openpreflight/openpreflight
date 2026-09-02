@@ -43,7 +43,7 @@ cd internal/web && npm ci && npm run css
 ## What we will not take yet
 
 Anything listed under **Not in v1** in the README: GitHub Actions YAML,
-`actions/runner`, creating GitHub Apps for you, matrices, caches, or artifacts.
+`actions/runner`, matrices, caches, or artifacts.
 
 ## Pull requests
 

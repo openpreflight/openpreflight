@@ -109,7 +109,7 @@ examples/            a sample .ci.yml
 
 ## Not in v1
 
-GitHub Actions YAML, `actions/runner`, creating GitHub Apps for you, matrices, caches, and artifacts. Jobs on another machine use `CI_DOCKER_HOST` / `DOCKER_HOST` (a Docker engine), not Coolify's API as a job runner.
+GitHub Actions YAML, `actions/runner`, matrices, caches, and artifacts. Jobs on another machine use `CI_DOCKER_HOST` / `DOCKER_HOST` (a Docker engine), not Coolify's API as a job runner. GitHub Apps can be created with GitHub's review screen or pasted.
 
 ## Development
 

@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Create with GitHub** on the GitHub Apps page uses GitHub's App manifest
+  flow (`POST /api/v1/github-apps/manifest/start` and the callback). Paste
+  remains under Advanced, including for GitHub Enterprise.
 - `GET /api/v1/jobs/{id}/logs/stream` tails an in-flight log over SSE. The run
   page opens EventSource while the job is running; meta-refresh stays for
   no-JS. If a reverse proxy swallows events, disable buffering on this path.

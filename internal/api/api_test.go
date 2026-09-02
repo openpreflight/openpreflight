@@ -4,7 +4,11 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -272,6 +276,139 @@ func TestBindingRequiresAnApp(t *testing.T) {
 	rec := ts.authed(t, token, http.MethodPut, "/api/v1/bindings", `{"repo":"acme/api","enabled":true}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+func manifestTestPEM(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}))
+}
+
+func TestAppManifestCreatesAnApp(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	pemData := manifestTestPEM(t)
+
+	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app-manifests/") && strings.HasSuffix(r.URL.Path, "/conversions"):
+			if !strings.Contains(r.URL.Path, "/good-code/") {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"id": 9191, "slug": "openpreflight-ci", "name": "openpreflight-ci",
+				"pem": pemData, "webhook_secret": "from-github-manifest",
+			})
+		case r.Method == http.MethodPatch && r.URL.Path == "/app/hook/config":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/app/installations":
+			json.NewEncoder(w).Encode([]any{})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(gh.Close)
+	ts.manifestAPI = gh.URL
+
+	rec := ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/manifest/start", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body.String())
+	}
+	var start struct {
+		Action   string         `json:"action"`
+		State    string         `json:"state"`
+		Manifest map[string]any `json:"manifest"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &start); err != nil {
+		t.Fatal(err)
+	}
+	if start.Action != githubNewAppURL || start.State == "" {
+		t.Fatalf("start payload: %+v", start)
+	}
+	if start.Manifest["url"] != "https://ci.example.com" {
+		t.Fatalf("manifest url: %+v", start.Manifest)
+	}
+	perms, _ := start.Manifest["default_permissions"].(map[string]any)
+	if perms["checks"] != "write" || perms["contents"] != "read" || perms["metadata"] != "read" {
+		t.Fatalf("permissions: %+v", perms)
+	}
+	var csrf string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == csrfCookie {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		t.Fatal("start did not mint a CSRF cookie to use as state")
+	}
+
+	bad := jsonReq(http.MethodGet, "/api/v1/github-apps/manifest/callback?code=good-code&state=nope", "")
+	bad.Header.Set("Authorization", "Bearer "+token)
+	bad.AddCookie(&http.Cookie{Name: csrfCookie, Value: csrf})
+	rec = ts.do(bad)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad state: %d %s", rec.Code, rec.Body.String())
+	}
+	apps, _ := ts.store.ListGitHubApps()
+	if len(apps) != 1 {
+		t.Fatalf("bad state created an App: %+v", apps)
+	}
+
+	ok := jsonReq(http.MethodGet, "/api/v1/github-apps/manifest/callback?code=good-code&state="+start.State, "")
+	ok.Header.Set("Authorization", "Bearer "+token)
+	ok.AddCookie(&http.Cookie{Name: csrfCookie, Value: csrf})
+	rec = ts.do(ok)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("callback: %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "BEGIN RSA PRIVATE KEY") || strings.Contains(rec.Body.String(), pemData) {
+		t.Fatal("callback leaked the PEM")
+	}
+	apps, _ = ts.store.ListGitHubApps()
+	if len(apps) != 2 {
+		t.Fatalf("apps after callback: %+v", apps)
+	}
+	var created store.GitHubApp
+	for _, a := range apps {
+		if a.Slug == "openpreflight-ci" {
+			created = a
+		}
+	}
+	if created.ID == 0 || created.AppID != 9191 {
+		t.Fatalf("created app: %+v", created)
+	}
+	gotPEM, err := ts.store.DecryptPEM(created)
+	if err != nil || strings.TrimSpace(gotPEM) != strings.TrimSpace(pemData) {
+		t.Fatalf("stored pem: %v", err)
+	}
+	secret, err := ts.store.DecryptWebhookSecret(created)
+	if err != nil || secret != "from-github-manifest" {
+		t.Fatalf("stored webhook secret: %v %q", err, secret)
+	}
+}
+
+func TestGitHubAppsPageOffersManifest(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	req := htmlReq(http.MethodGet, "/github-apps")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if !strings.Contains(body, "Create with GitHub") || !strings.Contains(body, "Advanced") {
+		t.Fatal("github-apps page is missing the manifest button")
+	}
+	if strings.Contains(body, "never creates Apps") {
+		t.Fatal("github-apps page still says we never create Apps")
 	}
 }
 
