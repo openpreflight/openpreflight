@@ -44,12 +44,12 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		s.fail(w, r, err)
 		return
 	}
-	jobs, err := s.store.ListJobs(8)
+	jobs, err := s.store.ListJobs(store.JobList{Limit: 8})
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	recent, err := s.store.ListJobs(100)
+	recent, err := s.store.ListJobs(store.JobList{Limit: 100})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -249,7 +249,7 @@ func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.Us
 		instNames[i.ID] = i.Name
 	}
 	rows := make([]bindingRow, 0, len(bindings))
-	recent, err := s.store.ListJobs(100)
+	recent, err := s.store.ListJobs(store.JobList{Limit: 100})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -360,14 +360,17 @@ func (s *Server) pageJobs(w http.ResponseWriter, r *http.Request, user store.Use
 		s.fail(w, r, err)
 		return
 	}
-	jobs, err := s.store.ListJobs(atoiDefault(r.URL.Query().Get("limit"), 100))
-	if err != nil {
-		s.fail(w, r, err)
+	jobs, f, ok := s.loadJobs(w, r)
+	if !ok {
 		return
 	}
 	s.render(w, "jobs", s.page(w, r, &user, "Jobs", "jobs", map[string]any{
 		"Settings": settings,
 		"Jobs":     jobs,
+		"Repo":     f.Repo,
+		"Status":   f.Status,
+		"Limit":    f.Limit,
+		"Offset":   f.Offset,
 	}))
 }
 
