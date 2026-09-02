@@ -121,6 +121,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/jobs", s.guard(s.listJobs))
 	mux.HandleFunc("GET /api/v1/jobs/{id}", s.guard(s.getJob))
 	mux.HandleFunc("GET /api/v1/jobs/{id}/logs", s.getJobLogs)
+	mux.HandleFunc("GET /api/v1/jobs/{id}/logs/stream", s.streamJobLogs)
 	mux.HandleFunc("POST /api/v1/jobs/{id}/rerun", s.guard(s.rerunJob))
 	mux.HandleFunc("POST /api/v1/jobs/{id}/cancel", s.guard(s.cancelJob))
 
