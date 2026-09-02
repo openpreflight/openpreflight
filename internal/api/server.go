@@ -70,6 +70,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /webhook/{slug}", s.handleWebhook)
 	mux.HandleFunc("GET /runs/{id}", s.pageRun)
 	mux.Handle("GET /assets/css/output.css", web.CSSHandler())
+	mux.Handle("GET /assets/brand/logo.svg", web.LogoHandler())
 	mux.Handle("GET /components/{bundle}", components.ScriptsHandler())
 
 	// Unauthenticated entry points.
@@ -82,9 +83,17 @@ func (s *Server) Handler() http.Handler {
 	// HTML pages.
 	mux.HandleFunc("GET /{$}", s.guard(s.pageDashboard))
 	mux.HandleFunc("GET /settings", s.guard(s.pageSettings))
+	mux.HandleFunc("GET /settings/runner", s.guard(s.pageSettingsRunner))
+	mux.HandleFunc("GET /settings/logs", s.guard(s.pageSettingsLogs))
+	mux.HandleFunc("GET /settings/admin", s.guard(s.pageSettingsAdmin))
 	mux.HandleFunc("GET /coolify", s.guard(s.pageCoolify))
 	mux.HandleFunc("GET /github-apps", s.guard(s.pageGitHubApps))
+	mux.HandleFunc("GET /github-apps/new", s.guard(s.pageGitHubAppsNew))
+	mux.HandleFunc("GET /github-apps/{id}/edit", s.guard(s.pageGitHubAppsEdit))
 	mux.HandleFunc("GET /repos", s.guard(s.pageRepos))
+	mux.HandleFunc("GET /repos/pick", s.guard(s.pageReposPick))
+	mux.HandleFunc("GET /repos/new", s.guard(s.pageReposNew))
+	mux.HandleFunc("GET /repos/{id}/edit", s.guard(s.pageReposEdit))
 	mux.HandleFunc("GET /jobs", s.guard(s.pageJobs))
 
 	// JSON API / form targets.

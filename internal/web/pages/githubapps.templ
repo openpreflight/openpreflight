@@ -8,6 +8,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/components/textarea"
@@ -18,11 +19,9 @@ templ GitHubApps(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ settings := settingsOf(m) }}
 	{{ apps := appsOf(m) }}
-	{{ editing := has(m, "Edit") }}
-	{{ edit := appOf(m, "Edit") }}
 	@layouts.Shell(p) {
 		@layouts.PageHead("CI GitHub Apps", "Your own GitHub App is what makes this a CI provider: only an App can write commit checks, and each App has exactly one webhook URL. Coolify's deploy connector cannot do this job.") {
-			@button.Button(button.Props{Href: "#add", Size: button.SizeSm}) {
+			@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
 				Add an App
 			}
 		}
@@ -75,7 +74,7 @@ templ GitHubApps(p web.Page) {
 									Test
 								}
 							</form>
-							@button.Button(button.Props{Href: "/github-apps?edit=" + itoa64(app.ID), Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
 								Edit
 							}
 							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID), Variant: button.VariantLink, Size: button.SizeSm}) {
@@ -94,17 +93,20 @@ templ GitHubApps(p web.Page) {
 				}
 			</div>
 		} else {
-			@empty.Empty(empty.Props{Class: "mb-6"}) {
+			@empty.Empty(empty.Props{Class: emptyPageClass}) {
 				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.Github()
+					}
 					@empty.Title() {
-						None yet
+						No CI GitHub App yet
 					}
 					@empty.Description() {
 						Create with GitHub, or paste credentials under Advanced.
 					}
 				}
 				@empty.Content() {
-					@button.Button(button.Props{Href: "#add", Size: button.SizeSm}) {
+					@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
 						Add an App
 					}
 				}
@@ -199,16 +201,17 @@ templ GitHubApps(p web.Page) {
 				}
 			}
 		}
-		@card.Card(card.Props{ID: "add"}) {
-			@card.Header() {
-				@card.Title() {
-					if editing {
-						Edit { edit.Name }
-					} else {
-						Add an App
-					}
-				}
-			}
+	}
+}
+
+templ GitHubAppsEditorPage(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	{{ editing := has(m, "Edit") }}
+	{{ edit := appOf(m, "Edit") }}
+	@layouts.Shell(p) {
+		@layouts.PageHead(appFormTitle(editing, edit.Name), appFormLede(editing))
+		@card.Card() {
 			@card.Content() {
 				if !editing {
 					if settings.PublicBaseURL != "" {
@@ -233,7 +236,7 @@ templ GitHubApps(p web.Page) {
 				}
 				if !editing {
 					<details class="mb-2">
-						<summary class="mb-4 cursor-pointer text-sm font-medium">Advanced — paste credentials</summary>
+						<summary class="mb-4 cursor-pointer text-sm font-medium">Advanced: paste credentials</summary>
 						<p class="text-muted-foreground mb-3 text-xs">
 							Register the App on GitHub
 							(<a class="text-primary underline-offset-4 hover:underline" href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>),
@@ -348,10 +351,8 @@ templ appCredentialsForm(p web.Page, settings store.Settings, editing bool, edit
 					Add and test
 				}
 			}
-			if editing {
-				@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantOutline, Size: button.SizeSm}) {
-					Cancel
-				}
+			@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantOutline, Size: button.SizeSm}) {
+				Cancel
 			}
 		</div>
 	</form>

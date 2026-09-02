@@ -164,5 +164,5 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request, user sto
 		return
 	}
 	s.reply(w, r, http.StatusOK, map[string]string{"status": "password updated"},
-		"/settings", "Password updated.", "ok")
+		"/settings/admin", "Password updated.", "ok")
 }

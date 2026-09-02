@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Operator chrome is full width (the login/setup column stays 440px). The
+  sidebar and wordmark use the website runway-check mark.
+- Jobs is a denser table (Status, Repo with ref and SHA stacked, Event, Took,
+  When, Actions). Filters sit in a toolbar on the table card.
+- Empty lists use a dashed panel, an icon, and one primary action.
+- Repos is a list. Pick repositories is `/repos/pick`; add is `/repos/new`.
+  Edit is `/repos/{id}/edit` (same form as add). `/repos?edit=` redirects
+  to that URL.
+- Settings is four pages: Configuration (`/settings`), Runner, Logs, Admin.
+  Each form saves only its fields and returns to that page.
+- GitHub Apps is a list. Add is `/github-apps/new`; edit is
+  `/github-apps/{id}/edit`. `/github-apps?edit=` redirects to the edit page.
+
 ## [2.0.0] - 2026-09-02
 
 Job query, live logs, Create with GitHub, and path filters. Image

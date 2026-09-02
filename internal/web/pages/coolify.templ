@@ -7,6 +7,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
@@ -79,18 +80,16 @@ templ Coolify(p web.Page) {
 				}
 			</div>
 		} else {
-			@empty.Empty(empty.Props{Class: "mb-6"}) {
+			@empty.Empty(empty.Props{Class: emptyPageClass}) {
 				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.Server()
+					}
 					@empty.Title() {
-						None yet
+						No instances yet
 					}
 					@empty.Description() {
-						Coolify is optional: inventory and a repo picker. The CI GitHub App is what runs checks.
-					}
-				}
-				@empty.Content() {
-					@button.Button(button.Props{Href: "#add", Size: button.SizeSm}) {
-						Add an instance
+						Coolify is optional: inventory and a repo picker. The CI GitHub App is what runs checks. Add one with the form below.
 					}
 				}
 			}

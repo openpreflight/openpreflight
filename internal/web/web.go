@@ -21,6 +21,9 @@ import (
 //go:embed assets/css/output.css
 var outputCSS string
 
+//go:embed assets/brand/logo.svg
+var brandLogo []byte
+
 // Crumb is one breadcrumb. Empty Href means the current page.
 type Crumb struct {
 	Label string
@@ -62,6 +65,16 @@ func CSSHandler() http.Handler {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		io.WriteString(w, outputCSS)
+	})
+}
+
+// LogoHandler serves the website runway-check mark. Login and setup need it
+// before a session exists.
+func LogoHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Write(brandLogo)
 	})
 }
 

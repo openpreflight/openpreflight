@@ -12,163 +12,238 @@ import (
 
 templ Settings(p web.Page) {
 	{{ m := asMap(p.Data) }}
-	{{ settings := settingsOf(m) }}
-	{{ dockerOK := asBool(m, "DockerAvailable") }}
-	{{ dockerHost := str(m, "DockerHost") }}
+	{{ section := settingsSectionOf(m) }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Settings", "Global defaults. A repo binding overrides its GitHub App, which overrides these.") {
+		switch section {
+		case "runner":
+			@settingsShell("runner", "Runner", "How many jobs this process runs at once, the default Docker image, and fork PRs.") {
+				@settingsRunner(p)
+			}
+		case "logs":
+			@settingsShell("logs", "Logs", "How large a job log may grow, and how long rows are kept.") {
+				@settingsLogs(p)
+			}
+		case "admin":
+			@settingsShell("admin", "Admin", "Change the operator password.") {
+				@settingsAdmin(p)
+			}
+		default:
+			@settingsShell("configuration", "Settings", "Global defaults. A repo binding overrides its GitHub App, which overrides these.") {
+				@settingsConfiguration(p)
+			}
+		}
+	}
+}
+
+templ settingsShell(section, title, lede string) {
+	@layouts.PageHead(title, lede) {
+		if section != "admin" {
 			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Attributes: templ.Attributes{"form": "settings-form"}}) {
 				Save settings
 			}
 		}
-		<div class="grid gap-6 xl:grid-cols-[14rem_1fr]">
-			<nav class="text-sm xl:sticky xl:top-6 xl:self-start" aria-label="Settings sections">
-				<ul class="flex flex-col gap-1">
-					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#configuration">Configuration</a></li>
-					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#runner">Runner</a></li>
-					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#logs">Logs</a></li>
-					<li><a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href="#admin">Admin</a></li>
-				</ul>
-			</nav>
-			<div class="space-y-6">
-				<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
-					@layouts.CSRF(p.CSRFToken)
-					@card.Card(card.Props{ID: "configuration", Class: "scroll-mt-6"}) {
-						@card.Header() {
-							@card.Title() {
-								Configuration
-							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-4"}) {
-							@field.Field() {
-								@field.Label(field.LabelProps{For: "public_base_url"}) {
-									Public base URL
-								}
-								@input.Input(input.Props{ID: "public_base_url", Name: "public_base_url", Type: "url", Value: settings.PublicBaseURL, Placeholder: "https://ci.example.com"})
-								@field.Description() {
-									{ settingsURLHint() }
-								}
-							}
-							<div class="grid gap-4 sm:grid-cols-2">
-								@field.Field() {
-									@field.Label(field.LabelProps{For: "default_check_name"}) {
-										Default check name
-									}
-									@input.Input(input.Props{ID: "default_check_name", Name: "default_check_name", Type: "text", Value: settings.DefaultCheckName})
-								}
-								@field.Field() {
-									@field.Label(field.LabelProps{For: "default_pipeline_file"}) {
-										Default pipeline file
-									}
-									@input.Input(input.Props{ID: "default_pipeline_file", Name: "default_pipeline_file", Type: "text", Value: settings.DefaultPipelineFile})
-								}
-							</div>
-							@field.Field() {
-								@field.Label(field.LabelProps{For: "default_timeout_seconds"}) {
-									Default timeout (seconds)
-								}
-								@input.Input(input.Props{ID: "default_timeout_seconds", Name: "default_timeout_seconds", Type: "number", Value: itoa(settings.DefaultTimeoutSeconds), Attributes: templ.Attributes{"min": "30"}})
-							}
-						}
+	}
+	<div class="grid gap-6 xl:grid-cols-[14rem_1fr]">
+		@settingsNav(section)
+		<div class="space-y-6">
+			{ children... }
+		</div>
+	</div>
+}
+
+templ settingsNav(current string) {
+	<nav class="text-sm xl:sticky xl:top-6 xl:self-start" aria-label="Settings">
+		<ul class="flex flex-col gap-1">
+			@settingsNavItem("/settings", "Configuration", current == "configuration")
+			@settingsNavItem("/settings/runner", "Runner", current == "runner")
+			@settingsNavItem("/settings/logs", "Logs", current == "logs")
+			@settingsNavItem("/settings/admin", "Admin", current == "admin")
+		</ul>
+	</nav>
+}
+
+templ settingsNavItem(href, label string, active bool) {
+	<li>
+		if active {
+			<a class="bg-muted text-foreground block rounded-md px-3 py-1.5 font-medium" href={ templ.SafeURL(href) } aria-current="page">{ label }</a>
+		} else {
+			<a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href={ templ.SafeURL(href) }>{ label }</a>
+		}
+	</li>
+}
+
+templ settingsConfiguration(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
+		@layouts.CSRF(p.CSRFToken)
+		<input type="hidden" name="next" value="/settings"/>
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					Configuration
+				}
+			}
+			@card.Content(card.ContentProps{Class: "space-y-4"}) {
+				@field.Field() {
+					@field.Label(field.LabelProps{For: "public_base_url"}) {
+						Public base URL
 					}
-					@card.Card(card.Props{ID: "runner", Class: "scroll-mt-6"}) {
-						@card.Header() {
-							@card.Title() {
-								Runner
-							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-4"}) {
-							<div class="grid gap-4 sm:grid-cols-2">
-								@field.Field() {
-									@field.Label(field.LabelProps{For: "max_concurrent_jobs"}) {
-										Max concurrent jobs
-									}
-									@input.Input(input.Props{ID: "max_concurrent_jobs", Name: "max_concurrent_jobs", Type: "number", Value: itoa(settings.MaxConcurrentJobs), Attributes: templ.Attributes{"min": "1", "max": "32"}})
-								}
-								@field.Field() {
-									@field.Label(field.LabelProps{For: "default_runtime"}) {
-										Default Docker runtime
-									}
-									@input.Input(input.Props{ID: "default_runtime", Name: "default_runtime", Type: "text", Value: settings.DefaultRuntime, Placeholder: "node:24"})
-									@field.Description() {
-										{ dockerHint(dockerOK, dockerHost) }
-									}
-								}
-							</div>
-							@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
-								@checkbox.Checkbox(checkbox.Props{ID: "skip_fork_prs", Name: "skip_fork_prs", Value: "1", DefaultChecked: settings.SkipForkPRs})
-								@field.Label(field.LabelProps{For: "skip_fork_prs"}) {
-									Skip fork pull requests
-								}
-							}
-							@field.Description() {
-								Leave on unless Docker is working and a default runtime is set. Fork jobs always run in Docker.
-							}
-						}
-					}
-					@card.Card(card.Props{ID: "logs", Class: "scroll-mt-6"}) {
-						@card.Header() {
-							@card.Title() {
-								Logs
-							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-4"}) {
-							<div class="grid gap-4 sm:grid-cols-2">
-								@field.Field() {
-									@field.Label(field.LabelProps{For: "max_log_bytes"}) {
-										Max log bytes per job
-									}
-									@input.Input(input.Props{ID: "max_log_bytes", Name: "max_log_bytes", Type: "number", Value: itoa64(settings.MaxLogBytes), Attributes: templ.Attributes{"min": "4096"}})
-									@field.Description() {
-										Logs stop growing at this size; the run continues.
-									}
-								}
-								@field.Field() {
-									@field.Label(field.LabelProps{For: "log_retention_days"}) {
-										Log retention (days)
-									}
-									@input.Input(input.Props{ID: "log_retention_days", Name: "log_retention_days", Type: "number", Value: itoa(settings.LogRetentionDays), Attributes: templ.Attributes{"min": "1", "max": "3650"}})
-									@field.Description() {
-										Job rows and log files older than this are pruned hourly.
-									}
-								}
-							</div>
-						}
-					}
-					<div class="flex justify-end">
-						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-							Save settings
-						}
-					</div>
-				</form>
-				@card.Card(card.Props{ID: "admin", Class: "scroll-mt-6"}) {
-					@card.Header() {
-						@card.Title() {
-							Change admin password
-						}
-					}
-					@card.Content() {
-						<form method="post" action="/api/v1/password" class="flex flex-col gap-4">
-							@layouts.CSRF(p.CSRFToken)
-							@field.Field() {
-								@field.Label(field.LabelProps{For: "password"}) {
-									New password
-								}
-								@input.Input(input.Props{
-									ID:         "password",
-									Name:       "password",
-									Type:       "password",
-									Required:   true,
-									Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password"},
-								})
-							}
-							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
-								Update password
-							}
-						</form>
+					@input.Input(input.Props{ID: "public_base_url", Name: "public_base_url", Type: "url", Value: settings.PublicBaseURL, Placeholder: "https://ci.example.com"})
+					@field.Description() {
+						{ settingsURLHint() }
 					}
 				}
-			</div>
+				<div class="grid gap-4 sm:grid-cols-2">
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "default_check_name"}) {
+							Default check name
+						}
+						@input.Input(input.Props{ID: "default_check_name", Name: "default_check_name", Type: "text", Value: settings.DefaultCheckName})
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "default_pipeline_file"}) {
+							Default pipeline file
+						}
+						@input.Input(input.Props{ID: "default_pipeline_file", Name: "default_pipeline_file", Type: "text", Value: settings.DefaultPipelineFile})
+					}
+				</div>
+				@field.Field() {
+					@field.Label(field.LabelProps{For: "default_timeout_seconds"}) {
+						Default timeout (seconds)
+					}
+					@input.Input(input.Props{ID: "default_timeout_seconds", Name: "default_timeout_seconds", Type: "number", Value: itoa(settings.DefaultTimeoutSeconds), Attributes: templ.Attributes{"min": "30"}})
+				}
+			}
+		}
+		<div class="flex justify-end">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				Save settings
+			}
 		</div>
+	</form>
+}
+
+templ settingsRunner(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	{{ dockerOK := asBool(m, "DockerAvailable") }}
+	{{ dockerHost := str(m, "DockerHost") }}
+	<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
+		@layouts.CSRF(p.CSRFToken)
+		<input type="hidden" name="next" value="/settings/runner"/>
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					Runner
+				}
+			}
+			@card.Content(card.ContentProps{Class: "space-y-4"}) {
+				<div class="grid gap-4 sm:grid-cols-2">
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "max_concurrent_jobs"}) {
+							Max concurrent jobs
+						}
+						@input.Input(input.Props{ID: "max_concurrent_jobs", Name: "max_concurrent_jobs", Type: "number", Value: itoa(settings.MaxConcurrentJobs), Attributes: templ.Attributes{"min": "1", "max": "32"}})
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "default_runtime"}) {
+							Default Docker runtime
+						}
+						@input.Input(input.Props{ID: "default_runtime", Name: "default_runtime", Type: "text", Value: settings.DefaultRuntime, Placeholder: "node:24"})
+						@field.Description() {
+							{ dockerHint(dockerOK, dockerHost) }
+						}
+					}
+				</div>
+				@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
+					@checkbox.Checkbox(checkbox.Props{ID: "skip_fork_prs", Name: "skip_fork_prs", Value: "1", DefaultChecked: settings.SkipForkPRs})
+					@field.Label(field.LabelProps{For: "skip_fork_prs"}) {
+						Skip fork pull requests
+					}
+				}
+				@field.Description() {
+					Leave on unless Docker is working and a default runtime is set. Fork jobs always run in Docker.
+				}
+			}
+		}
+		<div class="flex justify-end">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				Save settings
+			}
+		</div>
+	</form>
+}
+
+templ settingsLogs(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ settings := settingsOf(m) }}
+	<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
+		@layouts.CSRF(p.CSRFToken)
+		<input type="hidden" name="next" value="/settings/logs"/>
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					Logs
+				}
+			}
+			@card.Content(card.ContentProps{Class: "space-y-4"}) {
+				<div class="grid gap-4 sm:grid-cols-2">
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "max_log_bytes"}) {
+							Max log bytes per job
+						}
+						@input.Input(input.Props{ID: "max_log_bytes", Name: "max_log_bytes", Type: "number", Value: itoa64(settings.MaxLogBytes), Attributes: templ.Attributes{"min": "4096"}})
+						@field.Description() {
+							Logs stop growing at this size; the run continues.
+						}
+					}
+					@field.Field() {
+						@field.Label(field.LabelProps{For: "log_retention_days"}) {
+							Log retention (days)
+						}
+						@input.Input(input.Props{ID: "log_retention_days", Name: "log_retention_days", Type: "number", Value: itoa(settings.LogRetentionDays), Attributes: templ.Attributes{"min": "1", "max": "3650"}})
+						@field.Description() {
+							Job rows and log files older than this are pruned hourly.
+						}
+					}
+				</div>
+			}
+		}
+		<div class="flex justify-end">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				Save settings
+			}
+		</div>
+	</form>
+}
+
+templ settingsAdmin(p web.Page) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Change admin password
+			}
+		}
+		@card.Content() {
+			<form method="post" action="/api/v1/password" class="flex flex-col gap-4">
+				@layouts.CSRF(p.CSRFToken)
+				@field.Field() {
+					@field.Label(field.LabelProps{For: "password"}) {
+						New password
+					}
+					@input.Input(input.Props{
+						ID:         "password",
+						Name:       "password",
+						Type:       "password",
+						Required:   true,
+						Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password"},
+					})
+				}
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
+					Update password
+				}
+			</form>
+		}
 	}
 }

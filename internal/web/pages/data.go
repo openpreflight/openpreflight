@@ -198,6 +198,12 @@ func healthLabel(lastError string, seen bool) string {
 
 const selectClass = "border-input bg-transparent dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-full min-w-0 rounded-lg border px-2.5 py-1 text-sm outline-none focus-visible:ring-3"
 
+const selectToolbarClass = "border-input bg-transparent dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-[11rem] shrink-0 rounded-lg border px-2.5 py-1 text-sm outline-none focus-visible:ring-3"
+
+const emptyInCardClass = "border-0 bg-transparent px-4 py-10"
+
+const emptyPageClass = "mb-6"
+
 // Keep the glob out of .templ files: templ treats /* as a comment opener.
 const branchesPlaceholder = "main, release/*"
 
@@ -206,6 +212,26 @@ func bindingFormTitle(editing bool) string {
 		return "Edit binding"
 	}
 	return "Add a binding manually"
+}
+
+func bindingFilterLine(row bindingRow) string {
+	var b strings.Builder
+	b.WriteString(row.AppName)
+	if row.CoolifyName != "" {
+		b.WriteString(" · ")
+		b.WriteString(row.CoolifyName)
+	}
+	b.WriteString(" · ")
+	if row.Binding.Branches != "" {
+		b.WriteString(row.Binding.Branches)
+	} else {
+		b.WriteString("all branches")
+	}
+	if row.Binding.Paths != "" {
+		b.WriteString(" · ")
+		b.WriteString(row.Binding.Paths)
+	}
+	return b.String()
 }
 
 func bindingSubmitLabel(editing bool) string {
@@ -233,6 +259,23 @@ func appFormAction(editing bool, id int64) string {
 	return "/api/v1/github-apps"
 }
 
+func appFormTitle(editing bool, name string) string {
+	if editing {
+		if name != "" {
+			return "Edit " + name
+		}
+		return "Edit App"
+	}
+	return "Add an App"
+}
+
+func appFormLede(editing bool) string {
+	if editing {
+		return "Leave the webhook secret and PEM blank to keep the stored values."
+	}
+	return "Create with GitHub, or paste credentials under Advanced. GitHub Enterprise uses paste."
+}
+
 func appIDValue(editing bool, id int64) string {
 	if !editing || id == 0 {
 		return ""
@@ -255,6 +298,14 @@ func pemAttrs(editing bool) templ.Attributes {
 }
 
 func settingsOf(m map[string]any) store.Settings { return get[store.Settings](m, "Settings") }
+
+func settingsSectionOf(m map[string]any) string {
+	s := str(m, "Section")
+	if s == "" {
+		return "configuration"
+	}
+	return s
+}
 func appsOf(m map[string]any) []store.GitHubApp {
 	return get[[]store.GitHubApp](m, "Apps")
 }
@@ -370,6 +421,21 @@ func shareableChecked(editing bool, shareable bool) bool {
 }
 
 func jobInFlight(j store.Job) bool { return j.InFlight() }
+
+func jobRefLine(j store.Job) string {
+	ref := j.Ref
+	sha := web.ShortSHA(j.SHA)
+	switch {
+	case ref != "" && sha != "":
+		return ref + " · " + sha
+	case ref != "":
+		return ref
+	case sha != "":
+		return sha
+	default:
+		return "-"
+	}
+}
 
 func coolifyFormAction(editing bool, id int64) string {
 	if editing {

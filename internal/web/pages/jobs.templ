@@ -5,7 +5,6 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
-	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -19,27 +18,23 @@ templ Jobs(p web.Page) {
 	{{ lede := "Every run this worker has taken, newest first. Retention is " + itoa(settings.LogRetentionDays) + " days." }}
 	@layouts.Shell(p) {
 		@layouts.PageHead("Jobs", lede)
-		@card.Card() {
-			@card.Content() {
-				@jobsFilter(repo, status)
-				@jobsTable(p, list, jobFiltered(m))
-				@jobsPager(m, len(list))
-			}
+		@card.Card(card.Props{Class: "gap-0 py-0"}) {
+			@jobsFilter(repo, status)
+			@jobsTable(p, list, jobFiltered(m))
 		}
+		@jobsPager(m, len(list))
 	}
 }
 
 templ jobsFilter(repo, status string) {
-	<form method="get" action="/jobs" class="mb-4 flex flex-wrap items-end gap-3">
-		@field.Field() {
-			@field.Label(field.LabelProps{For: "status"}) {
-				Status
-			}
-			<select id="status" name="status" class={ selectClass }>
+	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5" aria-label="Filter jobs">
+		<div class="flex items-center gap-2">
+			<label for="status" class="text-muted-foreground text-xs font-medium">Status</label>
+			<select id="status" name="status" class={ selectToolbarClass } aria-label="Status">
 				if status == "" {
-					<option value="" selected>All</option>
+					<option value="" selected>All statuses</option>
 				} else {
-					<option value="">All</option>
+					<option value="">All statuses</option>
 				}
 				for _, st := range store.JobStatuses {
 					if status == st {
@@ -49,21 +44,29 @@ templ jobsFilter(repo, status string) {
 					}
 				}
 			</select>
-		}
-		@field.Field() {
-			@field.Label(field.LabelProps{For: "repo"}) {
-				Repo
+		</div>
+		<div class="flex min-w-0 items-center gap-2">
+			<label for="repo" class="text-muted-foreground text-xs font-medium">Repo</label>
+			@input.Input(input.Props{
+				ID:          "repo",
+				Name:        "repo",
+				Type:        "text",
+				Placeholder: "owner/name",
+				Value:       repo,
+				Class:       "w-56 max-w-full font-mono",
+				Attributes:  templ.Attributes{"aria-label": "Repo"},
+			})
+		</div>
+		<div class="flex items-center gap-2 sm:ml-auto">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				Filter
 			}
-			@input.Input(input.Props{ID: "repo", Name: "repo", Type: "text", Placeholder: "owner/name", Value: repo, Class: "font-mono"})
-		}
-		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-			Filter
-		}
-		if repo != "" || status != "" {
-			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
-				Clear
+			if repo != "" || status != "" {
+				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
+					Clear
+				}
 			}
-		}
+		</div>
 	</form>
 }
 

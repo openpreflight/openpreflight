@@ -61,7 +61,7 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(triggerLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 16, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 16, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -121,7 +121,7 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 						var templ_7745c5c3_Var8 string
 						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 21, Col: 12}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 21, Col: 12}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 						if templ_7745c5c3_Err != nil {
@@ -152,7 +152,7 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(desc)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 24, Col: 11}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 24, Col: 11}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
@@ -215,7 +215,7 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 					var templ_7745c5c3_Var13 templ.SafeURL
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(action))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 31, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 31, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
