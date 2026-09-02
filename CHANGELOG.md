@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-09-02
+
+Operator UI refresh on the 2.0.0 binary. Image
+`ghcr.io/openpreflight/openpreflight:2.0.2`.
+
 ### Changed
 
 - Operator chrome is full width (the login/setup column stays 440px). The
@@ -124,7 +129,8 @@ v1 of the configurator and worker in one Go binary.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.0.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.2
 [2.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.0
 [1.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.1.0
 [1.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.0.0
