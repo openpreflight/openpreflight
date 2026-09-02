@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-09-02
+
+Job query, live logs, Create with GitHub, and path filters. Image
+`ghcr.io/openpreflight/openpreflight:2.0.0`.
+
 ### Added
 
 - Binding **paths** (`frontend/**`, comma or newline). Empty is every path. A
@@ -104,6 +109,7 @@ v1 of the configurator and worker in one Go binary.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.0
 [1.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.1.0
 [1.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.0.0
