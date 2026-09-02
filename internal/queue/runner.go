@@ -279,6 +279,37 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		}
 	}
 
+	binding := store.RepoBinding{}
+	if job.BindingID != 0 {
+		if b, err := r.store.Binding(job.BindingID); err == nil {
+			binding = b
+		}
+	}
+
+	var token string
+	if strings.TrimSpace(binding.Paths) != "" {
+		var err error
+		token, err = client.InstallationToken(ctx, job.InstallationID)
+		if err != nil {
+			msg := fmt.Sprintf("could not mint an installation token: %v", err)
+			w.Printf("%s\n", msg)
+			r.fail(job, nil, "", msg)
+			complete("failure", nil, msg)
+			return err
+		}
+		files, ferr := client.CommitFiles(ctx, job.InstallationID, job.Repo, job.SHA)
+		if ferr != nil || files.Truncated {
+			w.Printf("path filter: fail-open (error=%v truncated=%v); running the job\n", ferr, files.Truncated)
+			r.log.Warn("path filter fail-open", "job", job.ID, "error", ferr, "truncated", files.Truncated)
+		} else if !binding.PathAllowed(files.ChangedPaths()) {
+			msg := "no changed path matched binding paths"
+			w.Printf("%s\n", msg)
+			r.store.FinishJob(job.ID, store.JobSkipped, "skipped", "[]", "")
+			complete("skipped", nil, msg)
+			return nil
+		}
+	}
+
 	ws, err := workspace.Prepare(r.cfg.WorkspaceDir(), job.ID)
 	if err != nil {
 		w.Printf("%v\n", err)
@@ -292,13 +323,16 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		}
 	}()
 
-	token, err := client.InstallationToken(ctx, job.InstallationID)
-	if err != nil {
-		msg := fmt.Sprintf("could not mint an installation token: %v", err)
-		w.Printf("%s\n", msg)
-		r.fail(job, nil, "", msg)
-		complete("failure", nil, msg)
-		return err
+	if token == "" {
+		var err error
+		token, err = client.InstallationToken(ctx, job.InstallationID)
+		if err != nil {
+			msg := fmt.Sprintf("could not mint an installation token: %v", err)
+			w.Printf("%s\n", msg)
+			r.fail(job, nil, "", msg)
+			complete("failure", nil, msg)
+			return err
+		}
 	}
 
 	cloneStart := time.Now()
@@ -322,12 +356,6 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 	w.Printf("checked out %s in %s\n\n", shortSHA(job.SHA), time.Since(cloneStart).Round(time.Millisecond))
 
-	binding := store.RepoBinding{}
-	if job.BindingID != 0 {
-		if b, err := r.store.Binding(job.BindingID); err == nil {
-			binding = b
-		}
-	}
 	pipelineFile := firstNonEmpty(binding.PipelineFile, settings.DefaultPipelineFile, ".ci.yml")
 	plan, err := pipeline.Resolve(ws.Repo, pipelineFile, pipeline.Overrides{
 		Install: binding.InstallCmd,

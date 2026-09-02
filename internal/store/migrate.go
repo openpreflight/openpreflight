@@ -150,6 +150,9 @@ CREATE INDEX idx_jobs_app_repo_sha ON jobs(github_app_id, repo, sha, status);
 	{"0004_drop_max_workspace_bytes", `
 ALTER TABLE settings DROP COLUMN max_workspace_bytes;
 `},
+	{"0005_binding_paths", `
+ALTER TABLE repo_bindings ADD COLUMN paths TEXT NOT NULL DEFAULT '';
+`},
 }
 
 func (s *Store) migrate() error {

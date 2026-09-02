@@ -78,6 +78,7 @@ type RepoBinding struct {
 	Repo              string    `json:"repo"`
 	Enabled           bool      `json:"enabled"`
 	Branches          string    `json:"branches"`
+	Paths             string    `json:"paths"`
 	CheckName         string    `json:"check_name"`
 	PipelineFile      string    `json:"pipeline_file"`
 	TimeoutSeconds    int       `json:"timeout_seconds"`

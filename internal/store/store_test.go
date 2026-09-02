@@ -263,12 +263,15 @@ func TestBindingUpsertAndAllowList(t *testing.T) {
 		t.Fatal("shareable logs must default to off")
 	}
 	// Upsert is keyed on (app, repo): a second call updates rather than adds.
-	again, err := st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "acme/api", Enabled: false, Branches: "main"})
+	again, err := st.UpsertBinding(BindingInput{GitHubAppID: app.ID, Repo: "acme/api", Enabled: false, Branches: "main", Paths: "frontend/**"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if again.ID != b.ID {
 		t.Fatalf("upsert created a second row: %d vs %d", again.ID, b.ID)
+	}
+	if again.Paths != "frontend/**" {
+		t.Fatalf("paths not stored: %q", again.Paths)
 	}
 	all, _ := st.ListBindings()
 	if len(all) != 1 {
@@ -284,6 +287,36 @@ func TestBindingUpsertAndAllowList(t *testing.T) {
 	}
 	if _, err := st.EnabledBinding(app.ID, "someone/else"); !errors.Is(err, ErrNotFound) {
 		t.Fatal("unknown repo must not resolve")
+	}
+}
+
+func TestPathAllowed(t *testing.T) {
+	cases := []struct {
+		paths   string
+		changed []string
+		want    bool
+	}{
+		{"", []string{"anything.go"}, true},
+		{"", nil, true},
+		{"frontend/**", []string{"frontend/app.ts"}, true},
+		{"frontend/**", []string{"frontend"}, true},
+		{"frontend/**", []string{"backend/app.ts"}, false},
+		{"/frontend/**", []string{"/frontend/app.ts"}, true},
+		{"*.md", []string{"README.md"}, true},
+		{"docs/*.md", []string{"docs/guide.md"}, true},
+		{"docs/*.md", []string{"docs/a/guide.md"}, false},
+		{"packages/api/**", []string{"packages/api/main.go"}, true},
+		{"frontend/**, packages/api/**", []string{"packages/api/x.go"}, true},
+		{"frontend/**", []string{"old.ts", "frontend/new.ts"}, true},
+		{"frontend/**", []string{"lib/old.ts"}, false},
+		{"frontend/**", nil, false},
+		{"frontend/**", []string{}, false},
+	}
+	for _, c := range cases {
+		b := RepoBinding{Paths: c.paths}
+		if got := b.PathAllowed(c.changed); got != c.want {
+			t.Errorf("paths %q vs %v: got %v want %v", c.paths, c.changed, got, c.want)
+		}
 	}
 }
 

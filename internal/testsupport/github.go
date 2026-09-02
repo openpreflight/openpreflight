@@ -18,11 +18,17 @@ import (
 type GitHub struct {
 	*httptest.Server
 
-	mu       sync.Mutex
-	created  []CheckRunCall
-	patched  []CheckRunCall
-	tokens   int
-	failNext map[string]int
+	mu          sync.Mutex
+	created     []CheckRunCall
+	patched     []CheckRunCall
+	tokens      int
+	failNext    map[string]int
+	commitFiles map[string]commitFilesStub
+}
+
+type commitFilesStub struct {
+	files     []map[string]any
+	truncated bool
 }
 
 // CheckRunCall records one Check Runs API call.
@@ -34,7 +40,7 @@ type CheckRunCall struct {
 // NewGitHub starts the fake. Bare repos live at <root>/<owner>/<name>.git.
 func NewGitHub(t *testing.T, root string) *GitHub {
 	t.Helper()
-	f := &GitHub{failNext: map[string]int{}}
+	f := &GitHub{failNext: map[string]int{}, commitFiles: map[string]commitFilesStub{}}
 	git := &GitServer{root: root}
 
 	mux := http.NewServeMux()
@@ -91,6 +97,25 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 		f.mu.Unlock()
 		json.NewEncoder(w).Encode(map[string]any{"id": 555})
 	})
+	mux.HandleFunc("GET /repos/{owner}/{repo}/commits/{sha}", func(w http.ResponseWriter, r *http.Request) {
+		if f.shouldFail("commit-files") {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"message":"server error"}`))
+			return
+		}
+		f.mu.Lock()
+		stub, ok := f.commitFiles[r.PathValue("sha")]
+		f.mu.Unlock()
+		files := stub.files
+		if files == nil {
+			files = []map[string]any{}
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"sha":       r.PathValue("sha"),
+			"files":     files,
+			"truncated": ok && stub.truncated,
+		})
+	})
 	// Anything else is a git request.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, ".git/") {
@@ -105,7 +130,7 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 	return f
 }
 
-// FailNext makes the named operation fail once ("token", "create-check").
+// FailNext makes the named operation fail once ("token", "create-check", "commit-files").
 func (f *GitHub) FailNext(op string) {
 	f.mu.Lock()
 	f.failNext[op]++
@@ -134,4 +159,11 @@ func (f *GitHub) CompletedCheckRuns() []CheckRunCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]CheckRunCall(nil), f.patched...)
+}
+
+// SetCommitFiles is the fake GET /repos/{}/commits/{sha} body for a SHA.
+func (f *GitHub) SetCommitFiles(sha string, files []map[string]any, truncated bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.commitFiles[sha] = commitFilesStub{files: files, truncated: truncated}
 }

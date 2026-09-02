@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Binding **paths** (`frontend/**`, comma or newline). Empty is every path. A
+  complete file list with no match skips the job (Check Run conclusion
+  `skipped`) before clone. A truncated or failed file list fail-opens and runs.
 - **Create with GitHub** on the GitHub Apps page uses GitHub's App manifest
   flow (`POST /api/v1/github-apps/manifest/start` and the callback). Paste
   remains under Advanced, including for GitHub Enterprise.
