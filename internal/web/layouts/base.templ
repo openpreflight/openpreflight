@@ -13,7 +13,7 @@ templ Base(p web.Page) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ p.Title } · openpreflight</title>
-			<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6f4f'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M8 17l5 5 11-12'/%3E%3C/svg%3E"/>
+			<link rel="icon" href="/assets/brand/logo.svg" type="image/svg+xml"/>
 			if p.RefreshSeconds > 0 {
 				<meta http-equiv="refresh" content={ itoa(p.RefreshSeconds) }/>
 			}
@@ -95,8 +95,8 @@ templ Flash(p web.Page) {
 
 templ Brand() {
 	<a class="brand" href="/">
-		<span class="inline-flex size-7 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">op</span>
-		openpreflight
+		<img src="/assets/brand/logo.svg" width="28" height="28" alt="" class="size-7 shrink-0 rounded-md"/>
+		<span class="group-data-[collapsible=icon]:hidden">openpreflight</span>
 	</a>
 }
 

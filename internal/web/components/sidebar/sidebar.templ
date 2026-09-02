@@ -212,6 +212,8 @@ type MenuButtonProps struct {
 	// tooltip.hidden): nil follows the collapsed-to-icons rule, false forces
 	// the tooltip, true disables it.
 	TooltipHidden *bool
+	// Type is the button type when Href is empty. Default is "button".
+	Type string
 }
 
 type MenuActionProps struct {
@@ -743,6 +745,9 @@ templ MenuButton(props ...MenuButtonProps) {
 	if p.Size == "" {
 		{{ p.Size = MenuButtonSizeDefault }}
 	}
+	if p.Type == "" {
+		{{ p.Type = "button" }}
+	}
 	if p.Tooltip != "" {
 		@tooltip.Tooltip() {
 			{{ s := sidebarState(ctx) }}
@@ -796,7 +801,7 @@ templ menuButtonEl(p MenuButtonProps) {
 			if p.ID != "" {
 				id={ p.ID }
 			}
-			type="button"
+			type={ p.Type }
 			data-slot="sidebar-menu-button"
 			data-sidebar="menu-button"
 			data-size={ string(p.Size) }

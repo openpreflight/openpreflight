@@ -8,137 +8,197 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/checkbox"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
 templ Repos(p web.Page) {
 	@layouts.Shell(p) {
-		@reposBody(p)
+		@reposList(p)
 	}
 }
 
-templ reposBody(p web.Page) {
+templ ReposPick(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ apps := appsOf(m) }}
+	@layouts.Shell(p) {
+		@layouts.PageHead("Pick repositories", "Choose an App, optionally a Coolify source, then check the repos this worker should run.")
+		if len(apps) == 0 {
+			@reposNeedApp()
+		} else {
+			@reposApps(p)
+		}
+	}
+}
+
+templ ReposEditorPage(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ apps := appsOf(m) }}
+	{{ editing := has(m, "Edit") }}
+	@layouts.Shell(p) {
+		if editing {
+			@reposList(p)
+			if len(apps) == 0 {
+				@reposNeedApp()
+			} else {
+				@reposEditDrawer(p)
+			}
+		} else {
+			@layouts.PageHead(bindingFormTitle(false), "A binding is one owner/name on one App. Empty branches and paths allow everything.")
+			if len(apps) == 0 {
+				@reposNeedApp()
+			} else {
+				@reposEditor(p)
+			}
+		}
+	}
+}
+
+templ reposList(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ apps := appsOf(m) }}
 	{{ rows := rowsOf(m) }}
 	@layouts.PageHead("Repos", "The worker's allow-list is this page. A repo with no enabled binding is ignored, even if its webhook signature is valid.") {
 		if len(apps) > 0 {
-			@button.Button(button.Props{Href: "#add", Size: button.SizeSm}) {
+			@button.Button(button.Props{Href: "/repos/pick", Size: button.SizeSm}) {
+				Pick repositories
+			}
+			@button.Button(button.Props{Href: "/repos/new", Variant: button.VariantOutline, Size: button.SizeSm}) {
 				Add a binding
 			}
 		}
-		<span></span>
 	}
-		if len(rows) > 0 {
-			<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-				for _, row := range rows {
-					@card.Card(card.Props{Size: card.SizeSm}) {
-						@card.Header() {
-							@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
-								{ row.Binding.Repo }
-							}
+	if len(rows) > 0 {
+		<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+			for _, row := range rows {
+				@card.Card(card.Props{Size: card.SizeSm}) {
+					@card.Header() {
+						@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
+							{ row.Binding.Repo }
 						}
-						@card.Content(card.ContentProps{Class: "space-y-2"}) {
-							<div class="flex flex-wrap gap-1">
-								if row.Binding.Enabled {
-									@badge.Badge() {
-										on
-									}
-								} else {
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-										off
-									}
+					}
+					@card.Content(card.ContentProps{Class: "space-y-2"}) {
+						<div class="flex flex-wrap gap-1">
+							if row.Binding.Enabled {
+								@badge.Badge() {
+									on
 								}
-								if row.Binding.ShareableLogs {
-									@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-										shareable
-									}
-								} else {
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-										private
-									}
-								}
-							</div>
-							<p class="text-muted-foreground text-xs">
-								{ row.AppName }
-								if row.CoolifyName != "" {
-									{ " · " + row.CoolifyName }
-								}
-								{ " · " }
-								if row.Binding.Branches != "" {
-									{ row.Binding.Branches }
-								} else {
-									all branches
-								}
-								if row.Binding.Paths != "" {
-									{ " · " + row.Binding.Paths }
-								}
-							</p>
-							if row.LastJob.ID != "" {
-								<div class="flex flex-wrap items-center gap-2 text-xs">
-									@StatusBadge(row.LastJob)
-									<span class="font-mono">{ web.ShortSHA(row.LastJob.SHA) }</span>
-									<span class="text-muted-foreground">{ web.Ago(row.LastJob.CreatedAt) }</span>
-								</div>
 							} else {
-								<p class="text-muted-foreground text-xs">no runs</p>
-							}
-						}
-						@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
-							@button.Button(button.Props{Href: "/repos?edit=" + itoa64(row.Binding.ID), Variant: button.VariantLink, Size: button.SizeSm}) {
-								Edit
-							}
-							<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
-								@layouts.CSRF(p.CSRFToken)
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
-									if row.Binding.Enabled {
-										Disable
-									} else {
-										Enable
-									}
+								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+									off
 								}
-							</form>
-							@layouts.ConfirmDelete(
-								"del-bind-"+itoa64(row.Binding.ID),
-								p.CSRFToken,
-								"/api/v1/bindings/"+itoa64(row.Binding.ID)+"/delete",
-								"Remove",
-								"Remove this binding?",
-								"The repo stops being checked.",
-							)
+							}
+							if row.Binding.ShareableLogs {
+								@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+									shareable
+								}
+							} else {
+								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+									private
+								}
+							}
+						</div>
+						<p class="text-muted-foreground text-xs">
+							{ row.AppName }
+							if row.CoolifyName != "" {
+								{ " · " + row.CoolifyName }
+							}
+							{ " · " }
+							if row.Binding.Branches != "" {
+								{ row.Binding.Branches }
+							} else {
+								all branches
+							}
+							if row.Binding.Paths != "" {
+								{ " · " + row.Binding.Paths }
+							}
+						</p>
+						if row.LastJob.ID != "" {
+							<div class="flex flex-wrap items-center gap-2 text-xs">
+								@StatusBadge(row.LastJob)
+								<span class="font-mono">{ web.ShortSHA(row.LastJob.SHA) }</span>
+								<span class="text-muted-foreground">{ web.Ago(row.LastJob.CreatedAt) }</span>
+							</div>
+						} else {
+							<p class="text-muted-foreground text-xs">no runs</p>
 						}
 					}
-				}
-			</div>
-		} else {
-			@empty.Empty(empty.Props{Class: "mb-6"}) {
-				@empty.Header() {
-					@empty.Title() {
-						No bindings yet
+					@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
+						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
+							Edit
+						}
+						<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
+							@layouts.CSRF(p.CSRFToken)
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
+								if row.Binding.Enabled {
+									Disable
+								} else {
+									Enable
+								}
+							}
+						</form>
+						@layouts.ConfirmDelete(
+							"del-bind-"+itoa64(row.Binding.ID),
+							p.CSRFToken,
+							"/api/v1/bindings/"+itoa64(row.Binding.ID)+"/delete",
+							"Remove",
+							"Remove this binding?",
+							"The repo stops being checked.",
+						)
 					}
 				}
 			}
-		}
-		if len(apps) == 0 {
-			@card.Card() {
-				@card.Header() {
-					@card.Title() {
-						Add a CI GitHub App first
-					}
-					@card.Description() {
-						A binding needs an App: it verifies the webhook signature and writes the Check Run.
-					}
+		</div>
+	} else if len(apps) == 0 {
+		@reposNeedApp()
+	} else {
+		@empty.Empty(empty.Props{Class: emptyPageClass}) {
+			@empty.Header() {
+				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+					@icon.FolderGit()
 				}
-				@card.Content() {
-					@button.Button(button.Props{Href: "/github-apps", Size: button.SizeSm}) {
-						Add one
-					}
+				@empty.Title() {
+					No bindings yet
+				}
+				@empty.Description() {
+					Pick repositories from an App, or add a binding by owner/name.
 				}
 			}
-		} else {
-			@reposApps(p)
+			@empty.Content() {
+				@button.Button(button.Props{Href: "/repos/pick", Size: button.SizeSm}) {
+					Pick repositories
+				}
+				@button.Button(button.Props{Href: "/repos/new", Variant: button.VariantOutline, Size: button.SizeSm}) {
+					Add a binding
+				}
+			}
 		}
+	}
+	if len(rows) > 0 && len(apps) == 0 {
+		@reposNeedApp()
+	}
+}
+
+templ reposNeedApp() {
+	@empty.Empty(empty.Props{Class: emptyPageClass}) {
+		@empty.Header() {
+			@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+				@icon.Github()
+			}
+			@empty.Title() {
+				Add a CI GitHub App first
+			}
+			@empty.Description() {
+				A binding needs an App: it verifies the webhook signature and writes the Check Run.
+			}
+		}
+		@empty.Content() {
+			@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
+				Add one
+			}
+		}
+	}
 }
 
 templ reposApps(p web.Page) {
@@ -148,115 +208,158 @@ templ reposApps(p web.Page) {
 	{{ selectedApp := asInt64(m, "SelectedAppID") }}
 	{{ selectedCoolify := asInt64(m, "SelectedCoolifyID") }}
 	{{ picker := pickerOf(m) }}
-	@card.Card(card.Props{Class: "mb-6"}) {
-				@card.Header() {
-					@card.Title() {
-						Pick repositories
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				Pick repositories
+			}
+		}
+		@card.Content(card.ContentProps{Class: "space-y-4"}) {
+			<form method="get" action="/repos/pick" class="grid gap-4 sm:grid-cols-3">
+				@field.Field() {
+					@field.Label(field.LabelProps{For: "app_id"}) {
+						CI GitHub App
+					}
+					<select id="app_id" name="app_id" class={ selectClass } onchange="this.form.submit()">
+						<option value="">- select -</option>
+						for _, a := range apps {
+							if a.ID == selectedApp {
+								<option value={ itoa64(a.ID) } selected>{ a.Name }</option>
+							} else {
+								<option value={ itoa64(a.ID) }>{ a.Name }</option>
+							}
+						}
+					</select>
+				}
+				@field.Field() {
+					@field.Label(field.LabelProps{For: "coolify_id"}) {
+						Repo list from
+					}
+					<select id="coolify_id" name="coolify_id" class={ selectClass } onchange="this.form.submit()">
+						<option value="">This App's installations</option>
+						for _, inst := range instances {
+							if inst.ID == selectedCoolify {
+								<option value={ itoa64(inst.ID) } selected>Coolify: { inst.Name }</option>
+							} else {
+								<option value={ itoa64(inst.ID) }>Coolify: { inst.Name }</option>
+							}
+						}
+					</select>
+					@field.Description() {
+						A Coolify connector's repo list is inventory only; the App above still does the webhook, the check and the clone.
 					}
 				}
-				@card.Content(card.ContentProps{Class: "space-y-4"}) {
-					<form method="get" action="/repos" class="grid gap-4 sm:grid-cols-3">
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "app_id"}) {
-								CI GitHub App
+				<div class="flex items-end">
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
+						Load repositories
+					}
+				</div>
+			</form>
+			if pickerError(m) != "" {
+				@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
+					{ pickerError(m) }
+				}
+			}
+			if len(picker) > 0 {
+				<form method="post" action="/api/v1/bindings/bulk" class="space-y-3">
+					@layouts.CSRF(p.CSRFToken)
+					<input type="hidden" name="github_app_id" value={ itoa64(selectedApp) }/>
+					<input type="hidden" name="coolify_instance_id" value={ itoa64(selectedCoolify) }/>
+					for _, r := range picker {
+						@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
+							@checkbox.Checkbox(checkbox.Props{
+								ID:             "repo-" + r.FullName,
+								Name:           "repo",
+								Value:          r.FullName,
+								DefaultChecked: r.Bound,
+							})
+							@field.Label(field.LabelProps{For: "repo-" + r.FullName, Class: "font-mono"}) {
+								{ r.FullName }
 							}
-							<select id="app_id" name="app_id" class={ selectClass } onchange="this.form.submit()">
-								<option value="">- select -</option>
-								for _, a := range apps {
-									if a.ID == selectedApp {
-										<option value={ itoa64(a.ID) } selected>{ a.Name }</option>
-									} else {
-										<option value={ itoa64(a.ID) }>{ a.Name }</option>
-									}
+							if r.Private {
+								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+									private
 								}
-							</select>
-						}
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "coolify_id"}) {
-								Repo list from
 							}
-							<select id="coolify_id" name="coolify_id" class={ selectClass } onchange="this.form.submit()">
-								<option value="">This App's installations</option>
-								for _, inst := range instances {
-									if inst.ID == selectedCoolify {
-										<option value={ itoa64(inst.ID) } selected>Coolify: { inst.Name }</option>
-									} else {
-										<option value={ itoa64(inst.ID) }>Coolify: { inst.Name }</option>
-									}
+							if r.Bound {
+								@badge.Badge() {
+									bound
 								}
-							</select>
-							@field.Description() {
-								A Coolify connector's repo list is inventory only; the App above still does the webhook, the check and the clone.
 							}
-						}
-						<div class="flex items-end">
-							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
-								Load repositories
-							}
-						</div>
-					</form>
-					if pickerError(m) != "" {
-						@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
-							{ pickerError(m) }
 						}
 					}
-					if len(picker) > 0 {
-						<form method="post" action="/api/v1/bindings/bulk" class="space-y-3">
-							@layouts.CSRF(p.CSRFToken)
-							<input type="hidden" name="github_app_id" value={ itoa64(selectedApp) }/>
-							<input type="hidden" name="coolify_instance_id" value={ itoa64(selectedCoolify) }/>
-							for _, r := range picker {
-								@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
-									@checkbox.Checkbox(checkbox.Props{
-										ID:             "repo-" + r.FullName,
-										Name:           "repo",
-										Value:          r.FullName,
-										DefaultChecked: r.Bound,
-									})
-									@field.Label(field.LabelProps{For: "repo-" + r.FullName, Class: "font-mono"}) {
-										{ r.FullName }
-									}
-									if r.Private {
-										@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-											private
-										}
-									}
-									if r.Bound {
-										@badge.Badge() {
-											bound
-										}
-									}
-								}
-							}
-							@field.Description() {
-								Unchecking a repo removes its binding. Only private repos you trust should be enabled: a pipeline runs the repo's own commands on this host.
-							}
-							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-								Save selection
-							}
-						</form>
+					@field.Description() {
+						Unchecking a repo removes its binding. Only private repos you trust should be enabled: a pipeline runs the repo's own commands on this host.
+					}
+					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+						Save selection
+					}
+				</form>
+			} else if selectedApp != 0 && pickerError(m) == "" {
+				@empty.Empty(empty.Props{Class: emptyInCardClass}) {
+					@empty.Header() {
+						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+							@icon.FolderGit()
+						}
+						@empty.Title() {
+							No repositories on this source
+						}
+						@empty.Description() {
+							Install the App on a GitHub account or org, or pick a Coolify connector that has repos, then load again.
+						}
 					}
 				}
 			}
-			@reposEditor(p)
+		}
+	}
 }
 
 templ reposEditor(p web.Page) {
+	@card.Card() {
+		@card.Header() {
+			@card.Title() {
+				{ bindingFormTitle(false) }
+			}
+		}
+		@card.Content() {
+			@reposEditorForm(p)
+		}
+	}
+}
+
+templ reposEditDrawer(p web.Page) {
+	{{ edit := bindingOf(asMap(p.Data)) }}
+	<a href="/repos" class="fixed inset-0 z-40 bg-black/10"><span class="sr-only">Close editor</span></a>
+	<aside
+		class="bg-background fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-y-auto border-l shadow-lg sm:max-w-2xl"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="edit-binding-title"
+	>
+		<div class="flex items-start justify-between gap-3 border-b px-5 py-4">
+			<div class="min-w-0">
+				<h2 id="edit-binding-title" class="truncate text-lg font-semibold">{ edit.Repo }</h2>
+				<p class="text-muted-foreground mt-1 text-sm">Empty branches and paths allow everything.</p>
+			</div>
+			@button.Button(button.Props{Href: "/repos", Variant: button.VariantGhost, Size: button.SizeIconSm, Attributes: templ.Attributes{"aria-label": "Close"}}) {
+				@icon.X()
+			}
+		</div>
+		<div class="flex-1 px-5 py-4">
+			@reposEditorForm(p)
+		</div>
+	</aside>
+}
+
+templ reposEditorForm(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ settings := settingsOf(m) }}
 	{{ apps := appsOf(m) }}
 	{{ instances := instancesOf(m) }}
 	{{ editing := has(m, "Edit") }}
 	{{ edit := bindingOf(m) }}
-	@card.Card(card.Props{ID: "add"}) {
-		@card.Header() {
-			@card.Title() {
-				{ bindingFormTitle(editing) }
-			}
-		}
-		@card.Content() {
-			<form method="post" action="/api/v1/bindings" class="flex flex-col gap-4">
-				@layouts.CSRF(p.CSRFToken)
+	<form method="post" action="/api/v1/bindings" class="flex flex-col gap-4">
+		@layouts.CSRF(p.CSRFToken)
 				<div class="grid gap-4 sm:grid-cols-3">
 					@field.Field() {
 						@field.Label(field.LabelProps{For: "b_repo"}) {
@@ -376,13 +479,9 @@ templ reposEditor(p web.Page) {
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
 						{ bindingSubmitLabel(editing) }
 					}
-					if editing {
-						@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
-							Cancel
-						}
+					@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
+						Cancel
 					}
 				</div>
-			</form>
-		}
-	}
+	</form>
 }

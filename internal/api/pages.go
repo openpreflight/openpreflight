@@ -78,16 +78,44 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 }
 
 func (s *Server) pageSettings(w http.ResponseWriter, r *http.Request, user store.User) {
+	s.renderSettings(w, r, user, "configuration", "Settings", nil)
+}
+
+func (s *Server) pageSettingsRunner(w http.ResponseWriter, r *http.Request, user store.User) {
+	s.renderSettings(w, r, user, "runner", "Runner", []web.Crumb{
+		{Label: "Settings", Href: "/settings"},
+		{Label: "Runner"},
+	})
+}
+
+func (s *Server) pageSettingsLogs(w http.ResponseWriter, r *http.Request, user store.User) {
+	s.renderSettings(w, r, user, "logs", "Logs", []web.Crumb{
+		{Label: "Settings", Href: "/settings"},
+		{Label: "Logs"},
+	})
+}
+
+func (s *Server) pageSettingsAdmin(w http.ResponseWriter, r *http.Request, user store.User) {
+	s.renderSettings(w, r, user, "admin", "Admin", []web.Crumb{
+		{Label: "Settings", Href: "/settings"},
+		{Label: "Admin"},
+	})
+}
+
+func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, user store.User, section, title string, crumbs []web.Crumb) {
 	settings, err := s.store.Settings()
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.render(w, "settings", s.page(w, r, &user, "Settings", "settings", map[string]any{
+	p := s.page(w, r, &user, title, "settings", map[string]any{
 		"Settings":        settings,
 		"DockerAvailable": s.dockerAvailable(),
 		"DockerHost":      s.cfg.DockerHost,
-	}))
+		"Section":         section,
+	})
+	p.Crumbs = crumbs
+	s.render(w, "settings", p)
 }
 
 func (s *Server) pageCoolify(w http.ResponseWriter, r *http.Request, user store.User) {
@@ -145,6 +173,15 @@ func (s *Server) pageCoolify(w http.ResponseWriter, r *http.Request, user store.
 }
 
 func (s *Server) pageGitHubApps(w http.ResponseWriter, r *http.Request, user store.User) {
+	if raw := r.URL.Query().Get("edit"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && id > 0 {
+			http.Redirect(w, r, "/github-apps/"+strconv.FormatInt(id, 10)+"/edit", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/github-apps", http.StatusSeeOther)
+		return
+	}
 	apps, err := s.store.ListGitHubApps()
 	if err != nil {
 		s.fail(w, r, err)
@@ -156,13 +193,6 @@ func (s *Server) pageGitHubApps(w http.ResponseWriter, r *http.Request, user sto
 		return
 	}
 	data := map[string]any{"Apps": apps, "Settings": settings}
-
-	if raw := r.URL.Query().Get("edit"); raw != "" {
-		id, _ := strconv.ParseInt(raw, 10, 64)
-		if app, err := s.store.GitHubApp(id); err == nil {
-			data["Edit"] = app
-		}
-	}
 
 	if raw := r.URL.Query().Get("inspect"); raw != "" {
 		id, convErr := strconv.ParseInt(raw, 10, 64)
@@ -185,6 +215,47 @@ func (s *Server) pageGitHubApps(w http.ResponseWriter, r *http.Request, user sto
 		}
 	}
 	s.render(w, "githubapps", s.page(w, r, &user, "GitHub Apps", "apps", data))
+}
+
+func (s *Server) pageGitHubAppsNew(w http.ResponseWriter, r *http.Request, user store.User) {
+	settings, err := s.store.Settings()
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	p := s.page(w, r, &user, "Add an App", "apps", map[string]any{"Settings": settings})
+	p.Crumbs = []web.Crumb{
+		{Label: "GitHub Apps", Href: "/github-apps"},
+		{Label: "New"},
+	}
+	s.render(w, "githubapps-edit", p)
+}
+
+func (s *Server) pageGitHubAppsEdit(w http.ResponseWriter, r *http.Request, user store.User) {
+	id, err := pathID(r)
+	if err != nil {
+		http.Redirect(w, r, "/github-apps", http.StatusSeeOther)
+		return
+	}
+	app, err := s.store.GitHubApp(id)
+	if err != nil {
+		http.Redirect(w, r, "/github-apps", http.StatusSeeOther)
+		return
+	}
+	settings, err := s.store.Settings()
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	p := s.page(w, r, &user, "Edit App", "apps", map[string]any{
+		"Settings": settings,
+		"Edit":     app,
+	})
+	p.Crumbs = []web.Crumb{
+		{Label: "GitHub Apps", Href: "/github-apps"},
+		{Label: app.Name},
+	}
+	s.render(w, "githubapps-edit", p)
 }
 
 // pickerRepo is one row of the repo picker.
@@ -219,51 +290,28 @@ func latestJobByRepo(jobs []store.Job) map[string]store.Job {
 }
 
 func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.User) {
-	settings, err := s.store.Settings()
-	if err != nil {
-		s.fail(w, r, err)
+	if raw := r.URL.Query().Get("edit"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err == nil && id > 0 {
+			http.Redirect(w, r, "/repos/"+strconv.FormatInt(id, 10)+"/edit", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
 		return
 	}
-	apps, err := s.store.ListGitHubApps()
-	if err != nil {
-		s.fail(w, r, err)
+	base, ok := s.loadReposBase(w, r)
+	if !ok {
 		return
 	}
-	instances, err := s.store.ListCoolifyInstances()
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	bindings, err := s.store.ListBindings()
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
+	s.render(w, "repos", s.page(w, r, &user, "Repos", "repos", base.data))
+}
 
-	appNames := map[int64]string{}
-	for _, a := range apps {
-		appNames[a.ID] = a.Name
-	}
-	instNames := map[int64]string{}
-	for _, i := range instances {
-		instNames[i.ID] = i.Name
-	}
-	rows := make([]bindingRow, 0, len(bindings))
-	recent, err := s.store.ListJobs(store.JobList{Limit: 100})
-	if err != nil {
-		s.fail(w, r, err)
+func (s *Server) pageReposPick(w http.ResponseWriter, r *http.Request, user store.User) {
+	base, ok := s.loadReposBase(w, r)
+	if !ok {
 		return
 	}
-	latest := latestJobByRepo(recent)
-	for _, b := range bindings {
-		rows = append(rows, bindingRow{
-			Binding:     b,
-			AppName:     orUnknown(appNames[b.GitHubAppID], "(deleted app)"),
-			CoolifyName: instNames[b.CoolifyInstanceID],
-			LastJob:     latest[b.Repo],
-		})
-	}
-
+	data := base.data
 	selectedApp := int64(0)
 	if raw := r.URL.Query().Get("app_id"); raw != "" {
 		selectedApp, _ = strconv.ParseInt(raw, 10, 64)
@@ -272,28 +320,14 @@ func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.Us
 	if raw := r.URL.Query().Get("coolify_id"); raw != "" {
 		selectedCoolify, _ = strconv.ParseInt(raw, 10, 64)
 	}
-
-	data := map[string]any{
-		"Settings":          settings,
-		"Apps":              apps,
-		"Instances":         instances,
-		"Bindings":          rows,
-		"SelectedAppID":     selectedApp,
-		"SelectedCoolifyID": selectedCoolify,
-	}
-
-	if raw := r.URL.Query().Get("edit"); raw != "" {
-		id, _ := strconv.ParseInt(raw, 10, 64)
-		if b, err := s.store.Binding(id); err == nil {
-			data["Edit"] = b
-		}
-	}
+	data["SelectedAppID"] = selectedApp
+	data["SelectedCoolifyID"] = selectedCoolify
 
 	// Load the picker only once an App is chosen: it is the App that must be
 	// able to see the repo, whichever list the names come from.
 	if selectedApp != 0 {
 		bound := map[string]bool{}
-		for _, b := range bindings {
+		for _, b := range base.bindings {
 			if b.GitHubAppID == selectedApp {
 				bound[b.Repo] = true
 			}
@@ -323,7 +357,112 @@ func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.Us
 		data["PickerRepos"] = picker
 	}
 
-	s.render(w, "repos", s.page(w, r, &user, "Repos", "repos", data))
+	p := s.page(w, r, &user, "Pick repositories", "repos", data)
+	p.Crumbs = []web.Crumb{
+		{Label: "Repos", Href: "/repos"},
+		{Label: "Pick"},
+	}
+	s.render(w, "repos-pick", p)
+}
+
+func (s *Server) pageReposNew(w http.ResponseWriter, r *http.Request, user store.User) {
+	base, ok := s.loadReposBase(w, r)
+	if !ok {
+		return
+	}
+	p := s.page(w, r, &user, "Add a binding", "repos", base.data)
+	p.Crumbs = []web.Crumb{
+		{Label: "Repos", Href: "/repos"},
+		{Label: "New"},
+	}
+	s.render(w, "repos-edit", p)
+}
+
+func (s *Server) pageReposEdit(w http.ResponseWriter, r *http.Request, user store.User) {
+	id, err := pathID(r)
+	if err != nil {
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
+		return
+	}
+	b, err := s.store.Binding(id)
+	if err != nil {
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
+		return
+	}
+	base, ok := s.loadReposBase(w, r)
+	if !ok {
+		return
+	}
+	data := base.data
+	data["Edit"] = b
+	p := s.page(w, r, &user, "Edit binding", "repos", data)
+	p.Crumbs = []web.Crumb{
+		{Label: "Repos", Href: "/repos"},
+		{Label: b.Repo},
+	}
+	s.render(w, "repos-edit", p)
+}
+
+type reposBase struct {
+	bindings []store.RepoBinding
+	data     map[string]any
+}
+
+func (s *Server) loadReposBase(w http.ResponseWriter, r *http.Request) (reposBase, bool) {
+	settings, err := s.store.Settings()
+	if err != nil {
+		s.fail(w, r, err)
+		return reposBase{}, false
+	}
+	apps, err := s.store.ListGitHubApps()
+	if err != nil {
+		s.fail(w, r, err)
+		return reposBase{}, false
+	}
+	instances, err := s.store.ListCoolifyInstances()
+	if err != nil {
+		s.fail(w, r, err)
+		return reposBase{}, false
+	}
+	bindings, err := s.store.ListBindings()
+	if err != nil {
+		s.fail(w, r, err)
+		return reposBase{}, false
+	}
+
+	appNames := map[int64]string{}
+	for _, a := range apps {
+		appNames[a.ID] = a.Name
+	}
+	instNames := map[int64]string{}
+	for _, i := range instances {
+		instNames[i.ID] = i.Name
+	}
+	recent, err := s.store.ListJobs(store.JobList{Limit: 100})
+	if err != nil {
+		s.fail(w, r, err)
+		return reposBase{}, false
+	}
+	latest := latestJobByRepo(recent)
+	rows := make([]bindingRow, 0, len(bindings))
+	for _, b := range bindings {
+		rows = append(rows, bindingRow{
+			Binding:     b,
+			AppName:     orUnknown(appNames[b.GitHubAppID], "(deleted app)"),
+			CoolifyName: instNames[b.CoolifyInstanceID],
+			LastJob:     latest[b.Repo],
+		})
+	}
+
+	return reposBase{
+		bindings: bindings,
+		data: map[string]any{
+			"Settings":  settings,
+			"Apps":      apps,
+			"Instances": instances,
+			"Bindings":  rows,
+		},
+	}, true
 }
 
 func pickerFromCoolify(repos []coolify.Repository, bound map[string]bool) []pickerRepo {

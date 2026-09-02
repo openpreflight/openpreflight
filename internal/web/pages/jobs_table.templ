@@ -5,6 +5,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -12,8 +13,11 @@ import (
 templ jobsTable(p web.Page, list []store.Job, filtered bool) {
 	if len(list) == 0 {
 		if filtered {
-			@empty.Empty() {
+			@empty.Empty(empty.Props{Class: emptyInCardClass}) {
 				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.Search()
+					}
 					@empty.Title() {
 						No jobs match this filter
 					}
@@ -28,8 +32,11 @@ templ jobsTable(p web.Page, list []store.Job, filtered bool) {
 				}
 			}
 		} else {
-			@empty.Empty() {
+			@empty.Empty(empty.Props{Class: emptyInCardClass}) {
 				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.Workflow()
+					}
 					@empty.Title() {
 						No jobs yet
 					}
@@ -46,22 +53,16 @@ templ jobsTable(p web.Page, list []store.Job, filtered bool) {
 		}
 	} else {
 		@table.Table() {
-			@table.Header() {
+			@table.Header(table.HeaderProps{Class: "sticky top-0 z-10 bg-card"}) {
 				@table.Row() {
+					@table.Head() {
+						Status
+					}
 					@table.Head() {
 						Repo
 					}
-					@table.Head() {
-						Ref
-					}
-					@table.Head() {
-						Commit
-					}
-					@table.Head() {
+					@table.Head(table.HeadProps{Class: "hidden lg:table-cell"}) {
 						Event
-					}
-					@table.Head() {
-						Status
 					}
 					@table.Head() {
 						Took
@@ -85,40 +86,31 @@ templ jobsTable(p web.Page, list []store.Job, filtered bool) {
 
 templ jobsRow(p web.Page, j store.Job) {
 	@table.Row() {
-		@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-			<a class="hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
-		}
-		@table.Cell(table.CellProps{Class: "text-xs"}) {
-			if j.Ref != "" {
-				{ j.Ref }
-			} else {
-				{ "-" }
-			}
-		}
-		@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-			{ web.ShortSHA(j.SHA) }
-		}
-		@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
-			{ j.Event }
-		}
 		@table.Cell() {
 			@StatusBadge(j)
 			if j.Error != "" {
-				<div class="text-muted-foreground text-xs">{ j.Error }</div>
+				<div class="text-muted-foreground max-w-[16rem] truncate text-xs">{ j.Error }</div>
 			}
 		}
-		@table.Cell(table.CellProps{Class: "text-xs"}) {
+		@table.Cell() {
+			<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
+			<div class="text-muted-foreground font-mono text-xs">{ jobRefLine(j) }</div>
+		}
+		@table.Cell(table.CellProps{Class: "text-muted-foreground hidden max-w-[12rem] truncate text-xs lg:table-cell"}) {
+			{ j.Event }
+		}
+		@table.Cell(table.CellProps{Class: "tabular-nums text-xs"}) {
 			if j.StartedAt != nil {
 				{ web.HumanDuration(j.Duration()) }
 			} else {
 				{ "-" }
 			}
 		}
-		@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+		@table.Cell(table.CellProps{Class: "text-muted-foreground tabular-nums text-xs"}) {
 			{ web.Ago(j.CreatedAt) }
 		}
-		@table.Cell(table.CellProps{Class: "whitespace-normal"}) {
-			<div class="flex flex-wrap items-center gap-2">
+		@table.Cell(table.CellProps{Class: "whitespace-nowrap"}) {
+			<div class="flex items-center gap-2">
 				@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantLink, Size: button.SizeSm}) {
 					Logs
 				}
@@ -143,19 +135,13 @@ templ jobsRow(p web.Page, j store.Job) {
 
 templ jobTable(jobs []store.Job) {
 	@table.Table() {
-		@table.Header() {
+		@table.Header(table.HeaderProps{Class: "sticky top-0 z-10 bg-card"}) {
 			@table.Row() {
 				@table.Head() {
-					Repo
-				}
-				@table.Head() {
-					Ref
-				}
-				@table.Head() {
-					Commit
-				}
-				@table.Head() {
 					Status
+				}
+				@table.Head() {
+					Repo
 				}
 				@table.Head() {
 					When
@@ -168,26 +154,17 @@ templ jobTable(jobs []store.Job) {
 		@table.Body() {
 			for _, j := range jobs {
 				@table.Row() {
-					@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-						{ j.Repo }
-					}
-					@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-						if j.Ref != "" {
-							{ j.Ref }
-						} else {
-							{ "-" }
-						}
-					}
-					@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-						{ web.ShortSHA(j.SHA) }
-					}
 					@table.Cell() {
 						@StatusBadge(j)
 					}
-					@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+					@table.Cell() {
+						<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
+						<div class="text-muted-foreground font-mono text-xs">{ jobRefLine(j) }</div>
+					}
+					@table.Cell(table.CellProps{Class: "text-muted-foreground tabular-nums text-xs"}) {
 						{ web.Ago(j.CreatedAt) }
 					}
-					@table.Cell() {
+					@table.Cell(table.CellProps{Class: "whitespace-nowrap"}) {
 						@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantLink, Size: button.SizeSm}) {
 							Logs
 						}

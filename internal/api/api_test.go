@@ -404,11 +404,35 @@ func TestGitHubAppsPageOffersManifest(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d", rec.Code)
 	}
+	if strings.Contains(body, "Create with GitHub") {
+		t.Fatal("list page should not embed the add form")
+	}
+	if !strings.Contains(body, "/github-apps/new") {
+		t.Fatal("list page is missing Add an App")
+	}
+
+	req = htmlReq(http.MethodGet, "/github-apps?edit="+itoa(ts.app.ID))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = ts.do(req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("edit query: %d", rec.Code)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/github-apps/"+itoa(ts.app.ID)+"/edit" {
+		t.Fatalf("edit query location: %s", loc)
+	}
+
+	req = htmlReq(http.MethodGet, "/github-apps/new")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = ts.do(req)
+	body = rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("new status %d", rec.Code)
+	}
 	if !strings.Contains(body, "Create with GitHub") || !strings.Contains(body, "Advanced") {
-		t.Fatal("github-apps page is missing the manifest button")
+		t.Fatal("add page is missing the manifest button")
 	}
 	if strings.Contains(body, "never creates Apps") {
-		t.Fatal("github-apps page still says we never create Apps")
+		t.Fatal("add page still says we never create Apps")
 	}
 }
 
@@ -509,7 +533,10 @@ func TestRerunRequiresEnabledBinding(t *testing.T) {
 func TestAuthenticatedPagesRender(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
-	ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
+	binding, err := ts.store.UpsertBinding(store.BindingInput{GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
 	ts.store.EnqueueJob(store.JobInput{GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "abc1234", Ref: "main"})
 	inst, err := ts.store.CreateCoolifyInstance(store.CoolifyInput{
 		Name: "prod", BaseURL: "https://coolify.example.com", APIToken: "1|secret-token-value",
@@ -519,8 +546,12 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 	}
 
 	paths := []string{
-		"/", "/settings", "/coolify", "/github-apps", "/repos", "/jobs",
-		"/github-apps?edit=" + itoa(ts.app.ID),
+		"/", "/settings", "/settings/runner", "/settings/logs", "/settings/admin",
+		"/coolify", "/github-apps", "/github-apps/new",
+		"/github-apps/" + itoa(ts.app.ID) + "/edit",
+		"/repos", "/repos/pick", "/repos/new",
+		"/repos/" + itoa(binding.ID) + "/edit",
+		"/jobs",
 		"/coolify?edit=" + itoa(inst.ID),
 	}
 	for _, path := range paths {
@@ -544,6 +575,54 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		if strings.Contains(body, "1|secret-token-value") {
 			t.Errorf("%s: leaks the Coolify token", path)
 		}
+		if strings.Contains(body, "max-w-[1180px]") {
+			t.Errorf("%s: still uses the old max-width shell", path)
+		}
+	}
+
+	edit := htmlReq(http.MethodGet, "/repos?edit="+itoa(binding.ID))
+	edit.Header.Set("Authorization", "Bearer "+token)
+	if rec := ts.do(edit); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/repos/"+itoa(binding.ID)+"/edit" {
+		t.Errorf("/repos?edit=: status %d location %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	logo := ts.do(htmlReq(http.MethodGet, "/assets/brand/logo.svg"))
+	if logo.Code != http.StatusOK || !strings.Contains(logo.Header().Get("Content-Type"), "image/svg+xml") {
+		t.Errorf("logo: status %d type %q", logo.Code, logo.Header().Get("Content-Type"))
+	}
+
+	repos := authedHTML(t, ts, token, "/repos")
+	if strings.Contains(repos, `name="app_id"`) {
+		t.Error("/repos still embeds the picker")
+	}
+	if !strings.Contains(repos, "/repos/pick") || !strings.Contains(repos, "/repos/new") {
+		t.Error("/repos missing pick/new links")
+	}
+	pick := authedHTML(t, ts, token, "/repos/pick")
+	if !strings.Contains(pick, `name="app_id"`) {
+		t.Error("/repos/pick missing the App picker")
+	}
+	editPage := authedHTML(t, ts, token, "/repos/"+itoa(binding.ID)+"/edit")
+	if !strings.Contains(editPage, `role="dialog"`) || !strings.Contains(editPage, "Save binding") {
+		t.Error("/repos/{id}/edit is not a drawer over the list")
+	}
+	if !strings.Contains(editPage, "Pick repositories") {
+		t.Error("edit drawer should keep the repos list underneath")
+	}
+	settings := authedHTML(t, ts, token, "/settings")
+	if strings.Contains(settings, `name="max_concurrent_jobs"`) || strings.Contains(settings, `name="password"`) {
+		t.Error("/settings still shows runner or admin fields")
+	}
+	if !strings.Contains(settings, `name="public_base_url"`) {
+		t.Error("/settings missing configuration fields")
+	}
+	runner := authedHTML(t, ts, token, "/settings/runner")
+	if !strings.Contains(runner, `name="max_concurrent_jobs"`) || !strings.Contains(runner, `aria-current="page"`) {
+		t.Error("/settings/runner missing runner fields or current nav")
+	}
+	admin := authedHTML(t, ts, token, "/settings/admin")
+	if !strings.Contains(admin, `name="password"`) {
+		t.Error("/settings/admin missing the password form")
 	}
 
 	req := htmlReq(http.MethodGet, "/")
@@ -553,6 +632,56 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		if !strings.Contains(home, want) {
 			t.Errorf("overview missing %q", want)
 		}
+	}
+}
+
+func authedHTML(t *testing.T, ts *testServer, token, path string) string {
+	t.Helper()
+	req := htmlReq(http.MethodGet, path)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("%s: status %d", path, rec.Code)
+	}
+	return rec.Body.String()
+}
+
+func TestSettingsFormRedirectsToSection(t *testing.T) {
+	ts := newTestServer(t)
+	session, csrf := ts.cookieAuth(t)
+	req := htmlForm(http.MethodPost, "/api/v1/settings",
+		"public_base_url=https://ci.example.com&default_check_name=openpreflight&default_pipeline_file=.ci.yml&default_timeout_seconds=900&next=/settings/logs&csrf="+csrf,
+		session, csrf)
+	rec := ts.do(req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/settings/logs" {
+		t.Fatalf("allowed next: status %d location %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	req = htmlForm(http.MethodPost, "/api/v1/settings",
+		"public_base_url=https://ci.example.com&next=https://evil.example/phish&csrf="+csrf,
+		session, csrf)
+	rec = ts.do(req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/settings" {
+		t.Fatalf("rejected next: status %d location %q", rec.Code, rec.Header().Get("Location"))
+	}
+
+	before, err := ts.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req = htmlForm(http.MethodPost, "/api/v1/settings",
+		"public_base_url=https://ci.example.com&default_check_name=openpreflight&default_pipeline_file=.ci.yml&default_timeout_seconds=900&next=/settings&csrf="+csrf,
+		session, csrf)
+	rec = ts.do(req)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("configuration save: %d %s", rec.Code, rec.Body.String())
+	}
+	after, err := ts.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.SkipForkPRs != before.SkipForkPRs || after.MaxConcurrentJobs != before.MaxConcurrentJobs {
+		t.Fatalf("configuration save mutated runner fields: %+v -> %+v", before, after)
 	}
 }
 
@@ -877,7 +1006,7 @@ func TestHTMLPostRenamesGitHubAppWithoutPEM(t *testing.T) {
 		t.Fatal("an empty PEM field rotated the stored key")
 	}
 
-	get := htmlReq(http.MethodGet, "/github-apps?edit="+itoa(ts.app.ID))
+	get := htmlReq(http.MethodGet, "/github-apps/"+itoa(ts.app.ID)+"/edit")
 	get.AddCookie(&http.Cookie{Name: sessionCookie, Value: session})
 	page := ts.do(get)
 	body := page.Body.String()

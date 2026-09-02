@@ -6,6 +6,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
@@ -22,7 +23,7 @@ templ Dashboard(p web.Page) {
 	@layouts.Shell(p) {
 		@layouts.PageHead("Overview", "Set the public URL, add your CI GitHub App, then enable the repos it should check. Coolify is optional.") {
 			if dashNeedApp(len(apps)) {
-				@button.Button(button.Props{Href: "/github-apps", Size: button.SizeSm}) {
+				@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
 					Add GitHub App
 				}
 			}
@@ -80,7 +81,7 @@ templ Dashboard(p web.Page) {
 								needed
 							}
 							CI GitHub App
-							@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/github-apps/new", Variant: button.VariantLink, Size: button.SizeSm}) {
 								Add one
 							}
 						}
@@ -146,10 +147,21 @@ templ Dashboard(p web.Page) {
 				if len(inflight) > 0 {
 					@jobTable(inflight)
 				} else {
-					@empty.Empty() {
+					@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
 						@empty.Header() {
+							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+								@icon.Workflow()
+							}
 							@empty.Title() {
 								No jobs queued or running
+							}
+							@empty.Description() {
+								Queued and in-flight runs show up here. Finished work is under Recent jobs.
+							}
+						}
+						@empty.Content() {
+							@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
+								View jobs
 							}
 						}
 					}
@@ -166,13 +178,21 @@ templ Dashboard(p web.Page) {
 				if len(jobs) > 0 {
 					@jobTable(jobs)
 				} else {
-					@empty.Empty() {
+					@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
 						@empty.Header() {
+							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+								@icon.Inbox()
+							}
 							@empty.Title() {
 								No jobs yet
 							}
 							@empty.Description() {
 								A job appears when GitHub sends a check_suite for an enabled repo.
+							}
+						}
+						@empty.Content() {
+							@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
+								Enable a repo
 							}
 						}
 					}

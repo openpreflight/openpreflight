@@ -27,8 +27,14 @@ func Render(w io.Writer, page string, p web.Page) error {
 		err = Coolify(p).Render(ctx, w)
 	case "githubapps":
 		err = GitHubApps(p).Render(ctx, w)
+	case "githubapps-edit":
+		err = GitHubAppsEditorPage(p).Render(ctx, w)
 	case "repos":
 		err = Repos(p).Render(ctx, w)
+	case "repos-pick":
+		err = ReposPick(p).Render(ctx, w)
+	case "repos-edit":
+		err = ReposEditorPage(p).Render(ctx, w)
 	case "jobs":
 		err = Jobs(p).Render(ctx, w)
 	case "run":

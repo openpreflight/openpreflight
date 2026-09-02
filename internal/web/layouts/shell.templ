@@ -46,7 +46,7 @@ templ Guest(p web.Page) {
 				@Brand()
 				@themeCycleIcon()
 			</header>
-			<main id="main" class="mx-auto w-full min-w-0 max-w-[1080px] flex-1 px-5 pb-16 pt-8">
+			<main id="main" class="w-full min-w-0 flex-1 px-5 pb-16 pt-8">
 				@Flash(p)
 				{ children... }
 			</main>
@@ -62,12 +62,12 @@ templ Shell(p web.Page) {
 		}) {
 			@AppSidebar(p)
 			@sidebar.Inset() {
-				<header class="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+				<header class="flex h-12 shrink-0 items-center gap-2 border-b px-5">
 					@sidebar.Trigger()
 					@separator.Separator(separator.Props{Orientation: separator.OrientationVertical, Class: "h-4"})
 					@Crumbs(p)
 				</header>
-				<div id="main" class="mx-auto w-full min-w-0 max-w-[1180px] px-5 pb-16 pt-6">
+				<div id="main" class="w-full min-w-0 px-5 pb-16 pt-6">
 					@Flash(p)
 					{ children... }
 				</div>
@@ -114,10 +114,9 @@ templ AppSidebar(p web.Page) {
 		Variant:     sidebar.VariantSidebar,
 	}) {
 		@sidebar.Header() {
-			<a href="/" class="flex h-10 items-center gap-2 px-2 font-semibold">
-				<span class="inline-flex size-7 items-center justify-center rounded-md bg-primary text-[11px] font-bold text-primary-foreground">op</span>
-				<span class="group-data-[collapsible=icon]:hidden">openpreflight</span>
-			</a>
+			<div class="flex h-8 items-center overflow-hidden group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center">
+				@Brand()
+			</div>
 		}
 		@sidebar.Content() {
 			@sidebar.Group() {
@@ -182,8 +181,29 @@ templ AppSidebar(p web.Page) {
 						<span>Settings</span>
 					}
 				}
+				@sidebar.MenuItem() {
+					@sidebar.MenuButton(sidebar.MenuButtonProps{
+						Tooltip:    "Theme",
+						Attributes: templ.Attributes{"data-theme-cycle": true, "aria-label": "Theme: system"},
+					}) {
+						@icon.Sun(icon.Props{Class: "size-4 dark:hidden"})
+						@icon.Moon(icon.Props{Class: "size-4 hidden dark:block"})
+						<span class="theme-label">System</span>
+					}
+				}
+				if p.User != nil {
+					@sidebar.MenuItem() {
+						<form method="post" action="/api/v1/logout" class="w-full">
+							@CSRF(p.CSRFToken)
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Type: "submit", Tooltip: "Sign out"}) {
+								@icon.LogOut()
+								<span>Sign out</span>
+							}
+						</form>
+					}
+				}
 			}
-			<div class="group-data-[collapsible=icon]:hidden text-muted-foreground mt-2 space-y-1 px-2 text-xs">
+			<div class="group-data-[collapsible=icon]:hidden text-muted-foreground space-y-1 px-2 text-xs">
 				<div class="flex items-center gap-1.5">
 					@icon.Container(icon.Props{Class: "size-3.5"})
 					<span>Docker { dockerLabel(p.DockerAvailable) }</span>
@@ -193,27 +213,6 @@ templ AppSidebar(p web.Page) {
 				}
 				if p.User != nil {
 					<div>{ p.User.Username }</div>
-				}
-			</div>
-			<div class="mt-2 flex flex-col gap-1 px-1">
-				@button.Button(button.Props{
-					Variant:    button.VariantGhost,
-					Size:       button.SizeSm,
-					Class:      "w-full justify-start",
-					Attributes: templ.Attributes{"data-theme-cycle": true, "aria-label": "Theme: system", "type": "button"},
-				}) {
-					@icon.Sun(icon.Props{Class: "size-4 dark:hidden"})
-					@icon.Moon(icon.Props{Class: "size-4 hidden dark:block"})
-					<span class="theme-label group-data-[collapsible=icon]:hidden">System</span>
-				}
-				if p.User != nil {
-					<form method="post" action="/api/v1/logout" class="m-0">
-						@CSRF(p.CSRFToken)
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm, Class: "w-full justify-start"}) {
-							@icon.LogOut()
-							<span class="group-data-[collapsible=icon]:hidden">Sign out</span>
-						}
-					</form>
 				}
 			</div>
 		}

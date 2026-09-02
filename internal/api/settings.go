@@ -55,7 +55,12 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 			next.DefaultRuntime = strings.TrimSpace(in.Str("default_runtime"))
 		}
 	} else {
-		next.SkipForkPRs = in.Bool("skip_fork_prs")
+		// HTML forms are split by section. Only the runner form posts
+		// skip_fork_prs; an unchecked box is absent, so the runner form is
+		// detected via max_concurrent_jobs.
+		if in.Has("max_concurrent_jobs") {
+			next.SkipForkPRs = in.Bool("skip_fork_prs")
+		}
 		if in.Has("default_runtime") {
 			next.DefaultRuntime = strings.TrimSpace(in.Str("default_runtime"))
 		}
@@ -100,5 +105,14 @@ func (s *Server) patchSettings(w http.ResponseWriter, r *http.Request, _ store.U
 		s.fail(w, r, err)
 		return
 	}
-	s.reply(w, r, http.StatusOK, next, "/settings", "Settings saved.", "ok")
+	s.reply(w, r, http.StatusOK, next, settingsNext(in), "Settings saved.", "ok")
+}
+
+func settingsNext(in *input) string {
+	switch in.Str("next") {
+	case "/settings", "/settings/runner", "/settings/logs":
+		return in.Str("next")
+	default:
+		return "/settings"
+	}
 }

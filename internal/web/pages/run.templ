@@ -8,6 +8,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -194,10 +195,16 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			@runLogStream()
 		}
 	} else {
-		@empty.Empty(empty.Props{Class: "bg-muted"}) {
+		@empty.Empty() {
 			@empty.Header() {
+				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+					@icon.ScrollText()
+				}
 				@empty.Title() {
 					No log yet
+				}
+				@empty.Description() {
+					The log appears when the runner starts, or after the job finishes writing it.
 				}
 			}
 		}
