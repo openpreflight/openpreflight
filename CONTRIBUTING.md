@@ -37,12 +37,12 @@ cd internal/web && npm ci && npm run css
 ## What we will take
 
 - Bug fixes with a test that would have failed before the change.
-- Gaps in v1 that stay inside the current process: configurator + local worker.
+- Gaps that stay inside the current process: configurator + local worker.
 - Docs that match the code.
 
 ## What we will not take yet
 
-Anything listed under **Not in v1** in the README: GitHub Actions YAML,
+Anything listed under **Out of scope** in the README: GitHub Actions YAML,
 `actions/runner`, matrices, caches, or artifacts.
 
 ## Pull requests
