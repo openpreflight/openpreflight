@@ -107,7 +107,7 @@ examples/            a sample .ci.yml
 
 `internal/web` carries the one `package.json` in this repo, and it exists only to compile Tailwind for the Go UI. The Dockerfile installs it in an isolated stage, so it must stay standalone rather than becoming part of a workspace.
 
-## Not in v1
+## Out of scope
 
 GitHub Actions YAML, `actions/runner`, matrices, caches, and artifacts. Jobs on another machine use `CI_DOCKER_HOST` / `DOCKER_HOST` (a Docker engine), not Coolify's API as a job runner. GitHub Apps can be created with GitHub's review screen or pasted.
 

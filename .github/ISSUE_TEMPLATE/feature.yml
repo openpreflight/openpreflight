@@ -1,12 +1,12 @@
 name: Feature
-description: A gap in v1, or a change to existing behaviour
+description: A gap already in scope, or a change to existing behaviour
 title: "[feature] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Check **Not in v1** in the README first. Those items are deferred on purpose.
+        Check **Out of scope** in the README first. Those items are deferred on purpose.
   - type: textarea
     id: problem
     attributes:
