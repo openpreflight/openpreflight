@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/store"
 )
 
 // checkTitle is the one-line title GitHub shows next to the check name.
@@ -84,4 +85,41 @@ func human(r executor.Result) string {
 		d = time.Second
 	}
 	return d.String()
+}
+
+// pathFilterDiagnostic is the "why did this run, or not" block. It goes in the
+// log on every outcome and in the Check Run summary on a skip, because a reader
+// on GitHub cannot see the worker's log file.
+func pathFilterDiagnostic(filter string, changed, matched int, allowed bool) string {
+	result := "SKIP"
+	if allowed {
+		result = "RUN"
+	}
+	return fmt.Sprintf("Changed files: %d\nMatched files: %d\nFilter: %s\nResult: %s",
+		changed, matched, strings.Join(strings.Fields(filter), ", "), result)
+}
+
+// skipExplanation turns a stored skip reason into a sentence for the Check Run.
+// The fork cases are the ones an operator can act on, so each says what to change.
+func skipExplanation(reason string) string {
+	switch reason {
+	case store.SkipReasonForkDisabled:
+		return "Fork pull requests are not run. This repository's checks are disabled for forks " +
+			"because a fork PR would run code from outside your organisation on your server. " +
+			"An operator can allow them by turning off skip_fork_prs and setting default_runtime, " +
+			"which makes fork jobs run in Docker."
+	case store.SkipReasonForkNoDocker:
+		return "Fork pull requests are enabled but no Docker engine is reachable. Fork jobs always " +
+			"run in a container, never as a process on the host, so this one cannot run. " +
+			"Set CI_DOCKER_HOST or mount the engine socket."
+	case store.SkipReasonForkNoRuntime:
+		return "Fork pull requests are enabled but settings.default_runtime is empty. Fork jobs need " +
+			"an image to run in; set one so they have a container to use."
+	case store.SkipReasonPathFilter:
+		return "No changed path matched this binding's path filter."
+	case store.SkipReasonNoPipeline:
+		return "Nothing to run: no pipeline file, no binding commands, and no recognisable project."
+	default:
+		return "Skipped."
+	}
 }

@@ -153,6 +153,21 @@ ALTER TABLE settings DROP COLUMN max_workspace_bytes;
 	{"0005_binding_paths", `
 ALTER TABLE repo_bindings ADD COLUMN paths TEXT NOT NULL DEFAULT '';
 `},
+	// skip_reason separates the kinds of skip that used to be indistinguishable.
+	// A path-filter miss is intentional; an empty pipeline is a configuration
+	// problem; a fork PR was refused by policy. All three concluded `skipped`
+	// with no way to tell which, and the fork case did not even produce a
+	// Check Run. See queue.Runner.runJob.
+	//
+	// max_workspace_bytes comes back after 0004 dropped it, and this time it is
+	// enforced: workspace.Usage is measured after clone and between steps. The
+	// column is only worth having with that enforcement, which is exactly what
+	// 0004's comment said.
+	{"0006_skip_reason_and_workspace_cap", `
+ALTER TABLE jobs ADD COLUMN skip_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE repo_bindings ADD COLUMN on_empty_pipeline TEXT NOT NULL DEFAULT '';
+ALTER TABLE settings ADD COLUMN max_workspace_bytes INTEGER NOT NULL DEFAULT 1073741824;
+`},
 }
 
 func (s *Store) migrate() error {

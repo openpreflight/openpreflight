@@ -267,11 +267,27 @@ func TestWebhookSkipsForkPRs(t *testing.T) {
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("status %d", rec.Code)
 	}
-	if reason := decodeBody(t, rec)["reason"]; !strings.Contains(reason, "fork") {
-		t.Fatalf("reason: %q", reason)
+	// The delivery is no longer dropped. A fork PR that policy refuses is
+	// queued carrying its reason, so the runner can complete a `skipped` Check
+	// Run: dropping it left a required check waiting forever with nothing on
+	// screen to explain why.
+	got := decodeBody(t, rec)
+	if got["will_skip"] != store.SkipReasonForkDisabled {
+		t.Fatalf("will_skip: %+v", got)
 	}
-	if ts.jobCount(t) != 0 {
-		t.Fatal("a fork PR must never run: it is untrusted code on this host")
+	if ts.jobCount(t) != 1 {
+		t.Fatal("the job exists only to report the skip")
+	}
+	jobs, err := ts.store.ListJobs(store.JobList{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jobs[0].SkipReason != store.SkipReasonForkDisabled {
+		t.Fatalf("skip_reason %q", jobs[0].SkipReason)
+	}
+	// The guarantee that matters is unchanged: nothing from the fork is run.
+	if !jobs[0].IsFork {
+		t.Fatal("the job must be marked as a fork so nothing later runs it")
 	}
 }
 
@@ -337,11 +353,45 @@ func TestWebhookForkRequiresDockerEvenWhenEnabled(t *testing.T) {
 	  "installation": {"id": 101}
 	}`, appNumericID)
 	rec := ts.post(t, "ci", "check_suite", "d-fork-nodocker", body)
-	if reason := decodeBody(t, rec)["reason"]; !strings.Contains(reason, "Docker") {
+	if got := decodeBody(t, rec); got["will_skip"] != store.SkipReasonForkNoDocker {
+		t.Fatalf("will_skip: %+v", got)
+	}
+	jobs, err := ts.store.ListJobs(store.JobList{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 || jobs[0].SkipReason != store.SkipReasonForkNoDocker {
+		t.Fatalf("expected one job recording why it cannot run: %+v", jobs)
+	}
+}
+
+// TestWebhookDropsForkForUnboundRepo pins the property that moving the fork
+// checks after the binding lookup had to preserve: the bindings table is the
+// allow-list, so an unknown or disabled repo produces nothing at all — not even
+// a job that exists to report a skip.
+func TestWebhookDropsForkForUnboundRepo(t *testing.T) {
+	ts := newTestServer(t)
+	body := fmt.Sprintf(`{
+	  "action": "requested",
+	  "check_suite": {
+	    "head_sha": "abc1234", "head_branch": "patch-1",
+	    "pull_requests": [{"head": {"repo": {"id": 99, "full_name": "outsider/api"}},
+	                       "base": {"repo": {"id": 10, "full_name": "acme/api"}}}],
+	    "app": {"id": %d}
+	  },
+	  "repository": {"id": 10, "full_name": "acme/api"},
+	  "installation": {"id": 101}
+	}`, appNumericID)
+
+	rec := ts.post(t, "ci", "check_suite", "d-fork-unbound", body)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if reason := decodeBody(t, rec)["reason"]; !strings.Contains(reason, "no enabled binding") {
 		t.Fatalf("reason: %q", reason)
 	}
 	if ts.jobCount(t) != 0 {
-		t.Fatal("a fork PR must not run without Docker")
+		t.Fatal("an unbound repo must not create a job, fork or otherwise")
 	}
 }
 
