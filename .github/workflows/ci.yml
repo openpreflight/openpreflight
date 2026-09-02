@@ -8,23 +8,12 @@ on:
 permissions:
   contents: read
 
+# `go vet` and `go test` are not here: openpreflight checks this repository
+# itself, at ci.openpreflight.xyz, via the committed `.ci.yml`. Running them
+# twice made the Check Run on a commit ambiguous about which system had
+# actually gated it. The image build stays because openpreflight reports
+# checks and does not publish artifacts.
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test ./...
-
   image:
     runs-on: ubuntu-latest
     steps:
