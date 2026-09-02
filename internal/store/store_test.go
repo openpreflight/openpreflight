@@ -392,6 +392,56 @@ func TestJobLifecycleAndDeliveryDedup(t *testing.T) {
 	}
 }
 
+func TestListJobsFiltersByRepoAndStatus(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	a, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/api", SHA: "aaa"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/web", SHA: "bbb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.FinishJob(b.ID, JobFailure, "failure", "[]", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := st.ListJobs(JobList{Repo: "acme/api"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != a.ID {
+		t.Fatalf("repo filter: %+v", got)
+	}
+
+	failed, err := st.ListJobs(JobList{Status: JobFailure})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(failed) != 1 || failed[0].ID != b.ID {
+		t.Fatalf("status filter: %+v", failed)
+	}
+
+	none, err := st.ListJobs(JobList{Repo: "acme/api", Status: JobFailure})
+	if err != nil || len(none) != 0 {
+		t.Fatalf("combined filter: %v %+v", err, none)
+	}
+
+	page, err := st.ListJobs(JobList{Limit: 1, Offset: 1})
+	if err != nil || len(page) != 1 {
+		t.Fatalf("offset: %v %+v", err, page)
+	}
+}
+
+func TestListJobsRejectsUnknownStatus(t *testing.T) {
+	st := newTestStore(t)
+	_, err := st.ListJobs(JobList{Status: "nope"})
+	if !errors.Is(err, ErrInvalidJobStatus) {
+		t.Fatalf("unknown status: %v", err)
+	}
+}
+
 func TestCountAndListInFlight(t *testing.T) {
 	st := newTestStore(t)
 	app := mustApp(t, st, "ci")

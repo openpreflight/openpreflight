@@ -46,6 +46,10 @@ type Server struct {
 	dockerMu     sync.Mutex
 	dockerCached bool
 	dockerAt     time.Time
+
+	// manifestAPI is the GitHub API base used to convert a manifest code.
+	// Empty means https://api.github.com. Tests point it at a fake server.
+	manifestAPI string
 }
 
 // New builds the server.
@@ -103,6 +107,8 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/v1/github-apps", s.guard(s.listApps))
 	mux.HandleFunc("POST /api/v1/github-apps", s.guard(s.createApp))
+	mux.HandleFunc("POST /api/v1/github-apps/manifest/start", s.guard(s.startAppManifest))
+	mux.HandleFunc("GET /api/v1/github-apps/manifest/callback", s.guard(s.callbackAppManifest))
 	mux.HandleFunc("PATCH /api/v1/github-apps/{id}", s.guard(s.updateApp))
 	mux.HandleFunc("POST /api/v1/github-apps/{id}", s.guard(s.updateApp))
 	mux.HandleFunc("POST /api/v1/github-apps/{id}/test", s.guard(s.testApp))
@@ -121,6 +127,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/jobs", s.guard(s.listJobs))
 	mux.HandleFunc("GET /api/v1/jobs/{id}", s.guard(s.getJob))
 	mux.HandleFunc("GET /api/v1/jobs/{id}/logs", s.getJobLogs)
+	mux.HandleFunc("GET /api/v1/jobs/{id}/logs/stream", s.streamJobLogs)
 	mux.HandleFunc("POST /api/v1/jobs/{id}/rerun", s.guard(s.rerunJob))
 	mux.HandleFunc("POST /api/v1/jobs/{id}/cancel", s.guard(s.cancelJob))
 

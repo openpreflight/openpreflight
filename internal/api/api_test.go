@@ -3,12 +3,18 @@
 package api
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/logs"
@@ -273,6 +279,139 @@ func TestBindingRequiresAnApp(t *testing.T) {
 	}
 }
 
+func manifestTestPEM(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{
+		Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key),
+	}))
+}
+
+func TestAppManifestCreatesAnApp(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	pemData := manifestTestPEM(t)
+
+	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/app-manifests/") && strings.HasSuffix(r.URL.Path, "/conversions"):
+			if !strings.Contains(r.URL.Path, "/good-code/") {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"id": 9191, "slug": "openpreflight-ci", "name": "openpreflight-ci",
+				"pem": pemData, "webhook_secret": "from-github-manifest",
+			})
+		case r.Method == http.MethodPatch && r.URL.Path == "/app/hook/config":
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/app/installations":
+			json.NewEncoder(w).Encode([]any{})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(gh.Close)
+	ts.manifestAPI = gh.URL
+
+	rec := ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/manifest/start", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body.String())
+	}
+	var start struct {
+		Action   string         `json:"action"`
+		State    string         `json:"state"`
+		Manifest map[string]any `json:"manifest"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &start); err != nil {
+		t.Fatal(err)
+	}
+	if start.Action != githubNewAppURL || start.State == "" {
+		t.Fatalf("start payload: %+v", start)
+	}
+	if start.Manifest["url"] != "https://ci.example.com" {
+		t.Fatalf("manifest url: %+v", start.Manifest)
+	}
+	perms, _ := start.Manifest["default_permissions"].(map[string]any)
+	if perms["checks"] != "write" || perms["contents"] != "read" || perms["metadata"] != "read" {
+		t.Fatalf("permissions: %+v", perms)
+	}
+	var csrf string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == csrfCookie {
+			csrf = c.Value
+		}
+	}
+	if csrf == "" {
+		t.Fatal("start did not mint a CSRF cookie to use as state")
+	}
+
+	bad := jsonReq(http.MethodGet, "/api/v1/github-apps/manifest/callback?code=good-code&state=nope", "")
+	bad.Header.Set("Authorization", "Bearer "+token)
+	bad.AddCookie(&http.Cookie{Name: csrfCookie, Value: csrf})
+	rec = ts.do(bad)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad state: %d %s", rec.Code, rec.Body.String())
+	}
+	apps, _ := ts.store.ListGitHubApps()
+	if len(apps) != 1 {
+		t.Fatalf("bad state created an App: %+v", apps)
+	}
+
+	ok := jsonReq(http.MethodGet, "/api/v1/github-apps/manifest/callback?code=good-code&state="+start.State, "")
+	ok.Header.Set("Authorization", "Bearer "+token)
+	ok.AddCookie(&http.Cookie{Name: csrfCookie, Value: csrf})
+	rec = ts.do(ok)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("callback: %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "BEGIN RSA PRIVATE KEY") || strings.Contains(rec.Body.String(), pemData) {
+		t.Fatal("callback leaked the PEM")
+	}
+	apps, _ = ts.store.ListGitHubApps()
+	if len(apps) != 2 {
+		t.Fatalf("apps after callback: %+v", apps)
+	}
+	var created store.GitHubApp
+	for _, a := range apps {
+		if a.Slug == "openpreflight-ci" {
+			created = a
+		}
+	}
+	if created.ID == 0 || created.AppID != 9191 {
+		t.Fatalf("created app: %+v", created)
+	}
+	gotPEM, err := ts.store.DecryptPEM(created)
+	if err != nil || strings.TrimSpace(gotPEM) != strings.TrimSpace(pemData) {
+		t.Fatalf("stored pem: %v", err)
+	}
+	secret, err := ts.store.DecryptWebhookSecret(created)
+	if err != nil || secret != "from-github-manifest" {
+		t.Fatalf("stored webhook secret: %v %q", err, secret)
+	}
+}
+
+func TestGitHubAppsPageOffersManifest(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	req := htmlReq(http.MethodGet, "/github-apps")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if !strings.Contains(body, "Create with GitHub") || !strings.Contains(body, "Advanced") {
+		t.Fatal("github-apps page is missing the manifest button")
+	}
+	if strings.Contains(body, "never creates Apps") {
+		t.Fatal("github-apps page still says we never create Apps")
+	}
+}
+
 func TestRunPageRequiresSessionUnlessShareable(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
@@ -354,7 +493,7 @@ func TestRerunRequiresEnabledBinding(t *testing.T) {
 	if rec.Code != http.StatusAccepted {
 		t.Fatalf("rerun: %d %s", rec.Code, rec.Body.String())
 	}
-	jobs, _ := ts.store.ListJobs(10)
+	jobs, _ := ts.store.ListJobs(store.JobList{Limit: 10})
 	if len(jobs) != 2 {
 		t.Fatalf("expected a new job, got %d", len(jobs))
 	}
@@ -414,6 +553,84 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		if !strings.Contains(home, want) {
 			t.Errorf("overview missing %q", want)
 		}
+	}
+}
+
+func TestJobsAPIFilters(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	if _, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/web", SHA: "bbb",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := ts.authed(t, token, http.MethodGet, "/api/v1/jobs?repo=acme/api", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("repo filter: %d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Jobs []store.Job `json:"jobs"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Jobs) != 1 || out.Jobs[0].Repo != "acme/api" {
+		t.Fatalf("repo filter jobs: %+v", out.Jobs)
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs?status=nope", "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unknown status: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestJobsIndexFilterForm(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	req := htmlReq(http.MethodGet, "/jobs")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `name="status"`) || !strings.Contains(body, `name="repo"`) {
+		t.Fatal("jobs page is missing the filter form")
+	}
+	if !strings.Contains(body, "No jobs yet") {
+		t.Fatal("unfiltered empty should still say no jobs yet")
+	}
+	if strings.Contains(body, "No jobs match this filter") {
+		t.Fatal("unfiltered empty is not a filter miss")
+	}
+}
+
+func TestJobsIndexFilteredEmpty(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	if _, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "abc1234",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	req := htmlReq(http.MethodGet, "/jobs?repo=nobody/else")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", rec.Code, body)
+	}
+	if !strings.Contains(body, "No jobs match this filter") {
+		t.Fatal("filtered empty should say no jobs match")
+	}
+	if strings.Contains(body, "Enable a repo") {
+		t.Fatal("filtered empty must not send the operator to enable a repo")
 	}
 }
 
@@ -520,6 +737,84 @@ func TestJobLogsAPIHonoursShareableLogs(t *testing.T) {
 	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/1e6b1f9c-0000-4000-8000-000000000000/logs", "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("missing job: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestJobLogStreamHonoursShareableLogs(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	private, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "aaa", ShareableLogs: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shared, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "bbb", ShareableLogs: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{private.ID, shared.ID} {
+		w, err := logs.Create(ts.cfg.LogDir(), id, 1<<20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Printf("secret build output for %s\n", id)
+		w.Close()
+		if err := ts.store.FinishJob(id, store.JobSuccess, "success", "[]", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	rec := ts.do(jsonReq(http.MethodGet, "/api/v1/jobs/"+private.ID+"/logs/stream", ""))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("private stream leaked: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.do(jsonReq(http.MethodGet, "/api/v1/jobs/"+shared.ID+"/logs/stream", ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("shareable stream: %d %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "secret build output for "+shared.ID) {
+		t.Fatalf("shareable stream missing log: %s", body)
+	}
+	if !strings.Contains(body, "event: finished") {
+		t.Fatalf("shareable stream missing finished: %s", body)
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/"+private.ID+"/logs/stream", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "secret build output for "+private.ID) {
+		t.Fatalf("authenticated stream: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.authed(t, token, http.MethodGet, "/api/v1/jobs/1e6b1f9c-0000-4000-8000-000000000000/logs/stream", "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing job stream: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestJobLogStreamStopsWhenClientLeaves(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	job, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "ccc", ShareableLogs: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := jsonReq(http.MethodGet, "/api/v1/jobs/"+job.ID+"/logs/stream", "")
+	req.Header.Set("Authorization", "Bearer "+token)
+	ctx, cancel := context.WithCancel(req.Context())
+	req = req.WithContext(ctx)
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+	rec := ts.do(req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("in-flight stream: %d %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -696,6 +991,9 @@ func TestRunPageOperatorSurface(t *testing.T) {
 	if !strings.Contains(body, `http-equiv="refresh"`) {
 		t.Fatal("in-flight run page is missing meta refresh")
 	}
+	if !strings.Contains(body, `id="job-log"`) || !strings.Contains(body, "EventSource") {
+		t.Fatal("in-flight run page is missing the live log stream")
+	}
 	if !strings.Contains(body, "/api/v1/jobs/"+running.ID+"/rerun") ||
 		!strings.Contains(body, "/api/v1/jobs/"+running.ID+"/cancel") {
 		t.Fatal("authed run page is missing re-run/cancel")
@@ -723,6 +1021,9 @@ func TestRunPageOperatorSurface(t *testing.T) {
 	}
 	if strings.Contains(doneBody, `http-equiv="refresh"`) {
 		t.Fatal("finished job should not refresh")
+	}
+	if strings.Contains(doneBody, "EventSource") {
+		t.Fatal("finished job should not open EventSource")
 	}
 	if !strings.Contains(doneBody, "✓") || !strings.Contains(doneBody, "✗") || !strings.Contains(doneBody, "–") {
 		t.Fatalf("step marks missing from %s", doneBody)

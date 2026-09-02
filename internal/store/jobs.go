@@ -108,12 +108,40 @@ func (s *Store) Job(id string) (Job, error) {
 	return j, nil
 }
 
-// ListJobs returns the most recent jobs first.
-func (s *Store) ListJobs(limit int) ([]Job, error) {
-	if limit <= 0 || limit > 500 {
-		limit = 100
+// JobList filters ListJobs. Empty Repo or Status means all. Unknown Status is
+// an error. Limit defaults to 100 and is capped at 500. Offset below 0 is 0.
+type JobList struct {
+	Repo   string
+	Status string
+	Limit  int
+	Offset int
+}
+
+func (f JobList) clamp() (JobList, error) {
+	if f.Limit <= 0 || f.Limit > 500 {
+		f.Limit = 100
 	}
-	rows, err := s.db.Query(`SELECT `+jobCols+` FROM jobs ORDER BY created_at DESC, id LIMIT ?`, limit)
+	if f.Offset < 0 {
+		f.Offset = 0
+	}
+	if f.Status != "" && !ValidJobStatus(f.Status) {
+		return f, fmt.Errorf("%w: %q", ErrInvalidJobStatus, f.Status)
+	}
+	return f, nil
+}
+
+// ListJobs returns the most recent jobs first, optionally filtered by repo
+// (exact owner/name) and status.
+func (s *Store) ListJobs(f JobList) ([]Job, error) {
+	f, err := f.clamp()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(`SELECT `+jobCols+` FROM jobs
+		WHERE (? = '' OR repo = ?) AND (? = '' OR status = ?)
+		ORDER BY created_at DESC, id
+		LIMIT ? OFFSET ?`,
+		f.Repo, f.Repo, f.Status, f.Status, f.Limit, f.Offset)
 	if err != nil {
 		return nil, fmt.Errorf("store: list jobs: %w", err)
 	}

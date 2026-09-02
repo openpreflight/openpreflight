@@ -9,20 +9,38 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
-templ jobsTable(p web.Page, list []store.Job) {
+templ jobsTable(p web.Page, list []store.Job, filtered bool) {
 	if len(list) == 0 {
-		@empty.Empty() {
-			@empty.Header() {
-				@empty.Title() {
-					No jobs yet
+		if filtered {
+			@empty.Empty() {
+				@empty.Header() {
+					@empty.Title() {
+						No jobs match this filter
+					}
+					@empty.Description() {
+						Try a different repo or status, or clear the filter to see every run.
+					}
 				}
-				@empty.Description() {
-					GitHub creates one by sending a check_suite for a repo with an enabled binding.
+				@empty.Content() {
+					@button.Button(button.Props{Href: "/jobs", Size: button.SizeSm}) {
+						Clear filters
+					}
 				}
 			}
-			@empty.Content() {
-				@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
-					Enable a repo
+		} else {
+			@empty.Empty() {
+				@empty.Header() {
+					@empty.Title() {
+						No jobs yet
+					}
+					@empty.Description() {
+						GitHub creates one by sending a check_suite for a repo with an enabled binding.
+					}
+				}
+				@empty.Content() {
+					@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
+						Enable a repo
+					}
 				}
 			}
 		}
