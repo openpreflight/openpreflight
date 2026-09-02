@@ -13,6 +13,7 @@ type Settings struct {
 	DefaultTimeoutSeconds int    `json:"default_timeout_seconds"`
 	MaxConcurrentJobs     int    `json:"max_concurrent_jobs"`
 	MaxLogBytes           int64  `json:"max_log_bytes"`
+	MaxWorkspaceBytes     int64  `json:"max_workspace_bytes"`
 	LogRetentionDays      int    `json:"log_retention_days"`
 	SkipForkPRs           bool   `json:"skip_fork_prs"`
 	DefaultRuntime        string `json:"default_runtime"`
@@ -86,9 +87,29 @@ type RepoBinding struct {
 	TestCmd           string    `json:"test_cmd"`
 	BuildCmd          string    `json:"build_cmd"`
 	ShareableLogs     bool      `json:"shareable_logs"`
+	OnEmptyPipeline   string    `json:"on_empty_pipeline"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
+
+// on_empty_pipeline values. A pipeline that resolves to no steps is usually a
+// configuration mistake, but it is a legitimate intention for a repo that is
+// only sometimes checkable, so the operator chooses.
+const (
+	OnEmptyPipelineSkip = "skip"
+	OnEmptyPipelineFail = "fail"
+)
+
+// Skip reasons recorded on a job. These separate cases that all concluded
+// `skipped` with no way to tell them apart, and the fork cases used to produce
+// no Check Run at all.
+const (
+	SkipReasonPathFilter    = "path_filter"
+	SkipReasonNoPipeline    = "no_pipeline"
+	SkipReasonForkDisabled  = "fork_disabled"
+	SkipReasonForkNoDocker  = "fork_no_docker"
+	SkipReasonForkNoRuntime = "fork_no_runtime"
+)
 
 // Job statuses. queued/in_progress are the in-flight set used for delivery
 // dedup; the rest are terminal.
@@ -140,6 +161,7 @@ type Job struct {
 	ShareableLogs  bool       `json:"shareable_logs"`
 	IsFork         bool       `json:"is_fork"`
 	PullNumber     int        `json:"pull_number"`
+	SkipReason     string     `json:"skip_reason"`
 	CreatedAt      time.Time  `json:"created_at"`
 	StartedAt      *time.Time `json:"started_at"`
 	FinishedAt     *time.Time `json:"finished_at"`

@@ -105,6 +105,42 @@ func (c *Client) CompleteCheckRun(ctx context.Context, installationID int64, in 
 	return c.do(ctx, http.MethodPatch, path, "Bearer "+token, body, nil)
 }
 
+// ReopenCheckRunInput moves an existing Check Run back to in_progress.
+type ReopenCheckRunInput struct {
+	Repo       string
+	CheckRunID int64
+	DetailsURL string
+	Output     *CheckOutput
+}
+
+// ReopenCheckRun patches a Check Run back to in_progress. A job requeued after a
+// crash or a redeploy must land on the Check Run it already created, or the
+// original is left in_progress forever and a required check never resolves.
+//
+// GitHub keeps `conclusion` and `completed_at` from the previous completion, so
+// both are sent as null: a run that says completed and in_progress at once
+// renders as finished on the Checks tab.
+func (c *Client) ReopenCheckRun(ctx context.Context, installationID int64, in ReopenCheckRunInput) error {
+	token, err := c.InstallationToken(ctx, installationID)
+	if err != nil {
+		return err
+	}
+	body := map[string]any{
+		"status":       "in_progress",
+		"started_at":   c.nowFunc().UTC().Format(time.RFC3339),
+		"conclusion":   nil,
+		"completed_at": nil,
+	}
+	if in.DetailsURL != "" {
+		body["details_url"] = in.DetailsURL
+	}
+	if in.Output != nil {
+		body["output"] = truncateOutput(*in.Output)
+	}
+	path := fmt.Sprintf("/repos/%s/check-runs/%d", in.Repo, in.CheckRunID)
+	return c.do(ctx, http.MethodPatch, path, "Bearer "+token, body, nil)
+}
+
 // truncateOutput keeps the payload under maxOutputBytes and says so in place of
 // what it dropped.
 func truncateOutput(o CheckOutput) map[string]any {

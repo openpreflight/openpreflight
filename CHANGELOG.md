@@ -6,6 +6,53 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cancel and timeout now actually stop a Docker job.** `Docker.Run` killed the
+  `docker` CLI and waited on pipes the container still held, so a cancelled
+  `runtime:` job reported cancelled on the Check Run and kept building. It also
+  kept its concurrency slot and workspace, which stalled the queue on an
+  instance running `max_concurrent_jobs: 1`. The container is now removed
+  engine-side and the process group killed, matching the process executor.
+- **A job requeued after a crash reuses its Check Run.** `RequeueStaleJobs`
+  keeps `check_run_id`, and the runner reopens that run instead of creating a
+  second one. Previously the first run was left `in_progress` with nothing ever
+  completing it, so a required check on that commit never resolved. One
+  repository + commit + pipeline is one logical Check Run, across restarts.
+- **Fork pull requests now get a completed Check Run.** A fork PR refused by
+  policy was answered at the webhook with no job and no check, so a required
+  check waited forever with nothing explaining why. It is queued instead and
+  concludes `skipped`, with a summary naming the settings an operator can
+  change. Unbound repositories still produce nothing.
+- **The Docker probe no longer fails a job on a busy host.** `Available` used a
+  3-second budget and, like `Run`, ignored it when a child held the output
+  pipes. A slow-but-healthy engine could fail a job with "the engine is not
+  reachable". The budget is 15s and actually enforced.
+
+### Added
+
+- **`on_empty_pipeline`** on a binding: `skip` (the default, unchanged
+  behaviour) or `fail`. A pipeline that resolves to no steps is usually a
+  configuration mistake, and it used to be indistinguishable from an intentional
+  path-filter skip.
+- **`skip_reason`** on a job (`path_filter`, `no_pipeline`, `fork_disabled`,
+  `fork_no_docker`, `fork_no_runtime`), exposed on the Jobs API. Every kind of
+  skip concluded `skipped` with no way to tell which.
+- **Path-filter diagnostics.** Changed count, matched count, the filter, and the
+  decision now appear in the log on every outcome, and in the Check Run summary
+  on a skip. A fail-open says so in words rather than only in the worker log.
+- **`max_workspace_bytes`** is back, and enforced this time: measured after
+  clone and between steps, failing the job rather than filling the disk. Default
+  1 GiB; `0` disables. Migration `0004` dropped the column precisely because
+  nothing read it.
+
+### Upgrade
+
+Run migration `0006` (automatic on boot). No configuration change is required:
+`on_empty_pipeline` defaults to today's behaviour and `max_workspace_bytes`
+defaults to 1 GiB. If a repository's checkout plus build legitimately exceeds
+1 GiB, raise it in Settings → Runner or set it to `0`.
+
 ## [2.0.2] - 2026-09-02
 
 Operator UI refresh on the 2.0.0 binary. Image

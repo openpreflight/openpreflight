@@ -6,8 +6,10 @@ package workspace
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +42,84 @@ func Prepare(base, jobID string) (*Workspace, error) {
 		}
 	}
 	return &Workspace{Root: root, Repo: filepath.Join(root, "repo")}, nil
+}
+
+// ErrTooLarge means the checkout plus whatever the build wrote exceeded the
+// operator's cap. Failing the job beats filling the server's disk, which takes
+// the whole worker down rather than one build.
+var ErrTooLarge = errors.New("workspace: over max_workspace_bytes")
+
+// Usage returns the total apparent size of the tree in bytes. Symlinks are not
+// followed, so a link into /nix or /usr counts as the link and not its target.
+//
+// This walks rather than accounting per write: a walk between steps is cheap
+// next to a compile, and an accountant would have to sit in every writer the
+// pipeline might use, which is not possible for arbitrary shell commands.
+func (w *Workspace) Usage() (int64, error) {
+	if w == nil || w.Root == "" {
+		return 0, nil
+	}
+	var total int64
+	err := filepath.WalkDir(w.Root, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			// A build can delete a file mid-walk; that is not a measurement
+			// failure worth failing the job over.
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if d.IsDir() || !d.Type().IsRegular() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		total += info.Size()
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("workspace: measure: %w", err)
+	}
+	return total, nil
+}
+
+// CheckSize reports ErrTooLarge when the tree is over limit. A limit of zero or
+// less disables the check, for an operator who would rather fill the disk than
+// fail a build.
+func (w *Workspace) CheckSize(limit int64) error {
+	if limit <= 0 {
+		return nil
+	}
+	used, err := w.Usage()
+	if err != nil {
+		// Do not fail a build because the measurement failed.
+		return nil
+	}
+	if used > limit {
+		return fmt.Errorf("%w: %s used, limit %s",
+			ErrTooLarge, humanBytes(used), humanBytes(limit))
+	}
+	return nil
+}
+
+// humanBytes formats a byte count the way an operator would read it back in the
+// settings field that produced the limit.
+func humanBytes(n int64) string {
+	switch {
+	case n >= 1<<30:
+		return fmt.Sprintf("%.1f GiB", float64(n)/float64(1<<30))
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MiB", float64(n)/float64(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KiB", float64(n)/float64(1<<10))
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
 }
 
 // Cleanup removes the whole tree.

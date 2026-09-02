@@ -12,7 +12,7 @@ import (
 
 const jobCols = `id, COALESCE(binding_id, 0), github_app_id, repo, sha, ref, event, delivery_id,
 	installation_id, check_suite_id, check_run_id, check_name, status, conclusion, steps_json, error,
-	log_bytes, shareable_logs, is_fork, pull_number, created_at, started_at, finished_at`
+	log_bytes, shareable_logs, is_fork, pull_number, skip_reason, created_at, started_at, finished_at`
 
 func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	var (
@@ -24,7 +24,8 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	)
 	if err := sc.Scan(&j.ID, &j.BindingID, &j.GitHubAppID, &j.Repo, &j.SHA, &j.Ref, &j.Event,
 		&j.DeliveryID, &j.InstallationID, &j.CheckSuiteID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
-		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &created, &started, &finished); err != nil {
+		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &j.SkipReason,
+		&created, &started, &finished); err != nil {
 		return Job{}, err
 	}
 	j.ShareableLogs = shared != 0
@@ -65,6 +66,10 @@ type JobInput struct {
 	ShareableLogs  bool
 	IsFork         bool
 	PullNumber     int
+	// SkipReason, when set, means the webhook already decided this job cannot
+	// run. The runner still opens and completes a Check Run so a required check
+	// resolves instead of hanging; it does not clone or run a pipeline.
+	SkipReason string
 }
 
 // EnqueueJob inserts a queued job and returns it.
@@ -75,11 +80,11 @@ func (s *Store) EnqueueJob(in JobInput) (Job, error) {
 	id := NewJobID()
 	_, err := s.db.Exec(`INSERT INTO jobs (id, binding_id, github_app_id, repo, sha, ref, event,
 		delivery_id, installation_id, check_suite_id, check_name, status, shareable_logs, is_fork,
-		pull_number, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		pull_number, skip_reason, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullInt64(in.BindingID), in.GitHubAppID, in.Repo, in.SHA, in.Ref, in.Event,
 		in.DeliveryID, in.InstallationID, in.CheckSuiteID, in.CheckName, JobQueued,
-		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, formatTime(now()))
+		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, in.SkipReason, formatTime(now()))
 	if err != nil {
 		return Job{}, fmt.Errorf("store: enqueue job: %w", err)
 	}
@@ -298,11 +303,27 @@ func (s *Store) SetJobLogBytes(id string, n int64) error {
 
 // FinishJob writes the terminal state.
 func (s *Store) FinishJob(id, status, conclusion, stepsJSON, errMsg string) error {
+	return s.FinishJobWithSkipReason(id, status, conclusion, stepsJSON, errMsg, "")
+}
+
+// FinishJobWithSkipReason is FinishJob plus the machine-readable reason a job was
+// skipped, so the API and the UI can tell an intentional path-filter skip from a
+// misconfigured pipeline. Empty reason leaves the column untouched.
+func (s *Store) FinishJobWithSkipReason(id, status, conclusion, stepsJSON, errMsg, skipReason string) error {
 	if stepsJSON == "" {
 		stepsJSON = "[]"
 	}
+	if skipReason == "" {
+		_, err := s.db.Exec(`UPDATE jobs SET status = ?, conclusion = ?, steps_json = ?, error = ?,
+			finished_at = ? WHERE id = ?`, status, conclusion, stepsJSON, errMsg, formatTime(now()), id)
+		if err != nil {
+			return fmt.Errorf("store: finish job: %w", err)
+		}
+		return nil
+	}
 	_, err := s.db.Exec(`UPDATE jobs SET status = ?, conclusion = ?, steps_json = ?, error = ?,
-		finished_at = ? WHERE id = ?`, status, conclusion, stepsJSON, errMsg, formatTime(now()), id)
+		skip_reason = ?, finished_at = ? WHERE id = ?`,
+		status, conclusion, stepsJSON, errMsg, skipReason, formatTime(now()), id)
 	if err != nil {
 		return fmt.Errorf("store: finish job: %w", err)
 	}
@@ -312,6 +333,11 @@ func (s *Store) FinishJob(id, status, conclusion, stepsJSON, errMsg string) erro
 // RequeueStaleJobs moves jobs that were running when the process died back to
 // queued. Coolify restarts the container on every deploy; without this, a job
 // interrupted mid-run would sit in_progress forever and block its delivery id.
+//
+// check_run_id is deliberately NOT cleared. The requeued job has to land on the
+// Check Run it already created, or the original stays in_progress forever and a
+// required check on that commit never resolves. The runner reopens it; see
+// queue.Runner.runJob.
 func (s *Store) RequeueStaleJobs() (int64, error) {
 	res, err := s.db.Exec(`UPDATE jobs SET status = ?, started_at = NULL WHERE status = ?`,
 		JobQueued, JobInProgress)

@@ -31,9 +31,11 @@ type commitFilesStub struct {
 	truncated bool
 }
 
-// CheckRunCall records one Check Runs API call.
+// CheckRunCall records one Check Runs API call. ID is the Check Run the call
+// addressed, and is zero for a create (the id does not exist yet).
 type CheckRunCall struct {
 	Repo string
+	ID   string
 	Body map[string]any
 }
 
@@ -92,9 +94,17 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 		repo := r.PathValue("owner") + "/" + r.PathValue("repo")
+		id := r.PathValue("id")
 		f.mu.Lock()
-		f.patched = append(f.patched, CheckRunCall{Repo: repo, Body: body})
+		f.patched = append(f.patched, CheckRunCall{Repo: repo, ID: id, Body: body})
 		f.mu.Unlock()
+		// A reopen is a PATCH like a completion; let a test make it fail so the
+		// create-instead fallback can be exercised.
+		if body["status"] == "in_progress" && f.shouldFail("reopen-check") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{"id": 555})
 	})
 	mux.HandleFunc("GET /repos/{owner}/{repo}/commits/{sha}", func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +140,8 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 	return f
 }
 
-// FailNext makes the named operation fail once ("token", "create-check", "commit-files").
+// FailNext makes the named operation fail once ("token", "create-check",
+// "reopen-check", "commit-files").
 func (f *GitHub) FailNext(op string) {
 	f.mu.Lock()
 	f.failNext[op]++

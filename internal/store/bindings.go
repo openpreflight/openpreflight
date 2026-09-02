@@ -13,7 +13,7 @@ import (
 
 const bindingCols = `id, github_app_id, COALESCE(coolify_instance_id, 0), repo, enabled, branches, paths,
 	check_name, pipeline_file, timeout_seconds, install_cmd, test_cmd, build_cmd,
-	shareable_logs, created_at, updated_at`
+	shareable_logs, on_empty_pipeline, created_at, updated_at`
 
 // repoPattern is GitHub's owner/name shape.
 var repoPattern = regexp.MustCompile(`^[A-Za-z0-9-_.]+/[A-Za-z0-9-_.]+$`)
@@ -26,7 +26,7 @@ func scanBinding(sc interface{ Scan(...any) error }) (RepoBinding, error) {
 	)
 	if err := sc.Scan(&b.ID, &b.GitHubAppID, &b.CoolifyInstanceID, &b.Repo, &enabled, &b.Branches, &b.Paths,
 		&b.CheckName, &b.PipelineFile, &b.TimeoutSeconds, &b.InstallCmd, &b.TestCmd, &b.BuildCmd,
-		&shared, &ca, &ua); err != nil {
+		&shared, &b.OnEmptyPipeline, &ca, &ua); err != nil {
 		return RepoBinding{}, err
 	}
 	b.Enabled = enabled != 0
@@ -96,6 +96,10 @@ type BindingInput struct {
 	TestCmd           string
 	BuildCmd          string
 	ShareableLogs     bool
+	// OnEmptyPipeline is "fail", "skip", or empty for the default. An empty
+	// pipeline is usually a configuration mistake rather than an intention, and
+	// an operator should be able to make it loud.
+	OnEmptyPipeline string
 }
 
 func (in *BindingInput) normalise() error {
@@ -104,6 +108,12 @@ func (in *BindingInput) normalise() error {
 	in.Paths = strings.TrimSpace(in.Paths)
 	in.CheckName = strings.TrimSpace(in.CheckName)
 	in.PipelineFile = strings.TrimSpace(in.PipelineFile)
+	in.OnEmptyPipeline = strings.ToLower(strings.TrimSpace(in.OnEmptyPipeline))
+	switch in.OnEmptyPipeline {
+	case "", OnEmptyPipelineSkip, OnEmptyPipelineFail:
+	default:
+		return fmt.Errorf("on_empty_pipeline must be %q or %q", OnEmptyPipelineSkip, OnEmptyPipelineFail)
+	}
 	if in.GitHubAppID <= 0 {
 		return errors.New("a CI GitHub App is required: it verifies the webhook and writes the Check Run")
 	}
@@ -136,8 +146,9 @@ func (s *Store) UpsertBinding(in BindingInput) (RepoBinding, error) {
 	ts := formatTime(now())
 	_, err := s.db.Exec(`INSERT INTO repo_bindings
 		(github_app_id, coolify_instance_id, repo, enabled, branches, paths, check_name, pipeline_file,
-		 timeout_seconds, install_cmd, test_cmd, build_cmd, shareable_logs, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 timeout_seconds, install_cmd, test_cmd, build_cmd, shareable_logs, on_empty_pipeline,
+		 created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT (github_app_id, repo) DO UPDATE SET
 			coolify_instance_id = excluded.coolify_instance_id,
 			enabled = excluded.enabled,
@@ -150,10 +161,11 @@ func (s *Store) UpsertBinding(in BindingInput) (RepoBinding, error) {
 			test_cmd = excluded.test_cmd,
 			build_cmd = excluded.build_cmd,
 			shareable_logs = excluded.shareable_logs,
+			on_empty_pipeline = excluded.on_empty_pipeline,
 			updated_at = excluded.updated_at`,
 		in.GitHubAppID, nullInt64(in.CoolifyInstanceID), in.Repo, boolInt(in.Enabled), in.Branches, in.Paths,
 		in.CheckName, in.PipelineFile, in.TimeoutSeconds, in.InstallCmd, in.TestCmd, in.BuildCmd,
-		boolInt(in.ShareableLogs), ts, ts)
+		boolInt(in.ShareableLogs), in.OnEmptyPipeline, ts, ts)
 	if err != nil {
 		return RepoBinding{}, fmt.Errorf("store: upsert binding: %w", err)
 	}
@@ -218,6 +230,30 @@ func (b RepoBinding) PathAllowed(changed []string) bool {
 		}
 	}
 	return false
+}
+
+// MatchedPaths returns the changed files this binding's patterns match. It is
+// PathAllowed's answer with the working shown, so the runner can report
+// "18 changed, 4 matched" rather than a bare yes or no.
+func (b RepoBinding) MatchedPaths(changed []string) []string {
+	patterns := splitList(b.Paths)
+	if len(patterns) == 0 {
+		return changed
+	}
+	var out []string
+	for _, file := range changed {
+		file = strings.TrimPrefix(strings.TrimSpace(file), "/")
+		if file == "" {
+			continue
+		}
+		for _, pattern := range patterns {
+			if pathMatches(pattern, file) {
+				out = append(out, file)
+				break
+			}
+		}
+	}
+	return out
 }
 
 func pathMatches(pattern, file string) bool {

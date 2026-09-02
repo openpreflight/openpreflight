@@ -85,6 +85,15 @@ func (h *harness) runOne(t *testing.T, in store.JobInput) store.Job {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return h.drainJob(t, job.ID)
+}
+
+// drainJob is runOne for a job that is already enqueued, so a test can set up
+// row state (a Check Run id from a previous attempt, say) before the runner
+// claims it.
+func (h *harness) drainJob(t *testing.T, jobID string) store.Job {
+	t.Helper()
+	job := store.Job{ID: jobID}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	go h.runner.Start(ctx)
@@ -260,11 +269,25 @@ func TestRunnerSkipsWhenNoPathMatches(t *testing.T) {
 		t.Fatalf("required checks need a skipped conclusion: %+v", h.github.CompletedCheckRuns()[0].Body)
 	}
 	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
-	if !strings.Contains(body, "no changed path matched") {
-		t.Fatalf("log should say why it skipped:\n%s", body)
+	// The bare "no changed path matched" sentence was replaced by a diagnostic
+	// that shows the counts and the filter, so an operator can tell a filter
+	// that is too narrow from one that is simply not matching this commit.
+	for _, want := range []string{"Changed files: 1", "Matched files: 0", "Filter: frontend/**", "Result: SKIP"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("log should contain %q:\n%s", want, body)
+		}
 	}
 	if strings.Contains(body, "checked out") {
 		t.Fatal("path miss cloned the repo")
+	}
+	if job.SkipReason != store.SkipReasonPathFilter {
+		t.Fatalf("skip_reason %q, want %q", job.SkipReason, store.SkipReasonPathFilter)
+	}
+	// The Check Run has to carry the diagnostic too: a reader on GitHub cannot
+	// see the worker's log file.
+	summary, _ := h.github.CompletedCheckRuns()[0].Body["output"].(map[string]any)
+	if s, _ := summary["summary"].(string); !strings.Contains(s, "Result: SKIP") {
+		t.Fatalf("check run summary should carry the diagnostic: %v", summary)
 	}
 }
 
@@ -389,6 +412,273 @@ func TestRunnerTimeoutIsReported(t *testing.T) {
 	}
 	if h.github.CompletedCheckRuns()[0].Body["conclusion"] != "timed_out" {
 		t.Fatalf("GitHub was not told about the timeout: %+v", h.github.CompletedCheckRuns()[0].Body)
+	}
+}
+
+// TestRunnerReusesCheckRunAfterRequeue is the regression test for the orphaned
+// Check Run. A job interrupted by a crash or a Coolify redeploy is requeued with
+// its check_run_id intact; if the runner created a second Check Run, the first
+// would stay in_progress forever and a required check on that commit would never
+// resolve.
+func TestRunnerReusesCheckRunAfterRequeue(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: echo testing\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	// Stand in for "the worker died mid-job": the row already carries the Check
+	// Run id that the first attempt created.
+	job, err := h.store.EnqueueJob(store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetJobCheckRun(job.ID, 555); err != nil {
+		t.Fatal(err)
+	}
+
+	settled := h.drainJob(t, job.ID)
+	if settled.Status != store.JobSuccess {
+		t.Fatalf("status %q err %q", settled.Status, settled.Error)
+	}
+	if got := h.github.CreatedCheckRuns(); len(got) != 0 {
+		t.Fatalf("a requeued job must reuse its Check Run, not create one: %+v", got)
+	}
+	patches := h.github.CompletedCheckRuns()
+	if len(patches) != 2 {
+		t.Fatalf("expected a reopen then a completion, got %d: %+v", len(patches), patches)
+	}
+	if patches[0].Body["status"] != "in_progress" {
+		t.Fatalf("first PATCH should reopen the run: %+v", patches[0].Body)
+	}
+	// A run left both completed and in_progress renders as finished on the
+	// Checks tab, so the previous conclusion has to be cleared.
+	if patches[0].Body["conclusion"] != nil {
+		t.Fatalf("reopen must clear the old conclusion: %+v", patches[0].Body)
+	}
+	for i, pc := range patches {
+		if pc.ID != "555" {
+			t.Fatalf("PATCH %d addressed check run %q, want 555", i, pc.ID)
+		}
+	}
+	if settled.CheckRunID != 555 {
+		t.Fatalf("job kept check_run_id %d, want 555", settled.CheckRunID)
+	}
+}
+
+// TestRunnerCreatesCheckRunWhenReopenFails covers the run being deleted or the
+// App reinstalled. Falling back to create is what this code did before the
+// reuse existed, so the worst case is the old behaviour, not a failed job.
+func TestRunnerCreatesCheckRunWhenReopenFails(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: echo testing\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job, err := h.store.EnqueueJob(store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetJobCheckRun(job.ID, 999); err != nil {
+		t.Fatal(err)
+	}
+	h.github.FailNext("reopen-check")
+
+	settled := h.drainJob(t, job.ID)
+	if settled.Status != store.JobSuccess {
+		t.Fatalf("a failed reopen must not fail the job: %q %q", settled.Status, settled.Error)
+	}
+	if len(h.github.CreatedCheckRuns()) != 1 {
+		t.Fatalf("expected one create after the reopen failed: %+v", h.github.CreatedCheckRuns())
+	}
+}
+
+// TestRunnerReportsForkSkipAsACompletedCheck is the regression test for fork
+// pull requests hanging a required check. The webhook used to answer 202 and
+// drop the delivery, so no Check Run existed and branch protection waited
+// forever with nothing on screen explaining why.
+func TestRunnerReportsForkSkipAsACompletedCheck(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: echo testing\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+		IsFork: true, PullNumber: 7, SkipReason: store.SkipReasonForkDisabled,
+	})
+	if job.Status != store.JobSkipped {
+		t.Fatalf("status %q err %q", job.Status, job.Error)
+	}
+	if job.SkipReason != store.SkipReasonForkDisabled {
+		t.Fatalf("skip_reason %q", job.SkipReason)
+	}
+	completions := h.github.CompletedCheckRuns()
+	if len(completions) != 1 {
+		t.Fatalf("expected exactly one completion, got %d", len(completions))
+	}
+	if completions[0].Body["conclusion"] != "skipped" {
+		t.Fatalf("conclusion: %+v", completions[0].Body)
+	}
+	// An operator reading the PR needs to know what to change, not just that it
+	// was refused.
+	out, _ := completions[0].Body["output"].(map[string]any)
+	summary, _ := out["summary"].(string)
+	for _, want := range []string{"skip_fork_prs", "default_runtime"} {
+		if !strings.Contains(summary, want) {
+			t.Fatalf("summary should name %q so an operator can act:\n%s", want, summary)
+		}
+	}
+	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
+	if strings.Contains(body, "checked out") {
+		t.Fatal("a pre-flight skip must not clone")
+	}
+}
+
+func TestRunnerForkSkipReasonsAreDistinct(t *testing.T) {
+	for _, tc := range []struct {
+		reason string
+		want   string
+	}{
+		{store.SkipReasonForkNoDocker, "no Docker engine is reachable"},
+		{store.SkipReasonForkNoRuntime, "default_runtime is empty"},
+	} {
+		t.Run(tc.reason, func(t *testing.T) {
+			h := newHarness(t)
+			sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{".ci.yml": "test: echo t\n"})
+			b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+			job := h.runOne(t, store.JobInput{
+				BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha,
+				InstallationID: 101, IsFork: true, SkipReason: tc.reason,
+			})
+			if job.Status != store.JobSkipped {
+				t.Fatalf("status %q", job.Status)
+			}
+			out, _ := h.github.CompletedCheckRuns()[0].Body["output"].(map[string]any)
+			summary, _ := out["summary"].(string)
+			if !strings.Contains(summary, tc.want) {
+				t.Fatalf("summary should say %q:\n%s", tc.want, summary)
+			}
+		})
+	}
+}
+
+// TestRunnerEmptyPipelineCanFail covers on_empty_pipeline. An empty pipeline
+// used to be indistinguishable from an intentional path-filter skip; an operator
+// who considers it a misconfiguration can now make it loud.
+func TestRunnerEmptyPipelineCanFail(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{"README.md": "just docs"})
+	b := h.binding(t, store.BindingInput{
+		Repo: "acme/api", Enabled: true, OnEmptyPipeline: store.OnEmptyPipelineFail,
+	})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobError {
+		t.Fatalf("on_empty_pipeline: fail should not skip, got %q", job.Status)
+	}
+	if h.github.CompletedCheckRuns()[0].Body["conclusion"] != "failure" {
+		t.Fatalf("conclusion: %+v", h.github.CompletedCheckRuns()[0].Body)
+	}
+}
+
+func TestRunnerEmptyPipelineSkipsByDefault(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{"README.md": "just docs"})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSkipped {
+		t.Fatalf("the default must stay today's behaviour, got %q", job.Status)
+	}
+	// Distinguishable from a path-filter skip, which is the whole point.
+	if job.SkipReason != store.SkipReasonNoPipeline {
+		t.Fatalf("skip_reason %q, want %q", job.SkipReason, store.SkipReasonNoPipeline)
+	}
+}
+
+// TestRunnerFailsWhenWorkspaceExceedsCap proves max_workspace_bytes is enforced
+// this time. Migration 0004 dropped the setting precisely because it was stored,
+// editable and never read.
+func TestRunnerFailsWhenWorkspaceExceedsCap(t *testing.T) {
+	h := newHarness(t)
+	settings, _ := h.store.Settings()
+	// Large enough that the checkout itself fits, so this exercises the
+	// between-steps check rather than the one right after clone.
+	settings.MaxWorkspaceBytes = 64 << 10
+	if err := h.store.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: dd if=/dev/zero of=big.bin bs=1024 count=256 2>/dev/null\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobFailure {
+		t.Fatalf("a workspace over the cap should fail, got %q err %q", job.Status, job.Error)
+	}
+	if !strings.Contains(job.Error, "max_workspace_bytes") {
+		t.Fatalf("error should name the setting: %q", job.Error)
+	}
+}
+
+// TestRunnerFailsWhenCheckoutAlreadyExceedsCap covers the other enforcement
+// point: a repository too big for the cap fails before any step runs, and
+// reports the same status as the between-steps case.
+func TestRunnerFailsWhenCheckoutAlreadyExceedsCap(t *testing.T) {
+	h := newHarness(t)
+	settings, _ := h.store.Settings()
+	settings.MaxWorkspaceBytes = 512
+	if err := h.store.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: echo testing\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobFailure {
+		t.Fatalf("status %q err %q", job.Status, job.Error)
+	}
+	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
+	if strings.Contains(body, "--- test ---") {
+		t.Fatal("an oversized checkout must fail before running a step")
+	}
+}
+
+func TestRunnerWorkspaceCapOfZeroDisablesTheCheck(t *testing.T) {
+	h := newHarness(t)
+	settings, _ := h.store.Settings()
+	settings.MaxWorkspaceBytes = 0
+	if err := h.store.SaveSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: dd if=/dev/zero of=big.bin bs=1024 count=64 2>/dev/null\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSuccess {
+		t.Fatalf("zero means no cap, got %q err %q", job.Status, job.Error)
 	}
 }
 
