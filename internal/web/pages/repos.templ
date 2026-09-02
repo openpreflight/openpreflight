@@ -37,20 +37,11 @@ templ ReposEditorPage(p web.Page) {
 	{{ apps := appsOf(m) }}
 	{{ editing := has(m, "Edit") }}
 	@layouts.Shell(p) {
-		if editing {
-			@reposList(p)
-			if len(apps) == 0 {
-				@reposNeedApp()
-			} else {
-				@reposEditDrawer(p)
-			}
+		@layouts.PageHead(bindingFormTitle(editing), "A binding is one owner/name on one App. Empty branches and paths allow everything.")
+		if len(apps) == 0 {
+			@reposNeedApp()
 		} else {
-			@layouts.PageHead(bindingFormTitle(false), "A binding is one owner/name on one App. Empty branches and paths allow everything.")
-			if len(apps) == 0 {
-				@reposNeedApp()
-			} else {
-				@reposEditor(p)
-			}
+			@reposEditor(p)
 		}
 	}
 }
@@ -79,6 +70,7 @@ templ reposList(p web.Page) {
 						}
 					}
 					@card.Content(card.ContentProps{Class: "space-y-2"}) {
+						{{ filter := bindingFilterLine(row) }}
 						<div class="flex flex-wrap gap-1">
 							if row.Binding.Enabled {
 								@badge.Badge() {
@@ -99,20 +91,8 @@ templ reposList(p web.Page) {
 								}
 							}
 						</div>
-						<p class="text-muted-foreground text-xs">
-							{ row.AppName }
-							if row.CoolifyName != "" {
-								{ " · " + row.CoolifyName }
-							}
-							{ " · " }
-							if row.Binding.Branches != "" {
-								{ row.Binding.Branches }
-							} else {
-								all branches
-							}
-							if row.Binding.Paths != "" {
-								{ " · " + row.Binding.Paths }
-							}
+						<p class="text-muted-foreground min-w-0 truncate text-xs" title={ filter }>
+							{ filter }
 						</p>
 						if row.LastJob.ID != "" {
 							<div class="flex flex-wrap items-center gap-2 text-xs">
@@ -315,40 +295,17 @@ templ reposApps(p web.Page) {
 }
 
 templ reposEditor(p web.Page) {
+	{{ editing := has(asMap(p.Data), "Edit") }}
 	@card.Card() {
 		@card.Header() {
 			@card.Title() {
-				{ bindingFormTitle(false) }
+				{ bindingFormTitle(editing) }
 			}
 		}
 		@card.Content() {
 			@reposEditorForm(p)
 		}
 	}
-}
-
-templ reposEditDrawer(p web.Page) {
-	{{ edit := bindingOf(asMap(p.Data)) }}
-	<a href="/repos" class="fixed inset-0 z-40 bg-black/10"><span class="sr-only">Close editor</span></a>
-	<aside
-		class="bg-background fixed inset-y-0 right-0 z-50 flex w-full flex-col overflow-y-auto border-l shadow-lg sm:max-w-2xl"
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="edit-binding-title"
-	>
-		<div class="flex items-start justify-between gap-3 border-b px-5 py-4">
-			<div class="min-w-0">
-				<h2 id="edit-binding-title" class="truncate text-lg font-semibold">{ edit.Repo }</h2>
-				<p class="text-muted-foreground mt-1 text-sm">Empty branches and paths allow everything.</p>
-			</div>
-			@button.Button(button.Props{Href: "/repos", Variant: button.VariantGhost, Size: button.SizeIconSm, Attributes: templ.Attributes{"aria-label": "Close"}}) {
-				@icon.X()
-			}
-		</div>
-		<div class="flex-1 px-5 py-4">
-			@reposEditorForm(p)
-		</div>
-	</aside>
 }
 
 templ reposEditorForm(p web.Page) {

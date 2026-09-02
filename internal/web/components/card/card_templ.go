@@ -89,7 +89,7 @@ func Card(props ...Props) templ.Component {
 		if p.Size == "" {
 			p.Size = SizeDefault
 		}
-		var templ_7745c5c3_Var2 = []any{utils.CN("ring-foreground/10 bg-card text-card-foreground gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm ring-1 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl group/card flex w-full min-w-0 flex-col", p.Class)}
+		var templ_7745c5c3_Var2 = []any{utils.CN("ring-foreground/10 bg-card text-card-foreground gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm ring-1 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl group/card flex h-full w-full min-w-0 flex-col", p.Class)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -561,7 +561,7 @@ func Content(props ...ContentProps) templ.Component {
 		if len(props) > 0 {
 			p = props[0]
 		}
-		var templ_7745c5c3_Var23 = []any{utils.CN("px-(--card-spacing)", p.Class)}
+		var templ_7745c5c3_Var23 = []any{utils.CN("px-(--card-spacing) flex-1", p.Class)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var23...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -651,7 +651,7 @@ func Footer(props ...FooterProps) templ.Component {
 		if len(props) > 0 {
 			p = props[0]
 		}
-		var templ_7745c5c3_Var27 = []any{utils.CN("bg-muted/50 rounded-b-xl border-t p-(--card-spacing) flex items-center", p.Class)}
+		var templ_7745c5c3_Var27 = []any{utils.CN("bg-muted/50 -mt-(--card-spacing) rounded-b-xl border-t p-(--card-spacing) flex items-center", p.Class)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var27...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

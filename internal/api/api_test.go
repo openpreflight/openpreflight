@@ -603,11 +603,14 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		t.Error("/repos/pick missing the App picker")
 	}
 	editPage := authedHTML(t, ts, token, "/repos/"+itoa(binding.ID)+"/edit")
-	if !strings.Contains(editPage, `role="dialog"`) || !strings.Contains(editPage, "Save binding") {
-		t.Error("/repos/{id}/edit is not a drawer over the list")
+	if strings.Contains(editPage, "Close editor") || strings.Contains(editPage, `aria-labelledby="edit-binding-title"`) {
+		t.Error("/repos/{id}/edit still uses a drawer")
 	}
-	if !strings.Contains(editPage, "Pick repositories") {
-		t.Error("edit drawer should keep the repos list underneath")
+	if !strings.Contains(editPage, "Save binding") || !strings.Contains(editPage, "Edit binding") {
+		t.Error("/repos/{id}/edit missing the editor page")
+	}
+	if strings.Contains(editPage, "Pick repositories") {
+		t.Error("edit page should not render the repos list")
 	}
 	settings := authedHTML(t, ts, token, "/settings")
 	if strings.Contains(settings, `name="max_concurrent_jobs"`) || strings.Contains(settings, `name="password"`) {

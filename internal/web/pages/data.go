@@ -214,6 +214,26 @@ func bindingFormTitle(editing bool) string {
 	return "Add a binding manually"
 }
 
+func bindingFilterLine(row bindingRow) string {
+	var b strings.Builder
+	b.WriteString(row.AppName)
+	if row.CoolifyName != "" {
+		b.WriteString(" · ")
+		b.WriteString(row.CoolifyName)
+	}
+	b.WriteString(" · ")
+	if row.Binding.Branches != "" {
+		b.WriteString(row.Binding.Branches)
+	} else {
+		b.WriteString("all branches")
+	}
+	if row.Binding.Paths != "" {
+		b.WriteString(" · ")
+		b.WriteString(row.Binding.Paths)
+	}
+	return b.String()
+}
+
 func bindingSubmitLabel(editing bool) string {
 	if editing {
 		return "Save binding"

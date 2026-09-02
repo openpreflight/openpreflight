@@ -14,8 +14,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   When, Actions). Filters sit in a toolbar on the table card.
 - Empty lists use a dashed panel, an icon, and one primary action.
 - Repos is a list. Pick repositories is `/repos/pick`; add is `/repos/new`.
-  Edit opens a drawer over the list at `/repos/{id}/edit`. `/repos?edit=`
-  redirects to that URL.
+  Edit is `/repos/{id}/edit` (same form as add). `/repos?edit=` redirects
+  to that URL.
 - Settings is four pages: Configuration (`/settings`), Runner, Logs, Admin.
   Each form saves only its fields and returns to that page.
 - GitHub Apps is a list. Add is `/github-apps/new`; edit is
