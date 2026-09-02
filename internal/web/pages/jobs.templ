@@ -1,8 +1,12 @@
 package pages
 
 import (
+	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
@@ -10,13 +14,76 @@ templ Jobs(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ settings := settingsOf(m) }}
 	{{ list := jobsOf(m) }}
+	{{ repo := jobRepoOf(m) }}
+	{{ status := jobStatusOf(m) }}
 	{{ lede := "Every run this worker has taken, newest first. Retention is " + itoa(settings.LogRetentionDays) + " days." }}
 	@layouts.Shell(p) {
 		@layouts.PageHead("Jobs", lede)
 		@card.Card() {
 			@card.Content() {
-				@jobsTable(p, list)
+				@jobsFilter(repo, status)
+				@jobsTable(p, list, jobFiltered(m))
+				@jobsPager(m, len(list))
 			}
 		}
+	}
+}
+
+templ jobsFilter(repo, status string) {
+	<form method="get" action="/jobs" class="mb-4 flex flex-wrap items-end gap-3">
+		@field.Field() {
+			@field.Label(field.LabelProps{For: "status"}) {
+				Status
+			}
+			<select id="status" name="status" class={ selectClass }>
+				if status == "" {
+					<option value="" selected>All</option>
+				} else {
+					<option value="">All</option>
+				}
+				for _, st := range store.JobStatuses {
+					if status == st {
+						<option value={ st } selected>{ st }</option>
+					} else {
+						<option value={ st }>{ st }</option>
+					}
+				}
+			</select>
+		}
+		@field.Field() {
+			@field.Label(field.LabelProps{For: "repo"}) {
+				Repo
+			}
+			@input.Input(input.Props{ID: "repo", Name: "repo", Type: "text", Placeholder: "owner/name", Value: repo, Class: "font-mono"})
+		}
+		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+			Filter
+		}
+		if repo != "" || status != "" {
+			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
+				Clear
+			}
+		}
+	</form>
+}
+
+templ jobsPager(m map[string]any, n int) {
+	{{ repo := jobRepoOf(m) }}
+	{{ status := jobStatusOf(m) }}
+	{{ limit := jobLimitOf(m) }}
+	{{ offset := jobOffsetOf(m) }}
+	if offset > 0 || n == limit {
+		<nav class="mt-4 flex flex-wrap gap-3" aria-label="Jobs pagination">
+			if offset > 0 {
+				@button.Button(button.Props{Href: jobsPath(repo, status, limit, jobPrevOffset(offset, limit)), Variant: button.VariantLink, Size: button.SizeSm}) {
+					Previous
+				}
+			}
+			if n == limit {
+				@button.Button(button.Props{Href: jobsPath(repo, status, limit, offset+limit), Variant: button.VariantLink, Size: button.SizeSm}) {
+					Next
+				}
+			}
+		</nav>
 	}
 }

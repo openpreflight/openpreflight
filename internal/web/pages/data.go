@@ -2,6 +2,7 @@ package pages
 
 import (
 	"encoding/json"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -267,10 +268,55 @@ func bindingsOf(m map[string]any) []store.RepoBinding {
 	return get[[]store.RepoBinding](m, "Bindings")
 }
 func jobsOf(m map[string]any) []store.Job { return get[[]store.Job](m, "Jobs") }
+
+func jobRepoOf(m map[string]any) string   { return str(m, "Repo") }
+func jobStatusOf(m map[string]any) string { return str(m, "Status") }
+func jobLimitOf(m map[string]any) int {
+	n := asInt(m, "Limit")
+	if n <= 0 || n > 500 {
+		return 100
+	}
+	return n
+}
+func jobOffsetOf(m map[string]any) int { return asInt(m, "Offset") }
+
+func jobPrevOffset(offset, limit int) int {
+	n := offset - limit
+	if n < 0 {
+		return 0
+	}
+	return n
+}
+
+// jobFiltered is true when the jobs index is constrained by repo, status, or
+// a non-zero offset, so an empty table is "no matches" rather than "no jobs yet".
+func jobFiltered(m map[string]any) bool {
+	return jobRepoOf(m) != "" || jobStatusOf(m) != "" || jobOffsetOf(m) > 0
+}
+
+func jobsPath(repo, status string, limit, offset int) string {
+	q := url.Values{}
+	if repo != "" {
+		q.Set("repo", repo)
+	}
+	if status != "" {
+		q.Set("status", status)
+	}
+	if limit > 0 && limit != 100 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		q.Set("offset", strconv.Itoa(offset))
+	}
+	if enc := q.Encode(); enc != "" {
+		return "/jobs?" + enc
+	}
+	return "/jobs"
+}
 func inflightOf(m map[string]any) []store.Job {
 	return get[[]store.Job](m, "InFlight")
 }
-func cardsOf(m map[string]any) []dashRepo { return get[[]dashRepo](m, "RepoCards") }
+func cardsOf(m map[string]any) []dashRepo  { return get[[]dashRepo](m, "RepoCards") }
 func rowsOf(m map[string]any) []bindingRow { return get[[]bindingRow](m, "Bindings") }
 func pickerOf(m map[string]any) []pickerRepo {
 	return get[[]pickerRepo](m, "PickerRepos")
@@ -299,7 +345,7 @@ func connectorsOf(m map[string]any) []coolify.GitHubApp {
 	return get[[]coolify.GitHubApp](m, "Connectors")
 }
 
-func dashNeedApp(n int) bool     { return n == 0 }
+func dashNeedApp(n int) bool { return n == 0 }
 func dashNeedRepo(apps, enabled int) bool {
 	return apps > 0 && enabled == 0
 }

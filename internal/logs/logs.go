@@ -110,6 +110,47 @@ func Read(dir, jobID string) (string, error) {
 	return string(b), nil
 }
 
+// readFromChunk caps one ReadFrom so a single SSE event cannot be the whole
+// max_log_bytes file.
+const readFromChunk = 32 << 10
+
+// ReadFrom returns up to readFromChunk bytes of a job log starting at offset,
+// and the offset to pass on the next call. A missing file yields empty data and
+// next 0. An offset past EOF yields empty data and next equal to offset.
+func ReadFrom(dir, jobID string, offset int64) (data []byte, next int64, err error) {
+	if offset < 0 {
+		offset = 0
+	}
+	f, err := os.Open(Path(dir, jobID))
+	if os.IsNotExist(err) {
+		return nil, 0, nil
+	}
+	if err != nil {
+		return nil, offset, fmt.Errorf("logs: open: %w", err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, offset, fmt.Errorf("logs: stat: %w", err)
+	}
+	size := info.Size()
+	if offset > size {
+		return nil, offset, nil
+	}
+	n := size - offset
+	if n > readFromChunk {
+		n = readFromChunk
+	}
+	if n == 0 {
+		return nil, offset, nil
+	}
+	buf := make([]byte, n)
+	if _, err := f.ReadAt(buf, offset); err != nil {
+		return nil, offset, fmt.Errorf("logs: read from: %w", err)
+	}
+	return buf, offset + n, nil
+}
+
 // Tail returns at most n bytes from the end of a log, for the Check Run output.
 func Tail(dir, jobID string, n int64) (string, error) {
 	f, err := os.Open(Path(dir, jobID))

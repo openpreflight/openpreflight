@@ -19,6 +19,10 @@ import (
 // ErrNotFound is returned by the Get* helpers when a row is absent.
 var ErrNotFound = errors.New("store: not found")
 
+// ErrInvalidJobStatus is returned by ListJobs when Status is set to a value
+// that is not a Job* constant.
+var ErrInvalidJobStatus = errors.New("store: unknown job status")
+
 // Store owns the database handle and the secret box used for secret columns.
 type Store struct {
 	db  *sql.DB
