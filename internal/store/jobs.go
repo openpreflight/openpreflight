@@ -13,7 +13,7 @@ import (
 const jobCols = `id, COALESCE(binding_id, 0), github_app_id, repo, sha, ref, event, delivery_id,
 	installation_id, check_suite_id, check_run_id, check_name, status, conclusion, steps_json, error,
 	log_bytes, shareable_logs, is_fork, pull_number, skip_reason, runtime, plan_source,
-	created_at, started_at, finished_at`
+	plan_origins, created_at, started_at, finished_at`
 
 func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	var (
@@ -26,7 +26,7 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	if err := sc.Scan(&j.ID, &j.BindingID, &j.GitHubAppID, &j.Repo, &j.SHA, &j.Ref, &j.Event,
 		&j.DeliveryID, &j.InstallationID, &j.CheckSuiteID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
 		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &j.SkipReason,
-		&j.Runtime, &j.PlanSource, &created, &started, &finished); err != nil {
+		&j.Runtime, &j.PlanSource, &j.PlanOrigins, &created, &started, &finished); err != nil {
 		return Job{}, err
 	}
 	j.ShareableLogs = shared != 0
@@ -299,9 +299,9 @@ func (s *Store) SetJobCheckName(id, name string) error {
 // SetJobPlan records what the runner resolved once the checkout existed: the
 // executor (empty means the worker process, otherwise a Docker image) and where
 // the commands came from. Both are decided after the job row is written.
-func (s *Store) SetJobPlan(id, runtime, planSource string) error {
-	_, err := s.db.Exec(`UPDATE jobs SET runtime = ?, plan_source = ? WHERE id = ?`,
-		runtime, planSource, id)
+func (s *Store) SetJobPlan(id, runtime, planSource, planOriginsJSON string) error {
+	_, err := s.db.Exec(`UPDATE jobs SET runtime = ?, plan_source = ?, plan_origins = ? WHERE id = ?`,
+		runtime, planSource, planOriginsJSON, id)
 	return err
 }
 

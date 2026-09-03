@@ -108,6 +108,9 @@ templ reposList(p web.Page) {
 						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
 							Edit
 						}
+						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/resolve", Variant: button.VariantLink, Size: button.SizeSm}) {
+							Dry run
+						}
 						<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
 							@layouts.CSRF(p.CSRFToken)
 							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
@@ -453,6 +456,11 @@ templ reposEditorForm(p web.Page) {
 				<div class="flex flex-wrap items-center gap-2">
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
 						{ bindingSubmitLabel(editing) }
+					}
+					if editing {
+						@button.Button(button.Props{Href: "/repos/" + itoa64(edit.ID) + "/resolve", Variant: button.VariantOutline, Size: button.SizeSm}) {
+							Test configuration
+						}
 					}
 					@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
 						Cancel

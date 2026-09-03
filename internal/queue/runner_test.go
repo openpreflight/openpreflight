@@ -14,6 +14,7 @@ import (
 
 	"github.com/openpreflight/openpreflight/internal/config"
 	"github.com/openpreflight/openpreflight/internal/executor"
+	"github.com/openpreflight/openpreflight/internal/githubapp"
 	"github.com/openpreflight/openpreflight/internal/logs"
 	"github.com/openpreflight/openpreflight/internal/secret"
 	"github.com/openpreflight/openpreflight/internal/store"
@@ -814,8 +815,8 @@ func TestGitBaseURLDerivation(t *testing.T) {
 		"nonsense":                       "https://github.com",
 	}
 	for in, want := range cases {
-		if got := gitBaseURL(in); got != want {
-			t.Errorf("gitBaseURL(%q) = %q want %q", in, got, want)
+		if got := githubapp.GitBaseURL(in); got != want {
+			t.Errorf("GitBaseURL(%q) = %q want %q", in, got, want)
 		}
 	}
 }

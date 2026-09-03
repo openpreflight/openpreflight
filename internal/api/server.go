@@ -95,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /repos/new", s.guard(s.pageReposNew))
 	mux.HandleFunc("GET /repos/{id}", s.guard(s.pageRepo))
 	mux.HandleFunc("GET /repos/{id}/edit", s.guard(s.pageReposEdit))
+	mux.HandleFunc("GET /repos/{id}/resolve", s.guard(s.pageRepoResolve))
 	mux.HandleFunc("GET /jobs", s.guard(s.pageJobs))
 
 	// JSON API / form targets.
@@ -131,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/bindings", s.guard(s.upsertBinding))
 	mux.HandleFunc("POST /api/v1/bindings/bulk", s.guard(s.bulkBindings))
 	mux.HandleFunc("POST /api/v1/bindings/{id}/toggle", s.guard(s.toggleBinding))
+	mux.HandleFunc("POST /api/v1/bindings/{id}/resolve", s.guard(s.resolveBindingAPI))
 	mux.HandleFunc("DELETE /api/v1/bindings/{id}", s.guard(s.deleteBinding))
 	mux.HandleFunc("POST /api/v1/bindings/{id}/delete", s.guard(s.deleteBinding))
 

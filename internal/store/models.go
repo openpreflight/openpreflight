@@ -164,6 +164,7 @@ type Job struct {
 	SkipReason     string     `json:"skip_reason"`
 	Runtime        string     `json:"runtime"`
 	PlanSource     string     `json:"plan_source"`
+	PlanOrigins    string     `json:"plan_origins"`
 	CreatedAt      time.Time  `json:"created_at"`
 	StartedAt      *time.Time `json:"started_at"`
 	FinishedAt     *time.Time `json:"finished_at"`

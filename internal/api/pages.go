@@ -357,6 +357,43 @@ func (s *Server) pageRepo(w http.ResponseWriter, r *http.Request, user store.Use
 	s.render(w, "repo", p)
 }
 
+// pageRepoResolve is the dry run an operator can read: what this repository
+// would do on a ref, without pushing a commit to find out.
+//
+// A GET rather than a form POST. It has no effect on GitHub and none on the
+// database — it spends a clone and throws it away — so it is a link, with no
+// CSRF token to thread through and a URL an operator can bookmark per ref.
+func (s *Server) pageRepoResolve(w http.ResponseWriter, r *http.Request, user store.User) {
+	id, err := pathID(r)
+	if err != nil {
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
+		return
+	}
+	binding, err := s.store.Binding(id)
+	if err != nil {
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
+		return
+	}
+	ref := strings.TrimSpace(r.URL.Query().Get("ref"))
+	data := map[string]any{"Binding": binding, "Ref": ref}
+	// A dry run reaches GitHub and clones, so it can fail for reasons that have
+	// nothing to do with the configuration. Render the failure on the page
+	// instead of a 500: the operator came here to diagnose something.
+	if res, err := s.resolveBinding(r.Context(), id, ref); err != nil {
+		data["Error"] = err.Error()
+	} else {
+		data["Resolution"] = res
+		data["Ref"] = res.Ref
+	}
+	p := s.page(w, r, &user, "Dry run - "+binding.Repo, "repos", data)
+	p.Crumbs = []web.Crumb{
+		{Label: "Repos", Href: "/repos"},
+		{Label: binding.Repo, Href: "/repos/" + strconv.FormatInt(binding.ID, 10)},
+		{Label: "Dry run"},
+	}
+	s.render(w, "repo-resolve", p)
+}
+
 func (s *Server) pageReposPick(w http.ResponseWriter, r *http.Request, user store.User) {
 	base, ok := s.loadReposBase(w, r)
 	if !ok {

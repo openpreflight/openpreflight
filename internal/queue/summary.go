@@ -109,10 +109,13 @@ func human(r executor.Result) string {
 	return d.String()
 }
 
-// pathFilterDiagnostic is the "why did this run, or not" block. It goes in the
+// PathFilterDiagnostic is the "why did this run, or not" block. It goes in the
 // log on every outcome and in the Check Run summary on a skip, because a reader
 // on GitHub cannot see the worker's log file.
-func pathFilterDiagnostic(filter string, changed, matched int, allowed bool) string {
+//
+// Exported because the dry-run endpoint has to answer the same question about a
+// commit that has not run, and two implementations of "why" would drift.
+func PathFilterDiagnostic(filter string, changed, matched int, allowed bool) string {
 	result := "SKIP"
 	if allowed {
 		result = "RUN"

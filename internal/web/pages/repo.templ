@@ -20,6 +20,9 @@ templ Repo(p web.Page) {
 	{{ last := jobOf(m) }}
 	@layouts.Shell(p) {
 		@layouts.PageHead(b.Repo, repoSubtitle(b)) {
+			@button.Button(button.Props{Href: "/repos/" + itoa64(b.ID) + "/resolve", Variant: button.VariantOutline, Size: button.SizeSm}) {
+				Dry run
+			}
 			@button.Button(button.Props{Href: "/repos/" + itoa64(b.ID) + "/edit", Size: button.SizeSm}) {
 				Edit
 			}
