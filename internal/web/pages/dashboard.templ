@@ -20,6 +20,8 @@ templ Dashboard(p web.Page) {
 	{{ inflight := inflightOf(m) }}
 	{{ jobs := jobsOf(m) }}
 	{{ cards := cardsOf(m) }}
+	{{ ranAny := asBool(m, "RanAny") }}
+	{{ passedAny := asBool(m, "PassedAny") }}
 	@layouts.Shell(p) {
 		@layouts.PageHead("Overview", "Set the public URL, add your CI GitHub App, then enable the repos it should check. Coolify is optional.") {
 			if dashNeedApp(len(apps)) {
@@ -38,6 +40,7 @@ templ Dashboard(p web.Page) {
 				}
 			}
 		}
+		if !dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny) {
 		@card.Card(card.Props{Class: "mb-6"}) {
 			@card.Header() {
 				@card.Title() {
@@ -113,6 +116,43 @@ templ Dashboard(p web.Page) {
 							}
 						}
 					</li>
+					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
+						if ranAny {
+							@badge.Badge() {
+								done
+							}
+							First run
+							@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
+								View jobs
+							}
+						} else {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								waiting
+							}
+							First run
+							<span class="text-muted-foreground text-xs">push a commit, and GitHub calls the webhook</span>
+						}
+					</li>
+					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
+						if passedAny {
+							@badge.Badge() {
+								done
+							}
+							Passing Check Run
+						} else if ranAny {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								not yet
+							}
+							Passing Check Run
+							<span class="text-muted-foreground text-xs">a run finished, but none has passed — open it to see why</span>
+						} else {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								waiting
+							}
+							Passing Check Run
+							<span class="text-muted-foreground text-xs">the commit gets a green check here and on GitHub</span>
+						}
+					</li>
 					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3 last:pb-0">
 						if len(coolify) > 0 {
 							@badge.Badge() {
@@ -137,6 +177,7 @@ templ Dashboard(p web.Page) {
 				</ul>
 			}
 		}
+		}
 		@card.Card(card.Props{Class: "mb-6"}) {
 			@card.Header() {
 				@card.Title() {
@@ -145,7 +186,7 @@ templ Dashboard(p web.Page) {
 			}
 			@card.Content() {
 				if len(inflight) > 0 {
-					@jobTable(inflight)
+					@jobTable(inflight, true)
 				} else {
 					@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
 						@empty.Header() {
@@ -176,7 +217,7 @@ templ Dashboard(p web.Page) {
 			}
 			@card.Content() {
 				if len(jobs) > 0 {
-					@jobTable(jobs)
+					@jobTable(jobs, true)
 				} else {
 					@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
 						@empty.Header() {
@@ -211,20 +252,29 @@ templ Dashboard(p web.Page) {
 					@card.Card(card.Props{Size: card.SizeSm}) {
 						@card.Header() {
 							@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
-								if c.LastJob.ID != "" {
-									<a class="hover:underline" href={ templ.SafeURL("/runs/" + c.LastJob.ID) }>{ c.Repo }</a>
-								} else {
-									{ c.Repo }
-								}
+								// The repo's own page, not its last run: the card is
+								// about the repository, and one commit is not.
+								<a class="hover:underline" href={ templ.SafeURL("/repos/" + itoa64(c.ID)) }>{ c.Repo }</a>
 							}
 						}
 						@card.Content() {
 							if c.LastJob.ID != "" {
 								<div class="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
 									@StatusBadge(c.LastJob)
-									<span class="font-mono">{ web.ShortSHA(c.LastJob.SHA) }</span>
+									<a class="text-primary font-mono hover:underline" href={ templ.SafeURL("/runs/" + c.LastJob.ID) }>
+										{ web.ShortSHA(c.LastJob.SHA) }
+									</a>
+									if c.LastJob.Ref != "" {
+										<span class="font-mono">{ c.LastJob.Ref }</span>
+									}
+									if c.LastJob.StartedAt != nil {
+										<span class="tabular-nums">{ web.HumanDuration(c.LastJob.Duration()) }</span>
+									}
 									<span>{ web.Ago(c.LastJob.CreatedAt) }</span>
 								</div>
+								if repoFailureReason(c.LastJob) != "" {
+									<p class="text-muted-foreground mt-2 text-xs">{ repoFailureReason(c.LastJob) }</p>
+								}
 							} else {
 								<p class="text-muted-foreground text-xs">no runs</p>
 							}

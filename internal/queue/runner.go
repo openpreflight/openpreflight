@@ -288,7 +288,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	complete := func(conclusion string, results []executor.Result, note string) {
 		body, _ := logs.Tail(r.cfg.LogDir(), job.ID, 50<<10)
 		out := githubapp.CheckOutput{
-			Title:   checkTitle(conclusion),
+			Title:   titleFor(conclusion, results),
 			Summary: summarise(conclusion, results, note, detailsURL),
 		}
 		if body != "" {
@@ -496,6 +496,11 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		w.Printf("runtime %s via docker\n", image)
 	} else {
 		w.Printf("runtime: worker process\n")
+	}
+	// Record what was resolved. Both values are decided here, after the clone,
+	// and used to exist only in this log file.
+	if err := r.store.SetJobPlan(job.ID, image, plan.Source); err != nil {
+		r.log.Error("record job plan", "job", job.ID, "error", err)
 	}
 	// A pipeline file may set its own timeout, which the outer context does not
 	// know about. Tighten (or extend) here.

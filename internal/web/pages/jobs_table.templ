@@ -133,15 +133,23 @@ templ jobsRow(p web.Page, j store.Job) {
 	}
 }
 
-templ jobTable(jobs []store.Job) {
+// jobTable lists runs. showRepo is false on a page that is already about one
+// repository, where repeating its name in every row is noise.
+templ jobTable(jobs []store.Job, showRepo bool) {
 	@table.Table() {
 		@table.Header(table.HeaderProps{Class: "sticky top-0 z-10 bg-card"}) {
 			@table.Row() {
 				@table.Head() {
 					Status
 				}
-				@table.Head() {
-					Repo
+				if showRepo {
+					@table.Head() {
+						Repo
+					}
+				} else {
+					@table.Head() {
+						Commit
+					}
 				}
 				@table.Head() {
 					When
@@ -158,8 +166,18 @@ templ jobTable(jobs []store.Job) {
 						@StatusBadge(j)
 					}
 					@table.Cell() {
-						<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
-						<div class="text-muted-foreground font-mono text-xs">{ jobRefLine(j) }</div>
+						if showRepo {
+							<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
+							<div class="text-muted-foreground font-mono text-xs">{ jobRefLine(j) }</div>
+						} else {
+							<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ web.ShortSHA(j.SHA) }</a>
+							<div class="text-muted-foreground font-mono text-xs">
+								{ orDash(j.Ref) }
+								if j.PlanSource != "" {
+									· { j.PlanSource }
+								}
+							</div>
+						}
 					}
 					@table.Cell(table.CellProps{Class: "text-muted-foreground tabular-nums text-xs"}) {
 						{ web.Ago(j.CreatedAt) }

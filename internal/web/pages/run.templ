@@ -112,6 +112,24 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 						{ "-" }
 					}
 				</dd>
+				<dt class="text-muted-foreground">Executor</dt>
+				<dd class="text-xs">
+					if job.Runtime != "" {
+						<span class="font-mono">docker: { job.Runtime }</span>
+					} else if job.Status == store.JobSkipped {
+						{ "-" }
+					} else {
+						worker process
+					}
+				</dd>
+				<dt class="text-muted-foreground">Plan from</dt>
+				<dd class="text-xs">
+					if job.PlanSource != "" {
+						{ job.PlanSource }
+					} else {
+						{ "-" }
+					}
+				</dd>
 				<dt class="text-muted-foreground">Check name</dt>
 				<dd class="text-xs">
 					if job.CheckName != "" {

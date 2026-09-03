@@ -374,6 +374,24 @@ templ reposEditorForm(p web.Page) {
 						}
 					}
 					@field.Field() {
+						@field.Label(field.LabelProps{For: "b_on_empty"}) {
+							Empty pipeline
+						}
+						<select
+							id="b_on_empty"
+							name="on_empty_pipeline"
+							class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+						>
+							<option value="skip" selected?={ edit.OnEmptyPipeline != "fail" }>Skip the job</option>
+							<option value="fail" selected?={ edit.OnEmptyPipeline == "fail" }>Fail the job</option>
+						</select>
+						@field.Description() {
+							What to do when nothing resolves to run: no pipeline file, no commands
+							here, and no recognisable project. Usually a misconfiguration rather
+							than an intention.
+						}
+					}
+					@field.Field() {
 						@field.Label(field.LabelProps{For: "b_check"}) {
 							Check name
 						}

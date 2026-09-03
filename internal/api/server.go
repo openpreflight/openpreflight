@@ -93,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /repos", s.guard(s.pageRepos))
 	mux.HandleFunc("GET /repos/pick", s.guard(s.pageReposPick))
 	mux.HandleFunc("GET /repos/new", s.guard(s.pageReposNew))
+	mux.HandleFunc("GET /repos/{id}", s.guard(s.pageRepo))
 	mux.HandleFunc("GET /repos/{id}/edit", s.guard(s.pageReposEdit))
 	mux.HandleFunc("GET /jobs", s.guard(s.pageJobs))
 

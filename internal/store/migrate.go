@@ -168,6 +168,15 @@ ALTER TABLE jobs ADD COLUMN skip_reason TEXT NOT NULL DEFAULT '';
 ALTER TABLE repo_bindings ADD COLUMN on_empty_pipeline TEXT NOT NULL DEFAULT '';
 ALTER TABLE settings ADD COLUMN max_workspace_bytes INTEGER NOT NULL DEFAULT 1073741824;
 `},
+	// The runner resolves the executor and where the commands came from after
+	// the clone, printed both to the log, and threw them away. They are the two
+	// questions an operator asks about a run they did not watch — "what ran
+	// this?" and "where did these commands come from?" — so they are recorded
+	// the same way check_run_id and check_name already are.
+	{"0007_job_plan", `
+ALTER TABLE jobs ADD COLUMN runtime TEXT NOT NULL DEFAULT '';
+ALTER TABLE jobs ADD COLUMN plan_source TEXT NOT NULL DEFAULT '';
+`},
 }
 
 func (s *Store) migrate() error {

@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`on_empty_pipeline` is settable.** It shipped readable by the runner but
+  absent from the JSON API and the binding form, so no operator could actually
+  choose it. That is the same mistake migration `0004` exists to undo.
 - **Cancel and timeout now actually stop a Docker job.** `Docker.Run` killed the
   `docker` CLI and waited on pipes the container still held, so a cancelled
   `runtime:` job reported cancelled on the Check Run and kept building. It also
@@ -31,6 +34,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A page per repository** at `/repos/{id}`: what the binding is configured to
+  do, its last run with duration and the reason it did not pass, and that
+  repository's recent runs. `/repos` is a management list and `/repos/{id}/edit`
+  is a form; neither answered "what has this repo been doing".
+- **Executor and plan source on the run page.** Whether a job ran in the worker
+  process or `docker:<image>`, and whether its commands came from `.ci.yml`,
+  binding overrides or inference, both existed only in the log body. They are
+  recorded on the job now (migration `0007`) and shown.
+- **The onboarding checklist tracks the whole arc**, adding *First run* and
+  *Passing Check Run* to the four configuration steps, and **retires itself**
+  once the arc is complete. A finished install should not still be shown
+  instructions; it returns if a step regresses.
+- **The Check Run title names the failing step** — `Failed: test (exit 1)`
+  rather than `Failed`. The title is the only part visible in a pull request's
+  collapsed check list.
 - **`on_empty_pipeline`** on a binding: `skip` (the default, unchanged
   behaviour) or `fail`. A pipeline that resolves to no steps is usually a
   configuration mistake, and it used to be indistinguishable from an intentional
@@ -48,7 +66,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrade
 
-Run migration `0006` (automatic on boot). No configuration change is required:
+Run migrations `0006` and `0007` (automatic on boot). No configuration change is required:
 `on_empty_pipeline` defaults to today's behaviour and `max_workspace_bytes`
 defaults to 1 GiB. If a repository's checkout plus build legitimately exceeds
 1 GiB, raise it in Settings → Runner or set it to `0`.

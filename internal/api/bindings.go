@@ -46,6 +46,7 @@ func (s *Server) upsertBinding(w http.ResponseWriter, r *http.Request, _ store.U
 		TestCmd:           in.Str("test_cmd"),
 		BuildCmd:          in.Str("build_cmd"),
 		ShareableLogs:     in.Bool("shareable_logs"),
+		OnEmptyPipeline:   in.Str("on_empty_pipeline"),
 	})
 	if err != nil {
 		s.badRequest(w, r, err)
@@ -150,6 +151,7 @@ func bindingInputFrom(b store.RepoBinding) store.BindingInput {
 		TestCmd:           b.TestCmd,
 		BuildCmd:          b.BuildCmd,
 		ShareableLogs:     b.ShareableLogs,
+		OnEmptyPipeline:   b.OnEmptyPipeline,
 	}
 }
 
