@@ -63,13 +63,45 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   clone and between steps, failing the job rather than filling the disk. Default
   1 GiB; `0` disables. Migration `0004` dropped the column precisely because
   nothing read it.
+- **A dry run.** `GET /repos/{id}/resolve` and
+  `POST /api/v1/bindings/{id}/resolve` answer "what would this repository run,
+  on this ref?" — checking out a real commit, resolving the plan the worker
+  would resolve, evaluating the path filter, and reporting every configuration
+  problem at once. It writes no Check Run, no job row and nothing to the queue.
+  Until now the only way to find out what a configuration did was to push a
+  commit and read the result afterwards.
+- **Per-value provenance.** Every resolved value records which of the four
+  layers supplied it — the pipeline file in the commit, the binding, settings,
+  or a built-in default. Shown on the dry run and on the run page for a finished
+  job (migration `0008`), and returned by the jobs API. One `plan_source` string
+  could say where the *commands* came from but not that the timeout came from
+  settings while the image came from `.ci.yml`.
+- **Pre-flight validation.** A bad `timeout:`, a rejected `runtime:` image, an
+  unreadable pipeline file and an empty plan are reported together by the dry
+  run, before a real commit fails on the first of them.
+- **Inference for Go, Rust and Python**, not only Node. `go.mod`, `Cargo.toml`
+  and `pyproject.toml`/`requirements.txt` each yield at most the same three
+  steps. Node is still checked first, so no repository that works today changes
+  plan, and a repository matching two ecosystems gets a warning rather than a
+  silent pick. Python's test step is emitted only where something says tests
+  exist: `pytest` exits 5 on "no tests collected", which would fail a check for
+  a repository that simply has none.
+- **The fork runtime fallback names itself.** A fork commit inheriting
+  `settings.default_runtime` used to be credited to the pipeline file. It is the
+  one resolved value with security consequences, so it now says where it came
+  from like every other value.
 
 ### Upgrade
 
-Run migrations `0006` and `0007` (automatic on boot). No configuration change is required:
-`on_empty_pipeline` defaults to today's behaviour and `max_workspace_bytes`
-defaults to 1 GiB. If a repository's checkout plus build legitimately exceeds
-1 GiB, raise it in Settings → Runner or set it to `0`.
+Run migrations `0006`, `0007` and `0008` (automatic on boot). No configuration
+change is required: `on_empty_pipeline` defaults to today's behaviour and
+`max_workspace_bytes` defaults to 1 GiB. If a repository's checkout plus build
+legitimately exceeds 1 GiB, raise it in Settings → Runner or set it to `0`.
+
+A dry run clones to the workspace directory and deletes the checkout when it is
+done. It does not take a concurrency slot, so it can run alongside a job; on a
+disk-constrained host, note that it is one extra checkout for the duration of
+the call.
 
 ## [2.0.2] - 2026-09-02
 

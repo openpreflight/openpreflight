@@ -1,0 +1,222 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/pipeline"
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/alert"
+	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/input"
+	"github.com/openpreflight/openpreflight/internal/web/components/label"
+	"github.com/openpreflight/openpreflight/internal/web/components/table"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+// RepoResolve is the dry run: what this repository would do on a ref, and which
+// configuration layer decided each part of it.
+//
+// The question it answers — "why did it run *that*?" — previously had only one
+// way to be answered, which was to push a commit and read the log afterwards.
+templ RepoResolve(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ b := bindingKeyOf(m, "Binding") }}
+	{{ res := resolutionOf(m) }}
+	{{ failure := str(m, "Error") }}
+	@layouts.Shell(p) {
+		@layouts.PageHead("Dry run", resolveLede(b.Repo)) {
+			@button.Button(button.Props{Href: "/repos/" + itoa64(b.ID), Variant: button.VariantOutline, Size: button.SizeSm}) {
+				Back to repo
+			}
+		}
+		<form method="get" action={ templ.SafeURL("/repos/" + itoa64(b.ID) + "/resolve") } class="mb-6 flex flex-wrap items-end gap-3">
+			<div class="grid gap-1.5">
+				@label.Label(label.Props{For: "ref"}) {
+					Branch, tag or commit
+				}
+				@input.Input(input.Props{ID: "ref", Name: "ref", Type: "text", Class: "font-mono", Value: str(m, "Ref"), Placeholder: "the default branch"})
+			</div>
+			@button.Button(button.Props{Type: "submit", Size: button.SizeSm}) {
+				Resolve
+			}
+		</form>
+		if failure != "" {
+			@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Class: "mb-6"}) {
+				@alert.Title() {
+					The dry run could not be attempted
+				}
+				@alert.Description() {
+					{ failure }
+				}
+			}
+		} else {
+			@card.Card(card.Props{Class: "mb-6"}) {
+				@card.Header() {
+					@card.Title() {
+						{ resolveVerdict(res) }
+					}
+					if res.Explanation != "" {
+						@card.Description() {
+							{ res.Explanation }
+						}
+					}
+				}
+				@card.Content() {
+					<dl class="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+						<dt class="text-muted-foreground">Commit</dt>
+						<dd class="font-mono text-xs">{ web.ShortSHA(res.SHA) } on { res.Ref }</dd>
+						<dt class="text-muted-foreground">Check name</dt>
+						<dd class="text-xs">{ res.CheckName }</dd>
+						<dt class="text-muted-foreground">Executor</dt>
+						<dd class="font-mono text-xs">{ res.Executor }</dd>
+						<dt class="text-muted-foreground">Timeout</dt>
+						<dd class="text-xs">{ res.Timeout }</dd>
+					</dl>
+				}
+			}
+			for _, msg := range res.Errors {
+				@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Class: "mb-3"}) {
+					@alert.Title() {
+						Error
+					}
+					@alert.Description() {
+						{ msg }
+					}
+				}
+			}
+			for _, msg := range res.Warnings {
+				@alert.Alert(alert.Props{Class: "mb-3"}) {
+					@alert.Title() {
+						Warning
+					}
+					@alert.Description() {
+						{ msg }
+					}
+				}
+			}
+			<div class="mt-6 grid gap-4">
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							Steps
+						}
+						@card.Description() {
+							Each command with the configuration layer that supplied it.
+						}
+					}
+					@card.Content(card.ContentProps{Class: "px-0"}) {
+						if len(res.Steps) > 0 {
+							@table.Table() {
+								@table.Header() {
+									@table.Row() {
+										@table.Head() {
+											Step
+										}
+										@table.Head() {
+											Command
+										}
+										@table.Head() {
+											From
+										}
+									}
+								}
+								@table.Body() {
+									for _, step := range res.Steps {
+										@table.Row() {
+											@table.Cell(table.CellProps{Class: "font-medium"}) {
+												{ step.Name }
+											}
+											@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+												{ step.Command }
+											}
+											@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+												{ step.Source }
+											}
+										}
+									}
+								}
+							}
+						} else {
+							<p class="text-muted-foreground px-6 text-sm">No steps. This commit would not run anything.</p>
+						}
+					}
+				}
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							Where every value came from
+						}
+						@card.Description() {
+							The four layers, in the order they are checked: the pipeline file in the commit, then the binding, then settings, then a built-in default.
+						}
+					}
+					@card.Content(card.ContentProps{Class: "px-0"}) {
+						@table.Table() {
+							@table.Header() {
+								@table.Row() {
+									@table.Head() {
+										Value
+									}
+									@table.Head() {
+										Resolved to
+									}
+									@table.Head() {
+										From
+									}
+								}
+							}
+							@table.Body() {
+								for _, o := range res.Origins {
+									@table.Row() {
+										@table.Cell(table.CellProps{Class: "font-medium"}) {
+											{ o.Field }
+										}
+										@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+											{ o.Value }
+										}
+										@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+											@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+												{ o.Source }
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				if res.PathFilter != "" {
+					@card.Card() {
+						@card.Header() {
+							@card.Title() {
+								Path filter
+							}
+							@card.Description() {
+								Evaluated against the same commit a webhook would deliver.
+							}
+						}
+						@card.Content() {
+							<pre class="bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs">{ res.PathFilter }</pre>
+						}
+					}
+				}
+			</div>
+		}
+	}
+}
+
+// resolveVerdict is the headline: the one thing an operator came to read.
+func resolveVerdict(res pipeline.Resolution) string {
+	switch res.Decision {
+	case pipeline.DecisionSkip:
+		return "This commit would be skipped"
+	case pipeline.DecisionFail:
+		return "This commit would fail"
+	default:
+		return "This commit would run"
+	}
+}
+
+func resolveLede(repo string) string {
+	return "What " + repo + " would do, resolved against a real commit. Nothing is queued and no Check Run is written."
+}

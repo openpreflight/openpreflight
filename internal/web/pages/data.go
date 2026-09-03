@@ -11,6 +11,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/coolify"
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/githubapp"
+	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
@@ -515,4 +516,26 @@ func orDefault(v, def string) string {
 		return def
 	}
 	return v
+}
+
+// resolutionOf is the dry run's result. It is the pipeline package's own type
+// rather than a mirror struct here, so the page and the JSON endpoint cannot
+// drift apart.
+func resolutionOf(m map[string]any) pipeline.Resolution {
+	return get[pipeline.Resolution](m, "Resolution")
+}
+
+// originsOf decodes the per-value provenance recorded on a job. A job from
+// before migration 0008, or one that never got as far as resolving a plan, has
+// none — an empty list, not an error, because the run page still has everything
+// else worth showing.
+func originsOf(j store.Job) []pipeline.Origin {
+	if strings.TrimSpace(j.PlanOrigins) == "" {
+		return nil
+	}
+	var out []pipeline.Origin
+	if err := json.Unmarshal([]byte(j.PlanOrigins), &out); err != nil {
+		return nil
+	}
+	return out
 }

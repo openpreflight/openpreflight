@@ -361,7 +361,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 			changed := files.ChangedPaths()
 			matched := binding.MatchedPaths(changed)
 			allowed := len(matched) > 0
-			diag := pathFilterDiagnostic(binding.Paths, len(changed), len(matched), allowed)
+			diag := PathFilterDiagnostic(binding.Paths, len(changed), len(matched), allowed)
 			// Log the diagnostic on every outcome, not only on a skip: "why did
 			// this run?" is as common a question as "why did it not?".
 			w.Printf("%s\n", diag)
@@ -407,7 +407,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		Repo:       job.Repo,
 		SHA:        job.SHA,
 		Token:      token,
-		BaseURL:    gitBaseURL(app.APIURL),
+		BaseURL:    githubapp.GitBaseURL(app.APIURL),
 		PullNumber: job.PullNumber,
 	}, w); err != nil {
 		msg := fmt.Sprintf("clone failed: %v", err)
@@ -439,11 +439,19 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 
 	pipelineFile := firstNonEmpty(binding.PipelineFile, settings.DefaultPipelineFile, ".ci.yml")
-	plan, err := pipeline.Resolve(ws.Repo, pipelineFile, pipeline.Overrides{
-		Install: binding.InstallCmd,
-		Test:    binding.TestCmd,
-		Build:   binding.BuildCmd,
-	}, timeout)
+	plan, err := pipeline.Resolve(ws.Repo, pipeline.Inputs{
+		PipelineFile:       pipelineFile,
+		PipelineFileSource: pipeline.Layer(binding.PipelineFile != "", settings.DefaultPipelineFile != ""),
+		Overrides: pipeline.Overrides{
+			Install: binding.InstallCmd,
+			Test:    binding.TestCmd,
+			Build:   binding.BuildCmd,
+		},
+		DefaultTimeout:       timeout,
+		DefaultTimeoutSource: pipeline.Layer(binding.TimeoutSeconds > 0, settings.DefaultTimeoutSeconds > 0),
+		DefaultRuntime:       settings.DefaultRuntime,
+		IsFork:               job.IsFork,
+	})
 	if errors.Is(err, pipeline.ErrNothingToRun) {
 		msg := fmt.Sprintf("no %s, no binding commands and no recognisable project — nothing to run", pipelineFile)
 		w.Printf("%s\n", msg)
@@ -472,10 +480,12 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 
 	w.Printf("plan from %s\n", plan.Source)
-	image := strings.TrimSpace(plan.Runtime)
-	if job.IsFork && image == "" {
-		image = strings.TrimSpace(settings.DefaultRuntime)
+	for _, warning := range plan.Warnings {
+		w.Printf("warning: %s\n", warning)
 	}
+	// plan.Runtime already includes the fork fallback to settings.default_runtime,
+	// applied inside Resolve so that it carries an origin like every other value.
+	image := strings.TrimSpace(plan.Runtime)
 	exec := r.exec
 	if image != "" {
 		if err := executor.ValidImage(image); err != nil {
@@ -497,9 +507,16 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	} else {
 		w.Printf("runtime: worker process\n")
 	}
-	// Record what was resolved. Both values are decided here, after the clone,
-	// and used to exist only in this log file.
-	if err := r.store.SetJobPlan(job.ID, image, plan.Source); err != nil {
+	// Record what was resolved. These values are decided here, after the clone,
+	// and used to exist only in this log file. The origins are what let the run
+	// page say the timeout came from settings while the image came from the
+	// pipeline file, which one summary string cannot.
+	origins, err := json.Marshal(plan.Origins)
+	if err != nil {
+		r.log.Error("encode plan origins", "job", job.ID, "error", err)
+		origins = nil
+	}
+	if err := r.store.SetJobPlan(job.ID, image, plan.Source, string(origins)); err != nil {
 		r.log.Error("record job plan", "job", job.ID, "error", err)
 	}
 	// A pipeline file may set its own timeout, which the outer context does not
@@ -645,27 +662,6 @@ func (r *Runner) pruneOnce() {
 	if len(ids) > 0 {
 		r.log.Info("pruned jobs past retention", "count", len(ids), "retention_days", settings.LogRetentionDays)
 	}
-}
-
-// gitBaseURL derives the git origin from the App's API URL so GitHub Enterprise
-// works: api.github.com → https://github.com, ghe.example.com/api/v3 →
-// https://ghe.example.com.
-func gitBaseURL(apiURL string) string {
-	if apiURL == "" {
-		return "https://github.com"
-	}
-	u, err := url.Parse(apiURL)
-	if err != nil || u.Host == "" {
-		return "https://github.com"
-	}
-	if u.Host == "api.github.com" {
-		return "https://github.com"
-	}
-	scheme := u.Scheme
-	if scheme == "" {
-		scheme = "https"
-	}
-	return scheme + "://" + u.Host
 }
 
 func firstNonEmpty(vals ...string) string {

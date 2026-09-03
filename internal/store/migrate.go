@@ -177,6 +177,18 @@ ALTER TABLE settings ADD COLUMN max_workspace_bytes INTEGER NOT NULL DEFAULT 107
 ALTER TABLE jobs ADD COLUMN runtime TEXT NOT NULL DEFAULT '';
 ALTER TABLE jobs ADD COLUMN plan_source TEXT NOT NULL DEFAULT '';
 `},
+
+	// 0008 records the per-value provenance, not just one summary string.
+	// plan_source says where the *commands* came from; it cannot say that the
+	// timeout came from settings while the image came from the pipeline file,
+	// which is the question an operator actually asks about a finished run.
+	//
+	// Stored as JSON rather than a table: it is a small, ordered, write-once
+	// list that is only ever read whole, and a row per value would be four
+	// joins to render one page.
+	{"0008_job_plan_origins", `
+ALTER TABLE jobs ADD COLUMN plan_origins TEXT NOT NULL DEFAULT '';
+`},
 }
 
 func (s *Store) migrate() error {

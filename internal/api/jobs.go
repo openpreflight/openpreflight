@@ -3,12 +3,14 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/openpreflight/openpreflight/internal/logs"
+	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/store"
 )
 
@@ -81,7 +83,17 @@ func (s *Server) getJob(w http.ResponseWriter, r *http.Request, _ store.User) {
 		s.notFound(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"job": job})
+	// plan_origins is stored as a JSON string, so it appears on the job object
+	// as one. Decode it alongside, the way the run page does, so an API caller
+	// can read a finished run's provenance without unwrapping a string — the
+	// HTML and the JSON should not have different amounts of the truth.
+	var origins []pipeline.Origin
+	if strings.TrimSpace(job.PlanOrigins) != "" {
+		if err := json.Unmarshal([]byte(job.PlanOrigins), &origins); err != nil {
+			s.log.Warn("decode plan origins", "job", job.ID, "error", err)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"job": job, "plan_origins": origins})
 }
 
 // jobLogAccess loads a job and enforces the same rule as GET /runs/{id}:
