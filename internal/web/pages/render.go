@@ -33,6 +33,8 @@ func Render(w io.Writer, page string, p web.Page) error {
 		err = Repos(p).Render(ctx, w)
 	case "repos-pick":
 		err = ReposPick(p).Render(ctx, w)
+	case "repo":
+		err = Repo(p).Render(ctx, w)
 	case "repos-edit":
 		err = ReposEditorPage(p).Render(ctx, w)
 	case "jobs":

@@ -29,6 +29,28 @@ func checkTitle(conclusion string) string {
 	}
 }
 
+// titleFor is checkTitle plus the failing step, which is the one fact a reader
+// wants from a pull request's collapsed check list — the only place the title is
+// visible without opening the run.
+func titleFor(conclusion string, results []executor.Result) string {
+	if conclusion != "failure" {
+		return checkTitle(conclusion)
+	}
+	for _, r := range results {
+		if r.Skipped || r.OK() {
+			continue
+		}
+		if r.TimedOut {
+			return fmt.Sprintf("Failed: %s timed out", r.Name)
+		}
+		if r.ExitCode > 0 {
+			return fmt.Sprintf("Failed: %s (exit %d)", r.Name, r.ExitCode)
+		}
+		return fmt.Sprintf("Failed: %s", r.Name)
+	}
+	return checkTitle(conclusion)
+}
+
 // summarise renders the step table shown in the README:
 //
 //	✓ install   8s

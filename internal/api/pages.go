@@ -61,11 +61,24 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		if b.Enabled {
 			enabled++
 			if len(cards) < 12 {
-				cards = append(cards, dashRepo{Repo: b.Repo, LastJob: latest[b.Repo]})
+				cards = append(cards, dashRepo{ID: b.ID, Repo: b.Repo, LastJob: latest[b.Repo]})
 			}
 		}
 	}
+	// The setup card tracks the whole arc, not just configuration: an install
+	// with every box ticked and no green check is not finished, and an install
+	// that has been running for a year should not still be shown instructions.
+	ranAny, passedAny := false, false
+	for _, j := range recent {
+		ranAny = true
+		if j.Status == store.JobSuccess {
+			passedAny = true
+			break
+		}
+	}
 	s.render(w, "dashboard", s.page(w, r, &user, "Overview", "home", map[string]any{
+		"RanAny":          ranAny,
+		"PassedAny":       passedAny,
 		"Settings":        settings,
 		"Coolify":         instances,
 		"Apps":            apps,
@@ -275,6 +288,7 @@ type bindingRow struct {
 }
 
 type dashRepo struct {
+	ID      int64
 	Repo    string
 	LastJob store.Job
 }
@@ -304,6 +318,43 @@ func (s *Server) pageRepos(w http.ResponseWriter, r *http.Request, user store.Us
 		return
 	}
 	s.render(w, "repos", s.page(w, r, &user, "Repos", "repos", base.data))
+}
+
+// pageRepo is one repository's page. /repos is a management list and
+// /repos/{id}/edit is a form; neither answers "what has this repo been doing",
+// which is the question an operator actually arrives with.
+func (s *Server) pageRepo(w http.ResponseWriter, r *http.Request, user store.User) {
+	id, err := pathID(r)
+	if err != nil {
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
+		return
+	}
+	binding, err := s.store.Binding(id)
+	if err != nil {
+		// Matches pageReposEdit and pageGitHubAppsEdit: a stale or guessed id on
+		// an HTML page lands back on the list rather than a dead end.
+		http.Redirect(w, r, "/repos", http.StatusSeeOther)
+		return
+	}
+	jobs, err := s.store.ListJobs(store.JobList{Repo: binding.Repo, Limit: 20})
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	last := store.Job{}
+	if len(jobs) > 0 {
+		last = jobs[0]
+	}
+	p := s.page(w, r, &user, binding.Repo, "repos", map[string]any{
+		"Binding": binding,
+		"Jobs":    jobs,
+		"Job":     last,
+	})
+	p.Crumbs = []web.Crumb{
+		{Label: "Repos", Href: "/repos"},
+		{Label: binding.Repo},
+	}
+	s.render(w, "repo", p)
 }
 
 func (s *Server) pageReposPick(w http.ResponseWriter, r *http.Request, user store.User) {

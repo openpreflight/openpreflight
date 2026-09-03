@@ -682,6 +682,45 @@ func TestRunnerWorkspaceCapOfZeroDisablesTheCheck(t *testing.T) {
 	}
 }
 
+// TestRunnerRecordsExecutorAndPlanSource pins the two facts the run page shows.
+// Both are resolved after the clone and used to live only in the log file.
+func TestRunnerRecordsExecutorAndPlanSource(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "test: echo testing\n",
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.Status != store.JobSuccess {
+		t.Fatalf("status %q err %q", job.Status, job.Error)
+	}
+	// No runtime: in the pipeline file, so this ran in the worker process.
+	if job.Runtime != "" {
+		t.Fatalf("runtime %q, want empty for the process executor", job.Runtime)
+	}
+	if job.PlanSource != ".ci.yml" {
+		t.Fatalf("plan_source %q, want %q", job.PlanSource, ".ci.yml")
+	}
+}
+
+func TestRunnerRecordsBindingCommandsAsThePlanSource(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{"README.md": "docs"})
+	b := h.binding(t, store.BindingInput{
+		Repo: "acme/api", Enabled: true, TestCmd: "echo from-the-binding",
+	})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, InstallationID: 101,
+	})
+	if job.PlanSource != "binding commands" {
+		t.Fatalf("plan_source %q", job.PlanSource)
+	}
+}
+
 func TestRunnerFailsWhenCheckRunCannotBeCreated(t *testing.T) {
 	h := newHarness(t)
 	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{".ci.yml": "test: echo hi\n"})
@@ -738,6 +777,31 @@ func TestPruneDeletesLogFiles(t *testing.T) {
 
 	if body, _ := logs.Read(h.cfg.LogDir(), job.ID); body != "" {
 		t.Fatalf("log file survived pruning: %q", body)
+	}
+}
+
+func TestCheckTitleNamesTheFailingStep(t *testing.T) {
+	results := []executor.Result{
+		{Name: "install", ExitCode: 0},
+		{Name: "test", ExitCode: 1},
+		{Name: "build", Skipped: true},
+	}
+	// The title is the only part visible in a pull request's collapsed check
+	// list, so a bare "Failed" wastes the one line a reader gets.
+	if got := titleFor("failure", results); got != "Failed: test (exit 1)" {
+		t.Fatalf("title %q", got)
+	}
+	if got := titleFor("success", results); got != "Passed" {
+		t.Fatalf("a passing run keeps the plain title, got %q", got)
+	}
+	timedOut := []executor.Result{{Name: "test", TimedOut: true, ExitCode: -1}}
+	if got := titleFor("failure", timedOut); got != "Failed: test timed out" {
+		t.Fatalf("title %q", got)
+	}
+	// A failure with no step results at all (a clone failure, say) must not
+	// invent one.
+	if got := titleFor("failure", nil); got != "Failed" {
+		t.Fatalf("title %q", got)
 	}
 }
 
