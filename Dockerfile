@@ -22,7 +22,10 @@ COPY --from=css /web/assets/css/output.css internal/web/assets/css/output.css
 RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
 RUN templ generate ./internal/web/...
 ENV CGO_ENABLED=0 GOOS=linux
-RUN go build -trimpath -ldflags="-s -w" -o /out/openpreflight ./cmd/server
+ARG VERSION=dev
+RUN go build -trimpath \
+      -ldflags="-s -w -X github.com/openpreflight/openpreflight/internal/build.Version=${VERSION}" \
+      -o /out/openpreflight ./cmd/server
 
 # Runtime: git is required to check out commits, and Node is the default
 # pipeline runtime (README Pipelines). Everything runs as a non-root user.

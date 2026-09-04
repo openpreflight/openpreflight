@@ -52,3 +52,33 @@ Anything listed under **Out of scope** in the README: GitHub Actions YAML,
 - Do not add `pkg/` unless something here is meant to be imported by other
   modules. Client code for Coolify and GitHub stays under `internal/`.
 - Fill in `.github/PULL_REQUEST_TEMPLATE.md`.
+
+## Versioning
+
+Semantic versioning, with the boundaries drawn where they actually bite for a
+self-hosted server that owns your branch protection:
+
+| Bump | Means | Examples |
+|---|---|---|
+| **Major** | A change that can break a working install | A removed or renamed endpoint or JSON field; a setting whose default changes behaviour; a migration that cannot be applied without a decision from the operator |
+| **Minor** | Additive | New endpoints and pages; new settings that default to today's behaviour; migrations that only add columns |
+| **Patch** | Fixes | Bug fixes, UI work, docs — no schema change, no contract change |
+
+Three commitments that follow from that, and are worth stating because each has
+already decided something:
+
+- **Released tags are never renumbered.** `v2.0.0` stays `v2.0.0` even though
+  the version before it was `v1.1.0` and the jump was mostly operator UI. The
+  changelog is a record, not a narrative.
+- **"Additive" is a constraint on design, not a description after the fact.**
+  When `on_empty_pipeline` was added, its default was chosen to be the existing
+  behaviour *so that* the release could honestly be a minor. If a change cannot
+  be made additive, it waits for a major rather than being shipped as one.
+- **The check name is effectively part of the contract.** GitHub matches a
+  required status check by its name string, so changing an existing install's
+  default check name would leave its branch protection rule permanently
+  unsatisfiable. That is why `defaultSettings()` affects new installs only.
+
+Every release section in `CHANGELOG.md` carries an **Upgrade** line saying
+either *No action required* or exactly what to run and what to set. A release
+without one is not ready to tag.

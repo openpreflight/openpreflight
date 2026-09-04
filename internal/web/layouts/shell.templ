@@ -148,6 +148,12 @@ templ AppSidebar(p web.Page) {
 								<span>Repos</span>
 							}
 						}
+						@sidebar.MenuItem() {
+							@sidebar.MenuButton(sidebar.MenuButtonProps{Href: "/status", IsActive: p.Nav == "status", Tooltip: "Status"}) {
+								@icon.Activity()
+								<span>Status</span>
+							}
+						}
 					}
 				}
 			}

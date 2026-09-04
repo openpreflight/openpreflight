@@ -11,6 +11,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/coolify"
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/githubapp"
+	"github.com/openpreflight/openpreflight/internal/health"
 	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
@@ -538,4 +539,11 @@ func originsOf(j store.Job) []pipeline.Origin {
 		return nil
 	}
 	return out
+}
+
+// reportOf is the instance self-report rendered by the status page. It is the
+// health package's own type rather than a mirror here, for the same reason the
+// dry run's is: two definitions of "what is wrong" would drift.
+func reportOf(m map[string]any) health.Report {
+	return get[health.Report](m, "Report")
 }

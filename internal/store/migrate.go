@@ -224,3 +224,33 @@ func (s *Store) migrate() error {
 	}
 	return nil
 }
+
+// Schema is what this database is at, next to what this binary expects. The
+// migrations table has always been written and never read back, so the one
+// question an upgrade raises — did my database actually move? — had no answer
+// short of opening SQLite by hand.
+type Schema struct {
+	// Applied is the last migration this database has run, e.g. "0008_job_plan_origins".
+	Applied string `json:"applied"`
+	// Count is how many migrations this database has run.
+	Count int `json:"count"`
+	// Expected is how many this binary carries. Count below Expected means a
+	// migration did not run, which Open would normally have refused to start
+	// on — so seeing it here means something is wrong that is worth saying out
+	// loud rather than inferring.
+	Expected int `json:"expected"`
+}
+
+// UpToDate reports whether every migration this binary carries has been applied.
+func (s Schema) UpToDate() bool { return s.Count >= s.Expected }
+
+// SchemaVersion reads the migrations table back.
+func (s *Store) SchemaVersion() (Schema, error) {
+	out := Schema{Expected: len(migrations)}
+	err := s.db.QueryRow(
+		`SELECT COALESCE(MAX(name), ''), count(*) FROM schema_migrations`).Scan(&out.Applied, &out.Count)
+	if err != nil {
+		return Schema{}, fmt.Errorf("store: schema version: %w", err)
+	}
+	return out, nil
+}
