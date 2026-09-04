@@ -123,6 +123,13 @@ func (r *Runner) drain(ctx context.Context) {
 	}
 }
 
+// Active is how many jobs are actually running in this process. It is not the
+// same number as store.CountInFlight, which counts rows: a job killed by a
+// SIGKILL leaves an in_progress row behind with no goroutine, which is what
+// RequeueStaleJobs exists to clean up. The gap between the two is diagnostic,
+// so both are reported rather than one being presented as the truth.
+func (r *Runner) Active() int { return r.activeCount() }
+
 func (r *Runner) activeCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()

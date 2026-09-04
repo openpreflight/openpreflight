@@ -39,6 +39,8 @@ func Render(w io.Writer, page string, p web.Page) error {
 		err = RepoResolve(p).Render(ctx, w)
 	case "repos-edit":
 		err = ReposEditorPage(p).Render(ctx, w)
+	case "status":
+		err = InstanceStatus(p).Render(ctx, w)
 	case "jobs":
 		err = Jobs(p).Render(ctx, w)
 	case "run":

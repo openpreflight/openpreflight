@@ -49,6 +49,10 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          # metadata-action already stripped the leading v, so the running
+          # binary reports the same string as its image tag.
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -107,7 +111,8 @@ jobs:
         run: |
           mkdir -p dist
           for arch in amd64 arm64; do
-            GOARCH="$arch" go build -trimpath -ldflags="-s -w" \
+            GOARCH="$arch" go build -trimpath \
+              -ldflags="-s -w -X github.com/openpreflight/openpreflight/internal/build.Version=${{ steps.version.outputs.version }}" \
               -o "dist/openpreflight_${{ steps.version.outputs.version }}_linux_${arch}" \
               ./cmd/server
           done

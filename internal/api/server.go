@@ -97,6 +97,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /repos/{id}/edit", s.guard(s.pageReposEdit))
 	mux.HandleFunc("GET /repos/{id}/resolve", s.guard(s.pageRepoResolve))
 	mux.HandleFunc("GET /jobs", s.guard(s.pageJobs))
+	mux.HandleFunc("GET /status", s.guard(s.pageStatus))
 
 	// JSON API / form targets.
 	mux.HandleFunc("GET /api/v1/settings", s.guard(s.getSettings))
@@ -160,6 +161,16 @@ func (s *Server) dockerAvailable() bool {
 	return s.dockerCached
 }
 
+// health is the liveness contract. Its body and status codes are what Coolify's
+// healthcheck polls, so they do not change: `{"status":"ok"}` with 200, or
+// `{"status":"error", ...}` with 503.
+//
+// `?verbose=1` returns the full component breakdown — but only to an
+// authenticated caller. This endpoint is unguarded, and the breakdown names the
+// public base URL, the configured Apps, and which components are misconfigured.
+// That is a reconnaissance gift on a URL anyone can poll, so an anonymous
+// caller asking for detail gets the plain body instead of an error: the
+// liveness contract still holds for them, and nothing new is exposed.
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	// Touch the database: a process that cannot reach its own store is not
 	// healthy, and Coolify's healthcheck should say so.
@@ -167,7 +178,26 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "error", "error": err.Error()})
 		return
 	}
+	if verbose(r) {
+		if _, _, authed := s.authenticate(r); authed {
+			writeJSON(w, http.StatusOK, s.buildStatus())
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// verbose reads ?verbose=1. Any value other than an explicit falsehood counts,
+// because `?verbose` on its own is what people actually type.
+func verbose(r *http.Request) bool {
+	if !r.URL.Query().Has("verbose") {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(r.URL.Query().Get("verbose"))) {
+	case "0", "false", "no":
+		return false
+	}
+	return true
 }
 
 // withLogging records one line per request. Webhook bodies and secrets never

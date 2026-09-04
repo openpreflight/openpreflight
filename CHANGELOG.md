@@ -123,6 +123,11 @@ Operator UI refresh on the 2.0.0 binary. Image
 - GitHub Apps is a list. Add is `/github-apps/new`; edit is
   `/github-apps/{id}/edit`. `/github-apps?edit=` redirects to the edit page.
 
+### Upgrade
+
+No action required. The 2.0.2 image is the 2.0.0 binary with the operator UI
+rebuilt; no migration, no configuration change, no API change.
+
 ## [2.0.0] - 2026-09-02
 
 Job query, live logs, Create with GitHub, and path filters. Image
@@ -142,6 +147,12 @@ Job query, live logs, Create with GitHub, and path filters. Image
 - `GET /jobs` and `GET /api/v1/jobs` accept `repo`, `status`, `limit`, and
   `offset` query parameters. Unknown `status` is 400. The Jobs page has a
   GET form for repo and status.
+
+### Upgrade
+
+Migration `0005_binding_paths` runs on boot and adds the binding `paths`
+column. No configuration change is required: an empty filter means every
+path, which is the behaviour every install had before it.
 
 ## [1.1.0] - 2026-09-01
 
@@ -165,6 +176,13 @@ Operator chrome and the docker.sock workspace mount rewrite. Image
 - `runtime:` jobs using the host `docker.sock` mount the checkout from the
   host path behind `WORKSPACE_DIR` (via `/proc/self/mountinfo`, or
   `CI_WORKSPACE_HOST`). Sibling containers no longer see an empty `/work`.
+
+### Upgrade
+
+No schema change and no configuration change. One caveat rather than a blanket
+"no action": `runtime:` jobs now resolve the host workspace path themselves
+through `/proc/self/mountinfo`. If your deployment mounts the workspace in a
+way that detection cannot see, set `CI_WORKSPACE_HOST` to the host path.
 
 ## [1.0.0] - 2026-08-29
 
@@ -225,6 +243,11 @@ v1 of the configurator and worker in one Go binary.
   stripped before pipeline steps run.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
+
+### Upgrade
+
+First release. Migrations `0001`–`0004` create the schema on first boot;
+there is nothing to upgrade from.
 
 [unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.0.2...HEAD
 [2.0.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.2

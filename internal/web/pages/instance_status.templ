@@ -1,0 +1,120 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/health"
+	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/table"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
+)
+
+// InstanceStatus is the page an operator opens when checks have stopped appearing. It
+// answers one question per row — and where a row is not ok, it says what to do
+// rather than leaving the diagnosis as an exercise.
+templ InstanceStatus(p web.Page) {
+	{{ m := asMap(p.Data) }}
+	{{ report := reportOf(m) }}
+	@layouts.Shell(p) {
+		@layouts.PageHead("Status", statusLede(report)) {
+			@badge.Badge(badge.Props{Variant: statusVariant(report.Status)}) {
+				{ statusWord(report.Status) }
+			}
+		}
+		@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Content(card.ContentProps{Class: "px-0"}) {
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() {
+								Component
+							}
+							@table.Head() {
+								State
+							}
+							@table.Head() {
+								Detail
+							}
+						}
+					}
+					@table.Body() {
+						for _, c := range report.Components {
+							@table.Row() {
+								@table.Cell(table.CellProps{Class: "font-medium align-top"}) {
+									{ c.Name }
+								}
+								@table.Cell(table.CellProps{Class: "align-top"}) {
+									@badge.Badge(badge.Props{Variant: statusVariant(c.State)}) {
+										{ statusWord(c.State) }
+									}
+								}
+								@table.Cell(table.CellProps{Class: "text-xs"}) {
+									<span>{ c.Detail }</span>
+									if c.Action != "" {
+										<p class="text-muted-foreground mt-1">{ c.Action }</p>
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					This instance
+				}
+			}
+			@card.Content() {
+				<dl class="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+					<dt class="text-muted-foreground">Version</dt>
+					<dd class="font-mono text-xs">{ report.Version }</dd>
+					<dt class="text-muted-foreground">Detail as JSON</dt>
+					<dd class="font-mono text-xs">GET /health?verbose=1</dd>
+				</dl>
+				<p class="text-muted-foreground mt-3 text-xs">
+					Plain <code>GET /health</code> is unchanged and unauthenticated: it answers liveness for your
+					healthcheck. The breakdown above needs a session or a bearer token, because it names your
+					public URL and your configured Apps.
+				</p>
+			}
+		}
+	}
+}
+
+// statusWord is the state in the words the page uses, rather than the JSON
+// vocabulary.
+func statusWord(state string) string {
+	switch state {
+	case health.StateError:
+		return "error"
+	case health.StateWarn:
+		return "attention"
+	default:
+		return "ok"
+	}
+}
+
+func statusVariant(state string) badge.Variant {
+	switch state {
+	case health.StateError:
+		return badge.VariantDestructive
+	case health.StateWarn:
+		return badge.VariantOutline
+	default:
+		return badge.VariantDefault
+	}
+}
+
+// statusLede says what the page means before the table says what is wrong.
+func statusLede(report health.Report) string {
+	switch report.Status {
+	case health.StateError:
+		return "Something is stopping this instance from reporting checks."
+	case health.StateWarn:
+		return "This instance is running, but something below wants attention."
+	default:
+		return "Everything this instance can check about itself is in order."
+	}
+}
