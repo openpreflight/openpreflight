@@ -179,7 +179,7 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 						for _, s := range steps {
 							@table.Row() {
 								@table.Cell(table.CellProps{Class: "font-mono"}) {
-									{ web.StepMark(s) }
+									{ s.Mark() }
 								}
 								@table.Cell() {
 									{ s.Name }

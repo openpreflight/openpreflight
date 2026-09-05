@@ -1164,9 +1164,9 @@ func runBody(p web.Page, job store.Job, steps []executor.Result, logBody string,
 										}
 										ctx = templ.InitializeContext(ctx)
 										var templ_7745c5c3_Var57 string
-										templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(web.StepMark(s))
+										templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(s.Mark())
 										if templ_7745c5c3_Err != nil {
-											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/run.templ`, Line: 182, Col: 26}
+											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/run.templ`, Line: 182, Col: 19}
 										}
 										_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 										if templ_7745c5c3_Err != nil {

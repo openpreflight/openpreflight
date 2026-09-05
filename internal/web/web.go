@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/store"
 )
 
@@ -32,31 +31,29 @@ type Crumb struct {
 
 // Page is the data every view receives.
 type Page struct {
-	Title             string
-	Nav               string
-	User              *store.User
-	Flash             string
-	FlashKind         string // ok | err
-	CSRFToken         string
-	Data              any
-	Narrow            bool // login / setup: narrower main column
-	RefreshSeconds    int  // meta-refresh while a job is in flight
-	InFlightCount     int
-	DockerAvailable   bool
-	DockerHost        string
-	Crumbs            []Crumb
-	SidebarCollapsed  bool
+	Title            string
+	Nav              string
+	User             *store.User
+	Flash            string
+	FlashKind        string // ok | err
+	CSRFToken        string
+	Data             any
+	Narrow           bool // login / setup: narrower main column
+	RefreshSeconds   int  // meta-refresh while a job is in flight
+	InFlightCount    int
+	DockerAvailable  bool
+	DockerHost       string
+	Crumbs           []Crumb
+	SidebarCollapsed bool
 }
 
-// Renderer is kept so api.New can fail closed if CSS failed to embed.
-type Renderer struct{}
-
-// New checks that the stylesheet was compiled into the binary.
-func New() (*Renderer, error) {
+// CheckCSS lets api.New fail closed if the stylesheet was not compiled into
+// the binary.
+func CheckCSS() error {
 	if len(outputCSS) < 500 {
-		return nil, fmt.Errorf("web: embedded CSS is empty; from internal/web run: npm install && npm run css")
+		return fmt.Errorf("web: embedded CSS is empty; from internal/web run: npm install && npm run css")
 	}
-	return &Renderer{}, nil
+	return nil
 }
 
 // CSSHandler serves the compiled stylesheet.
@@ -76,6 +73,29 @@ func LogoHandler() http.Handler {
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		w.Write(brandLogo)
 	})
+}
+
+// DashRepo is one repo card on the dashboard.
+type DashRepo struct {
+	ID      int64
+	Repo    string
+	LastJob store.Job
+}
+
+// BindingRow pairs a binding with the names it references, so the template does
+// not have to look them up.
+type BindingRow struct {
+	Binding     store.RepoBinding
+	AppName     string
+	CoolifyName string
+	LastJob     store.Job
+}
+
+// PickerRepo is one row of the repo picker.
+type PickerRepo struct {
+	FullName string
+	Private  bool
+	Bound    bool
 }
 
 // ShortSHA is the first 8 characters of a commit, or the whole string if shorter.
@@ -113,19 +133,6 @@ func Ago(t time.Time) string {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	default:
 		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-	}
-}
-
-// StepMark matches queue/summary.go so the run page and the GitHub check
-// output use the same marks.
-func StepMark(r executor.Result) string {
-	switch {
-	case r.Skipped:
-		return "–"
-	case r.OK():
-		return "✓"
-	default:
-		return "✗"
 	}
 }
 

@@ -4,6 +4,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -41,8 +42,8 @@ const minSecretKeyLen = 32
 // Load reads the environment and validates it.
 func Load() (Config, error) {
 	c := Config{
-		ListenAddr:             env("LISTEN_ADDR", ":8080"),
-		DataDir:                env("DATA_DIR", "/data"),
+		ListenAddr:             cmp.Or(os.Getenv("LISTEN_ADDR"), ":8080"),
+		DataDir:                cmp.Or(os.Getenv("DATA_DIR"), "/data"),
 		SecretKey:              os.Getenv("CI_SECRET_KEY"),
 		BootstrapAdminPassword: os.Getenv("CI_BOOTSTRAP_ADMIN_PASSWORD"),
 		PublicBaseURL:          strings.TrimRight(os.Getenv("CI_PUBLIC_BASE_URL"), "/"),
@@ -73,7 +74,7 @@ func (c Config) LogDir() string { return filepath.Join(c.DataDir, "logs") }
 
 // WorkspaceDir is the parent of the per-job checkout directories. It is
 // deliberately outside DataDir so a Coolify volume can be mounted per purpose.
-func (c Config) WorkspaceDir() string { return env("WORKSPACE_DIR", "/workspace") }
+func (c Config) WorkspaceDir() string { return cmp.Or(os.Getenv("WORKSPACE_DIR"), "/workspace") }
 
 // EnsureDirs creates the directories the process writes to.
 func (c Config) EnsureDirs() error {
@@ -83,11 +84,4 @@ func (c Config) EnsureDirs() error {
 		}
 	}
 	return nil
-}
-
-func env(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
 }

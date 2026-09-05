@@ -40,6 +40,20 @@ type Result struct {
 // OK reports whether the step passed (or was skipped, which is not a failure).
 func (r Result) OK() bool { return r.Skipped || (r.ExitCode == 0 && r.Err == "") }
 
+// Mark is the one-character outcome the Check Run summary and the run page both
+// print. One definition, because a reader comparing the two reads them as the
+// same alphabet.
+func (r Result) Mark() string {
+	switch {
+	case r.Skipped:
+		return "–"
+	case r.OK():
+		return "✓"
+	default:
+		return "✗"
+	}
+}
+
 // Executor runs steps. Process is the default; Docker is used when the plan
 // names a runtime image or the job is a fork PR.
 type Executor interface {

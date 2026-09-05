@@ -4,6 +4,7 @@
 package workspace
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -206,7 +207,7 @@ func (w *Workspace) Clone(ctx context.Context, opts CloneOptions, out io.Writer)
 func (w *Workspace) git(ctx context.Context, token, base string, args []string, out io.Writer) error {
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", w.Repo}, args...)...)
 	env := []string{
-		"PATH=" + envOr("PATH", "/usr/local/bin:/usr/bin:/bin"),
+		"PATH=" + cmp.Or(os.Getenv("PATH"), "/usr/local/bin:/usr/bin:/bin"),
 		"HOME=" + w.Root,
 		// Never let git stop for credentials: fail the step instead of hanging
 		// until the job timeout.
@@ -263,11 +264,4 @@ func (r *redactWriter) Write(p []byte) (int, error) {
 		return 0, err
 	}
 	return len(p), nil
-}
-
-func envOr(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
 }

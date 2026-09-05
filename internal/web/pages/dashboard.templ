@@ -202,7 +202,7 @@ templ statCard(s dashStat) {
 		@card.Content(card.ContentProps{Class: "flex flex-col gap-1"}) {
 			<div class="flex items-center justify-between gap-2">
 				<span class="text-muted-foreground text-xs font-medium">{ s.Label }</span>
-				@icon.Icon(s.Icon)(icon.Props{Class: "text-muted-foreground size-4 shrink-0"})
+				@s.Icon(icon.Props{Class: "text-muted-foreground size-4 shrink-0"})
 			</div>
 			<span class="text-2xl leading-none font-semibold tracking-tight tabular-nums">{ s.Value }</span>
 			<span class="text-muted-foreground text-xs">{ s.Caption }</span>

@@ -39,7 +39,6 @@ type Server struct {
 	store    *store.Store
 	cfg      config.Config
 	runner   *queue.Runner
-	renderer *web.Renderer
 	log      *slog.Logger
 	dockerOK func() bool
 
@@ -54,11 +53,10 @@ type Server struct {
 
 // New builds the server.
 func New(st *store.Store, cfg config.Config, runner *queue.Runner, log *slog.Logger) (*Server, error) {
-	renderer, err := web.New()
-	if err != nil {
+	if err := web.CheckCSS(); err != nil {
 		return nil, err
 	}
-	return &Server{store: st, cfg: cfg, runner: runner, renderer: renderer, log: log}, nil
+	return &Server{store: st, cfg: cfg, runner: runner, log: log}, nil
 }
 
 // Handler returns the routed handler.

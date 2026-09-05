@@ -40,6 +40,7 @@ type Runner struct {
 
 	notify chan struct{}
 
+	wg      sync.WaitGroup
 	mu      sync.Mutex
 	running map[string]context.CancelFunc
 }
@@ -85,7 +86,7 @@ func (r *Runner) Start(ctx context.Context) {
 		r.drain(ctx)
 		select {
 		case <-ctx.Done():
-			r.waitForRunning()
+			r.wg.Wait()
 			return
 		case <-r.notify:
 		case <-ticker.C:
@@ -108,7 +109,7 @@ func (r *Runner) drain(ctx context.Context) {
 		if limit < 1 {
 			limit = 1
 		}
-		if r.activeCount() >= limit {
+		if r.Active() >= limit {
 			return
 		}
 		job, err := r.store.ClaimNextJob()
@@ -128,18 +129,10 @@ func (r *Runner) drain(ctx context.Context) {
 // SIGKILL leaves an in_progress row behind with no goroutine, which is what
 // RequeueStaleJobs exists to clean up. The gap between the two is diagnostic,
 // so both are reported rather than one being presented as the truth.
-func (r *Runner) Active() int { return r.activeCount() }
-
-func (r *Runner) activeCount() int {
+func (r *Runner) Active() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return len(r.running)
-}
-
-func (r *Runner) waitForRunning() {
-	for r.activeCount() > 0 {
-		time.Sleep(100 * time.Millisecond)
-	}
 }
 
 // startJob launches one job in its own goroutine with its own timeout.
@@ -153,6 +146,7 @@ func (r *Runner) startJob(parent context.Context, job store.Job, settings store.
 	r.running[job.ID] = cancel
 	r.mu.Unlock()
 
+	r.wg.Add(1)
 	go func() {
 		defer func() {
 			cancel()
@@ -161,6 +155,7 @@ func (r *Runner) startJob(parent context.Context, job store.Job, settings store.
 			r.mu.Unlock()
 			// A finished job frees a slot; look for the next one.
 			r.Notify()
+			r.wg.Done()
 		}()
 		if err := r.runJob(ctx, job, settings, timeout); err != nil {
 			r.log.Error("job failed", "job", job.ID, "repo", job.Repo, "error", err)

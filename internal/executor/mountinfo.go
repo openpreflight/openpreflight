@@ -4,6 +4,7 @@ package executor
 
 import (
 	"bufio"
+	"cmp"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +30,7 @@ type mount struct {
 func hostPath(container string) string {
 	container = filepath.Clean(container)
 	if host := strings.TrimRight(os.Getenv("CI_WORKSPACE_HOST"), "/"); host != "" {
-		ws := filepath.Clean(env("WORKSPACE_DIR", "/workspace"))
+		ws := filepath.Clean(cmp.Or(os.Getenv("WORKSPACE_DIR"), "/workspace"))
 		if covers(ws, container) {
 			rel, err := filepath.Rel(ws, container)
 			if err == nil {
@@ -121,11 +122,4 @@ func unescapeMount(s string) string {
 		b.WriteByte(s[i])
 	}
 	return b.String()
-}
-
-func env(k, def string) string {
-	if v := os.Getenv(k); v != "" {
-		return v
-	}
-	return def
 }

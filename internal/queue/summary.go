@@ -71,7 +71,7 @@ func summarise(conclusion string, results []executor.Result, note, detailsURL st
 		var total time.Duration
 		for _, r := range results {
 			total += r.Duration
-			b.WriteString(fmt.Sprintf("%s %-*s %8s\n", mark(r), width, r.Name, human(r)))
+			b.WriteString(fmt.Sprintf("%s %-*s %8s\n", r.Mark(), width, r.Name, human(r)))
 		}
 		b.WriteString("```\n\n")
 		b.WriteString(fmt.Sprintf("**%s in %s**\n", checkTitle(conclusion), total.Round(time.Second)))
@@ -85,17 +85,6 @@ func summarise(conclusion string, results []executor.Result, note, detailsURL st
 		b.WriteString("\n[View full logs](" + detailsURL + ")\n")
 	}
 	return b.String()
-}
-
-func mark(r executor.Result) string {
-	switch {
-	case r.Skipped:
-		return "–"
-	case r.OK():
-		return "✓"
-	default:
-		return "✗"
-	}
 }
 
 func human(r executor.Result) string {

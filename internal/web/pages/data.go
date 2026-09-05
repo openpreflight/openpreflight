@@ -17,6 +17,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 )
 
 const setupPasswordHint = "At least 12 characters. There is no password reset in v1, so keep it somewhere you can find."
@@ -55,74 +56,23 @@ func asMap(data any) map[string]any {
 	}
 }
 
+// get reads one key. Every value in the map is put there by internal/api as
+// the exact type the page asks for, so a failed assertion is a typo in the key
+// or the type, and the zero value renders an empty section.
 func get[T any](m map[string]any, key string) T {
-	var zero T
-	v, ok := m[key]
-	if !ok || v == nil {
-		return zero
-	}
-	if t, ok := v.(T); ok {
-		return t
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		return zero
-	}
-	var out T
-	if json.Unmarshal(b, &out) != nil {
-		return zero
-	}
-	return out
+	v, _ := m[key].(T)
+	return v
 }
 
 func str(m map[string]any, key string) string {
 	return get[string](m, key)
 }
 
-func asInt(m map[string]any, key string) int {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return 0
-	}
-	switch n := v.(type) {
-	case int:
-		return n
-	case int64:
-		return int(n)
-	case float64:
-		return int(n)
-	default:
-		return get[int](m, key)
-	}
-}
+func asInt(m map[string]any, key string) int { return get[int](m, key) }
 
-func asInt64(m map[string]any, key string) int64 {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return 0
-	}
-	switch n := v.(type) {
-	case int64:
-		return n
-	case int:
-		return int64(n)
-	case float64:
-		return int64(n)
-	default:
-		return get[int64](m, key)
-	}
-}
+func asInt64(m map[string]any, key string) int64 { return get[int64](m, key) }
 
-func asBool(m map[string]any, key string) bool {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return false
-	}
-	if b, ok := v.(bool); ok {
-		return b
-	}
-	return get[bool](m, key)
-}
+func asBool(m map[string]any, key string) bool { return get[bool](m, key) }
 
 func has(m map[string]any, key string) bool {
 	v, ok := m[key]
@@ -146,24 +96,11 @@ func agoPtr(t *time.Time) string {
 	return web.Ago(t.UTC())
 }
 
-type dashRepo struct {
-	ID      int64
-	Repo    string
-	LastJob store.Job
-}
-
-type bindingRow struct {
-	Binding     store.RepoBinding
-	AppName     string
-	CoolifyName string
-	LastJob     store.Job
-}
-
-type pickerRepo struct {
-	FullName string
-	Private  bool
-	Bound    bool
-}
+type (
+	dashRepo   = web.DashRepo
+	bindingRow = web.BindingRow
+	pickerRepo = web.PickerRepo
+)
 
 func jobVariant(j store.Job) badge.Variant {
 	switch j.Status {
@@ -559,7 +496,9 @@ func dashNoRepoHint(bound int) string {
 // number came from: these are the recent jobs the page already loaded, not an
 // all-time figure, and a bare percentage that implies otherwise is a lie.
 type dashStat struct {
-	Icon    string
+	// Icon is the component, not its name: a name that no longer exists is a
+	// render error at request time, a missing component is a build failure.
+	Icon    func(...icon.Props) templ.Component
 	Label   string
 	Value   string
 	Caption string
@@ -597,10 +536,10 @@ func dashStats(recent []store.Job, inflight, enabled, bound int) []dashStat {
 		midCaption = "median of " + itoa(len(durs)) + " runs"
 	}
 	return []dashStat{
-		{Icon: "circle-check", Label: "Pass rate", Value: rate, Caption: rateCaption},
-		{Icon: "loader", Label: "In flight", Value: itoa(inflight), Caption: "queued or running"},
-		{Icon: "git-branch", Label: "Enabled repos", Value: itoa(enabled), Caption: "of " + itoa(bound) + " bound"},
-		{Icon: "timer", Label: "Run time", Value: mid, Caption: midCaption},
+		{Icon: icon.CircleCheck, Label: "Pass rate", Value: rate, Caption: rateCaption},
+		{Icon: icon.Loader, Label: "In flight", Value: itoa(inflight), Caption: "queued or running"},
+		{Icon: icon.GitBranch, Label: "Enabled repos", Value: itoa(enabled), Caption: "of " + itoa(bound) + " bound"},
+		{Icon: icon.Timer, Label: "Run time", Value: mid, Caption: midCaption},
 	}
 }
 

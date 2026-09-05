@@ -98,51 +98,37 @@ func (e *APIError) Error() string {
 func (e *APIError) NotFound() bool { return e.Status == http.StatusNotFound }
 
 func (c *Client) get(ctx context.Context, path string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	return c.do(ctx, http.MethodGet, path, nil, out)
+}
+
+func (c *Client) post(ctx context.Context, path string, in any, out any) error {
+	return c.do(ctx, http.MethodPost, path, in, out)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, in, out any) error {
+	var body io.Reader
+	if in != nil {
+		buf, err := json.Marshal(in)
+		if err != nil {
+			return fmt.Errorf("coolify: encode %s: %w", path, err)
+		}
+		body = bytes.NewReader(buf)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return fmt.Errorf("coolify: build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	if in != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	res, err := c.http.Do(req)
 	if err != nil {
 		return fmt.Errorf("coolify: %s: %w", path, err)
 	}
 	defer res.Body.Close()
 	// Cap the read: a misconfigured base URL can point at anything.
-	body, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
-	if err != nil {
-		return fmt.Errorf("coolify: read %s: %w", path, err)
-	}
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return &APIError{Status: res.StatusCode, Path: path, Body: string(body)}
-	}
-	if out == nil {
-		return nil
-	}
-	if err := json.Unmarshal(body, out); err != nil {
-		return fmt.Errorf("coolify: %s did not return the expected JSON (is the base URL the Coolify root?): %w", path, err)
-	}
-	return nil
-}
-
-func (c *Client) post(ctx context.Context, path string, in any, out any) error {
-	body, err := json.Marshal(in)
-	if err != nil {
-		return fmt.Errorf("coolify: encode %s: %w", path, err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("coolify: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	res, err := c.http.Do(req)
-	if err != nil {
-		return fmt.Errorf("coolify: %s: %w", path, err)
-	}
-	defer res.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(res.Body, 4<<20))
 	if err != nil {
 		return fmt.Errorf("coolify: read %s: %w", path, err)
@@ -154,7 +140,7 @@ func (c *Client) post(ctx context.Context, path string, in any, out any) error {
 		return nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
-		return fmt.Errorf("coolify: %s did not return the expected JSON: %w", path, err)
+		return fmt.Errorf("coolify: %s did not return the expected JSON (is the base URL the Coolify root?): %w", path, err)
 	}
 	return nil
 }
@@ -208,7 +194,6 @@ func (c *Client) Repositories(ctx context.Context, connectorUUID string) ([]Repo
 	if connectorUUID == "" {
 		return nil, errors.New("coolify: connector uuid is required")
 	}
-	var lastErr error
 	for _, p := range repoPaths(connectorUUID) {
 		// Coolify wraps some list responses in {"repositories": [...]}, so
 		// decode into a shape that accepts either.
@@ -219,13 +204,9 @@ func (c *Client) Repositories(ctx context.Context, connectorUUID string) ([]Repo
 		}
 		var apiErr *APIError
 		if errors.As(err, &apiErr) && apiErr.NotFound() {
-			lastErr = err
 			continue
 		}
 		return nil, err
-	}
-	if lastErr != nil {
-		return nil, ErrReposUnsupported
 	}
 	return nil, ErrReposUnsupported
 }

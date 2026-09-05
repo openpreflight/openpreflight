@@ -3,6 +3,7 @@
 package api
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -56,12 +57,12 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 	}
 	latest := latestJobByRepo(recent)
 	enabled := 0
-	var cards []dashRepo
+	var cards []web.DashRepo
 	for _, b := range bindings {
 		if b.Enabled {
 			enabled++
 			if len(cards) < 12 {
-				cards = append(cards, dashRepo{ID: b.ID, Repo: b.Repo, LastJob: latest[b.Repo]})
+				cards = append(cards, web.DashRepo{ID: b.ID, Repo: b.Repo, LastJob: latest[b.Repo]})
 			}
 		}
 	}
@@ -272,28 +273,6 @@ func (s *Server) pageGitHubAppsEdit(w http.ResponseWriter, r *http.Request, user
 	s.render(w, "githubapps-edit", p)
 }
 
-// pickerRepo is one row of the repo picker.
-type pickerRepo struct {
-	FullName string
-	Private  bool
-	Bound    bool
-}
-
-// bindingRow pairs a binding with the names it references, so the template does
-// not have to look them up.
-type bindingRow struct {
-	Binding     store.RepoBinding
-	AppName     string
-	CoolifyName string
-	LastJob     store.Job
-}
-
-type dashRepo struct {
-	ID      int64
-	Repo    string
-	LastJob store.Job
-}
-
 func latestJobByRepo(jobs []store.Job) map[string]store.Job {
 	out := map[string]store.Job{}
 	for _, j := range jobs {
@@ -421,7 +400,7 @@ func (s *Server) pageReposPick(w http.ResponseWriter, r *http.Request, user stor
 				bound[b.Repo] = true
 			}
 		}
-		var picker []pickerRepo
+		var picker []web.PickerRepo
 		if selectedCoolify != 0 {
 			repos, err := s.loadCoolifyRepos(r.Context(), selectedCoolify)
 			if err != nil {
@@ -439,7 +418,7 @@ func (s *Server) pageReposPick(w http.ResponseWriter, r *http.Request, user stor
 		// saving the form would silently unbind them.
 		for repo := range bound {
 			if !containsRepo(picker, repo) {
-				picker = append(picker, pickerRepo{FullName: repo, Bound: true})
+				picker = append(picker, web.PickerRepo{FullName: repo, Bound: true})
 			}
 		}
 		sort.Slice(picker, func(i, j int) bool { return picker[i].FullName < picker[j].FullName })
@@ -533,11 +512,11 @@ func (s *Server) loadReposBase(w http.ResponseWriter, r *http.Request) (reposBas
 		return reposBase{}, false
 	}
 	latest := latestJobByRepo(recent)
-	rows := make([]bindingRow, 0, len(bindings))
+	rows := make([]web.BindingRow, 0, len(bindings))
 	for _, b := range bindings {
-		rows = append(rows, bindingRow{
+		rows = append(rows, web.BindingRow{
 			Binding:     b,
-			AppName:     orUnknown(appNames[b.GitHubAppID], "(deleted app)"),
+			AppName:     cmp.Or(appNames[b.GitHubAppID], "(deleted app)"),
 			CoolifyName: instNames[b.CoolifyInstanceID],
 			LastJob:     latest[b.Repo],
 		})
@@ -554,26 +533,26 @@ func (s *Server) loadReposBase(w http.ResponseWriter, r *http.Request) (reposBas
 	}, true
 }
 
-func pickerFromCoolify(repos []coolify.Repository, bound map[string]bool) []pickerRepo {
-	out := make([]pickerRepo, 0, len(repos))
+func pickerFromCoolify(repos []coolify.Repository, bound map[string]bool) []web.PickerRepo {
+	out := make([]web.PickerRepo, 0, len(repos))
 	for _, r := range repos {
-		out = append(out, pickerRepo{FullName: r.FullName, Private: r.Private, Bound: bound[r.FullName]})
+		out = append(out, web.PickerRepo{FullName: r.FullName, Private: r.Private, Bound: bound[r.FullName]})
 	}
 	return out
 }
 
-func pickerFromGitHub(repos []githubapp.Repository, bound map[string]bool) []pickerRepo {
-	out := make([]pickerRepo, 0, len(repos))
+func pickerFromGitHub(repos []githubapp.Repository, bound map[string]bool) []web.PickerRepo {
+	out := make([]web.PickerRepo, 0, len(repos))
 	for _, r := range repos {
 		if r.Archived {
 			continue
 		}
-		out = append(out, pickerRepo{FullName: r.FullName, Private: r.Private, Bound: bound[r.FullName]})
+		out = append(out, web.PickerRepo{FullName: r.FullName, Private: r.Private, Bound: bound[r.FullName]})
 	}
 	return out
 }
 
-func containsRepo(list []pickerRepo, name string) bool {
+func containsRepo(list []web.PickerRepo, name string) bool {
 	for _, r := range list {
 		if r.FullName == name {
 			return true
@@ -691,11 +670,4 @@ func githubCommitURL(job store.Job, apiURL string) string {
 		return ""
 	}
 	return "https://github.com/" + job.Repo + "/commit/" + job.SHA
-}
-
-func orUnknown(v, fallback string) string {
-	if v == "" {
-		return fallback
-	}
-	return v
 }

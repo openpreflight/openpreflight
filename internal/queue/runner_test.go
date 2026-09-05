@@ -78,7 +78,7 @@ func newHarness(t *testing.T) *harness {
 // Terminal status alone is not enough to assert on. runJob writes the terminal
 // status before it PATCHes the Check Run and before the deferred
 // SetJobLogBytes, so returning the moment InFlight() goes false races both.
-// activeCount() drops to zero only after runJob has returned, so that is the
+// Active() drops to zero only after runJob has returned, so that is the
 // signal that every write for this job has landed.
 func (h *harness) runOne(t *testing.T, in store.JobInput) store.Job {
 	t.Helper()
@@ -106,7 +106,7 @@ func (h *harness) drainJob(t *testing.T, jobID string) store.Job {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !current.InFlight() && h.runner.activeCount() == 0 {
+		if !current.InFlight() && h.runner.Active() == 0 {
 			// Re-read: the trailing writes landed after the load above.
 			settled, err := h.store.Job(job.ID)
 			if err != nil {
