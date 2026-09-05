@@ -45,26 +45,28 @@ templ Repo(p web.Page) {
 								<span class="text-muted-foreground font-mono text-xs">{ last.Ref }</span>
 							}
 						</div>
-						<dl class="grid gap-2 text-sm sm:grid-cols-[7rem_1fr]">
-							<dt class="text-muted-foreground">Duration</dt>
-							<dd class="text-xs tabular-nums">
+						@detailList() {
+							@detailRow("Duration") {
 								if last.StartedAt != nil {
-									{ web.HumanDuration(last.Duration()) }
+									<span class="tabular-nums">{ web.HumanDuration(last.Duration()) }</span>
 								} else {
-									{ "-" }
+									<span class="text-muted-foreground">{ "-" }</span>
 								}
-							</dd>
-							<dt class="text-muted-foreground">When</dt>
-							<dd class="text-xs">{ web.Ago(last.CreatedAt) }</dd>
-							<dt class="text-muted-foreground">Trigger</dt>
-							<dd class="text-xs">{ last.Event }</dd>
-							if repoFailureReason(last) != "" {
-								<dt class="text-muted-foreground">Why</dt>
-								<dd class="text-xs">{ repoFailureReason(last) }</dd>
 							}
-						</dl>
+							@detailRow("When") {
+								{ web.Ago(last.CreatedAt) }
+							}
+							@detailRow("Trigger") {
+								{ last.Event }
+							}
+							if repoFailureReason(last) != "" {
+								@detailRow("Why") {
+									<span class="text-destructive">{ repoFailureReason(last) }</span>
+								}
+							}
+						}
 					} else {
-						@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
+						@empty.Empty(empty.Props{Class: emptyInCardClass}) {
 							@empty.Header() {
 								@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
 									@icon.Github()
@@ -87,9 +89,8 @@ templ Repo(p web.Page) {
 					}
 				}
 				@card.Content() {
-					<dl class="grid gap-2 text-sm sm:grid-cols-[7rem_1fr]">
-						<dt class="text-muted-foreground">Enabled</dt>
-						<dd class="text-xs">
+					@detailList() {
+						@detailRow("Enabled") {
 							if b.Enabled {
 								@badge.Badge() {
 									yes
@@ -99,18 +100,23 @@ templ Repo(p web.Page) {
 									no
 								}
 							}
-						</dd>
-						<dt class="text-muted-foreground">Branches</dt>
-						<dd class="font-mono text-xs">{ orAll(b.Branches) }</dd>
-						<dt class="text-muted-foreground">Paths</dt>
-						<dd class="font-mono text-xs">{ orAll(b.Paths) }</dd>
-						<dt class="text-muted-foreground">Pipeline file</dt>
-						<dd class="font-mono text-xs">{ orDefault(b.PipelineFile, ".ci.yml") }</dd>
-						<dt class="text-muted-foreground">Check name</dt>
-						<dd class="text-xs">{ orDefault(b.CheckName, "inherited") }</dd>
-						<dt class="text-muted-foreground">Empty pipeline</dt>
-						<dd class="text-xs">{ orDefault(b.OnEmptyPipeline, "skip") }</dd>
-					</dl>
+						}
+						@detailRow("Branches") {
+							<span class="font-mono">{ orAll(b.Branches) }</span>
+						}
+						@detailRow("Paths") {
+							<span class="font-mono">{ orAll(b.Paths) }</span>
+						}
+						@detailRow("Pipeline file") {
+							<span class="font-mono">{ orDefault(b.PipelineFile, ".ci.yml") }</span>
+						}
+						@detailRow("Check name") {
+							{ orDefault(b.CheckName, "inherited") }
+						}
+						@detailRow("Empty pipeline") {
+							{ orDefault(b.OnEmptyPipeline, "skip") }
+						}
+					}
 				}
 			}
 		</div>
@@ -120,11 +126,11 @@ templ Repo(p web.Page) {
 					Recent runs
 				}
 			}
-			@card.Content(card.ContentProps{Class: "px-0"}) {
+			@card.Content() {
 				if len(jobs) > 0 {
 					@jobTable(jobs, false)
 				} else {
-					@empty.Empty(empty.Props{Class: "border-0 py-6"}) {
+					@empty.Empty(empty.Props{Class: emptyInCardClass}) {
 						@empty.Header() {
 							@empty.Title() {
 								Nothing yet

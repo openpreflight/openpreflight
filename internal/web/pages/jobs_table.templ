@@ -53,7 +53,7 @@ templ jobsTable(p web.Page, list []store.Job, filtered bool) {
 		}
 	} else {
 		@table.Table() {
-			@table.Header(table.HeaderProps{Class: "sticky top-0 z-10 bg-card"}) {
+			@table.Header() {
 				@table.Row() {
 					@table.Head() {
 						Status
@@ -121,12 +121,19 @@ templ jobsRow(p web.Page, j store.Job) {
 					}
 				</form>
 				if jobInFlight(j) {
-					<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + j.ID + "/cancel") } class="m-0">
-						@layouts.CSRF(p.CSRFToken)
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm, Class: "text-destructive"}) {
-							Cancel
-						}
-					</form>
+					// A row in a long table is the easiest place in this app to
+					// mis-click, and the rows either side are a different run.
+					@layouts.Confirm(layouts.ConfirmProps{
+						ID:           "cancel-job-" + j.ID,
+						Token:        p.CSRFToken,
+						Action:       "/api/v1/jobs/" + j.ID + "/cancel",
+						Trigger:      "Cancel",
+						TriggerClass: "text-destructive",
+						Title:        "Cancel this run?",
+						Description:  cancelJobDescription(j),
+						Confirm:      "Cancel the run",
+						Dismiss:      "Keep running",
+					})
 				}
 			</div>
 		}
@@ -137,7 +144,7 @@ templ jobsRow(p web.Page, j store.Job) {
 // repository, where repeating its name in every row is noise.
 templ jobTable(jobs []store.Job, showRepo bool) {
 	@table.Table() {
-		@table.Header(table.HeaderProps{Class: "sticky top-0 z-10 bg-card"}) {
+		@table.Header() {
 			@table.Row() {
 				@table.Head() {
 					Status

@@ -47,11 +47,7 @@ type ContentProps struct {
 }
 
 func mediaClasses(variant MediaVariant) string {
-	base := "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0"
-	if variant == MediaVariantIcon {
-		return utils.CN(base, "bg-muted text-foreground flex size-8 shrink-0 items-center justify-center rounded-lg [&_svg:not([class*='size-'])]:size-4")
-	}
-	return utils.CN(base, "bg-transparent")
+	return utils.CN("mb-2 flex shrink-0 items-center justify-center bg-transparent [&_svg]:pointer-events-none [&_svg]:shrink-0")
 }
 
 templ Empty(props ...Props) {
@@ -66,7 +62,7 @@ templ Empty(props ...Props) {
 		data-slot="empty"
 		class={
 			utils.CN(
-				"flex w-full min-w-0 flex-col items-start justify-center gap-4 rounded-xl border border-dashed p-8 text-left",
+				"bg-muted flex w-full min-w-0 flex-col items-center justify-center gap-4 rounded-xl border px-6 py-16 text-center",
 				p.Class,
 			),
 		}
@@ -86,7 +82,7 @@ templ Header(props ...HeaderProps) {
 			id={ p.ID }
 		}
 		data-slot="empty-header"
-		class={ utils.CN("flex max-w-lg flex-col items-start gap-2", p.Class) }
+		class={ utils.CN("flex max-w-lg flex-col items-center gap-2", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -101,17 +97,38 @@ templ Media(props ...MediaProps) {
 	if p.Variant == "" {
 		{{ p.Variant = MediaVariantDefault }}
 	}
-	<div
-		if p.ID != "" {
-			id={ p.ID }
-		}
-		data-slot="empty-icon"
-		data-variant={ string(p.Variant) }
-		class={ utils.CN(mediaClasses(p.Variant), p.Class) }
-		{ p.Attributes... }
-	>
-		{ children... }
-	</div>
+	if p.Variant == MediaVariantIcon {
+		// Three plates on a shared skew read as one stack seen from the side.
+		// The icon rides the front plate's transform rather than fighting it.
+		<div
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			data-slot="empty-icon"
+			data-variant={ string(p.Variant) }
+			class={ utils.CN("relative mb-2 h-20 w-24 shrink-0", p.Class) }
+			aria-hidden="true"
+			{ p.Attributes... }
+		>
+			<div class="bg-card absolute top-5 left-1 size-14 -skew-y-6 rounded-xl border shadow-xs"></div>
+			<div class="bg-card absolute top-3 left-5 size-14 -skew-y-6 rounded-xl border shadow-xs"></div>
+			<div class="bg-card text-muted-foreground absolute top-1 left-9 flex size-14 -skew-y-6 items-center justify-center rounded-xl border shadow-md [&_svg:not([class*='size-'])]:size-5">
+				{ children... }
+			</div>
+		</div>
+	} else {
+		<div
+			if p.ID != "" {
+				id={ p.ID }
+			}
+			data-slot="empty-icon"
+			data-variant={ string(p.Variant) }
+			class={ utils.CN(mediaClasses(p.Variant), p.Class) }
+			{ p.Attributes... }
+		>
+			{ children... }
+		</div>
+	}
 }
 
 templ Title(props ...TitleProps) {
@@ -124,7 +141,7 @@ templ Title(props ...TitleProps) {
 			id={ p.ID }
 		}
 		data-slot="empty-title"
-		class={ utils.CN("text-base font-medium tracking-tight", p.Class) }
+		class={ utils.CN("text-base font-semibold tracking-tight", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -165,7 +182,7 @@ templ Content(props ...ContentProps) {
 		data-slot="empty-content"
 		class={
 			utils.CN(
-				"flex min-w-0 flex-wrap items-center gap-2 text-sm",
+				"flex min-w-0 flex-wrap items-center justify-center gap-2 text-sm",
 				p.Class,
 			),
 		}

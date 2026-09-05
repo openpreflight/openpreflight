@@ -3,6 +3,7 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
@@ -26,28 +27,32 @@ templ GitHubApps(p web.Page) {
 			}
 		}
 		if len(apps) > 0 {
-			<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+			<div class="mb-6 grid gap-4 lg:grid-cols-2">
 				for _, app := range apps {
 					@card.Card(card.Props{Size: card.SizeSm}) {
 						@card.Header() {
 							@card.Title(card.TitleProps{Class: "truncate"}) {
 								{ app.Name }
 							}
-							@card.Description(card.DescriptionProps{Class: "font-mono"}) {
-								{ app.Slug } · App ID { itoa64(app.AppID) }
+							@card.Description(card.DescriptionProps{Class: "font-mono text-xs"}) {
+								{ appSubtitle(app) }
 							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-3"}) {
-							<div class="flex flex-wrap items-center gap-2">
+							@card.Action() {
 								@badge.Badge(badge.Props{Variant: healthVariant(app.LastError, app.LastSeenAt != nil)}) {
 									{ healthLabel(app.LastError, app.LastSeenAt != nil) }
 								}
+							}
+						}
+						@card.Content(card.ContentProps{Class: "space-y-3"}) {
+							<p class="text-muted-foreground text-xs">
+								Writes a check named
 								if app.CheckName != "" {
-									<span class="text-muted-foreground text-xs">{ app.CheckName }</span>
+									<span class="text-foreground font-mono">{ app.CheckName }</span>
 								} else {
-									<span class="text-muted-foreground text-xs">{ settings.DefaultCheckName } (global)</span>
+									<span class="text-foreground font-mono">{ settings.DefaultCheckName }</span>
+									<span>(global default)</span>
 								}
-							</div>
+							</p>
 							@field.Field() {
 								@field.Label(field.LabelProps{For: "hook-" + itoa64(app.ID)}) {
 									Webhook URL
@@ -62,7 +67,7 @@ templ GitHubApps(p web.Page) {
 								})
 							}
 							if app.LastError != "" {
-								<p class="text-muted-foreground text-xs">{ app.LastError }</p>
+								<p class="text-muted-foreground line-clamp-2 text-xs" title={ app.LastError }>{ app.LastError }</p>
 							} else if app.LastSeenAt != nil {
 								<p class="text-muted-foreground text-xs">{ agoPtr(app.LastSeenAt) }</p>
 							}
@@ -77,17 +82,17 @@ templ GitHubApps(p web.Page) {
 							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
 								Edit
 							}
-							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID), Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID) + "#inspect", Variant: button.VariantLink, Size: button.SizeSm}) {
 								Installations
 							}
-							@layouts.ConfirmDelete(
-								"del-app-"+itoa64(app.ID),
-								p.CSRFToken,
-								"/api/v1/github-apps/"+itoa64(app.ID)+"/delete",
-								"Remove",
-								"Remove this App?",
-								"Its repo bindings are removed too.",
-							)
+							@layouts.Confirm(layouts.ConfirmProps{
+								ID:          "del-app-" + itoa64(app.ID),
+								Token:       p.CSRFToken,
+								Action:      "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
+								Trigger:     "Remove",
+								Title:       "Remove this App?",
+								Description: "Its repo bindings are removed too.",
+							})
 						}
 					}
 				}
@@ -116,7 +121,7 @@ templ GitHubApps(p web.Page) {
 			{{ inspect := appOf(m, "Inspect") }}
 			{{ installs := installsOf(m) }}
 			{{ repos := ghReposOf(m) }}
-			@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Card(card.Props{ID: "inspect", Class: "mb-6 scroll-mt-6"}) {
 				@card.Header() {
 					@card.Title() {
 						{ inspect.Name } - installations
@@ -124,8 +129,10 @@ templ GitHubApps(p web.Page) {
 				}
 				@card.Content(card.ContentProps{Class: "space-y-4"}) {
 					if errMsg := str(m, "InspectError"); errMsg != "" {
-						@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
-							{ errMsg }
+						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
+							@alert.Title() {
+								{ errMsg }
+							}
 						}
 					}
 					if len(installs) > 0 {
@@ -192,10 +199,7 @@ templ GitHubApps(p web.Page) {
 						}
 						<p class="text-muted-foreground text-xs">
 							Enable the ones you want checked on the
-							@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Repos
-							}
-							page.
+							<a class="text-primary underline-offset-4 hover:underline" href="/repos">Repos</a> page.
 						</p>
 					}
 				}
@@ -227,9 +231,7 @@ templ GitHubAppsEditorPage(p web.Page) {
 					} else {
 						<p class="text-muted-foreground mb-4 text-xs">
 							Set the public base URL in
-							@button.Button(button.Props{Href: "/settings", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Settings
-							}
+							<a class="text-primary underline-offset-4 hover:underline" href="/settings">Settings</a>
 							before creating an App with GitHub. GitHub must be able to reach this host.
 						</p>
 					}

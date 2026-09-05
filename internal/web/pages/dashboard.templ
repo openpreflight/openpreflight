@@ -20,6 +20,7 @@ templ Dashboard(p web.Page) {
 	{{ inflight := inflightOf(m) }}
 	{{ jobs := jobsOf(m) }}
 	{{ cards := cardsOf(m) }}
+	{{ recent := recentOf(m) }}
 	{{ ranAny := asBool(m, "RanAny") }}
 	{{ passedAny := asBool(m, "PassedAny") }}
 	@layouts.Shell(p) {
@@ -40,155 +41,65 @@ templ Dashboard(p web.Page) {
 				}
 			}
 		}
+		if len(recent) > 0 {
+			<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				for _, s := range dashStats(recent, len(inflight), enabled, len(bindings)) {
+					@statCard(s)
+				}
+			</div>
+		}
 		if !dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny) {
-		@card.Card(card.Props{Class: "mb-6"}) {
-			@card.Header() {
-				@card.Title() {
-					Setup
-				}
-			}
-			@card.Content() {
-				<ul class="m-0 flex list-none flex-col divide-y p-0">
-					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3 first:pt-0">
+			@layouts.SectionHead("Setup")
+			@card.Card(card.Props{Class: "mb-6"}) {
+				@card.Content() {
+					<ul class="m-0 flex list-none flex-col divide-y p-0">
 						if settings.PublicBaseURL != "" {
-							@badge.Badge() {
-								done
-							}
-							Public base URL
-							<span class="text-muted-foreground font-mono text-xs">{ settings.PublicBaseURL }</span>
-							@button.Button(button.Props{Href: "/settings", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Settings
-							}
+							@setupRow(badge.VariantDefault, "done", "Public base URL", settings.PublicBaseURL, true, "/settings", "Settings")
 						} else {
-							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-								needed
-							}
-							Public base URL
-							@button.Button(button.Props{Href: "/settings", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Set it in Settings
-							}
+							@setupRow(badge.VariantOutline, "needed", "Public base URL", "", false, "/settings", "Set it in Settings")
 						}
-					</li>
-					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
 						if len(apps) > 0 {
-							@badge.Badge() {
-								done
-							}
-							CI GitHub App
-							<span class="text-muted-foreground text-xs">{ itoa(len(apps)) } configured</span>
-							@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Manage
-							}
+							@setupRow(badge.VariantDefault, "done", "CI GitHub App", itoa(len(apps))+" configured", false, "/github-apps", "Manage")
 						} else {
-							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-								needed
-							}
-							CI GitHub App
-							@button.Button(button.Props{Href: "/github-apps/new", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Add one
-							}
+							@setupRow(badge.VariantOutline, "needed", "CI GitHub App", "", false, "/github-apps/new", "Add one")
 						}
-					</li>
-					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
 						if enabled > 0 {
-							@badge.Badge() {
-								done
-							}
-							Enabled repo
-							<span class="text-muted-foreground text-xs">{ itoa(enabled) } of { itoa(len(bindings)) } enabled</span>
-							@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Manage
-							}
+							@setupRow(badge.VariantDefault, "done", "Enabled repo", itoa(enabled)+" of "+itoa(len(bindings))+" enabled", false, "/repos", "Manage")
 						} else {
-							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-								needed
-							}
-							Enabled repo
-							<span class="text-muted-foreground text-xs">
-								if len(bindings) > 0 {
-									{ itoa(len(bindings)) } bound, none enabled
-								} else {
-									the worker runs nothing without one
-								}
-							</span>
-							@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Enable a repo
-							}
+							@setupRow(badge.VariantOutline, "needed", "Enabled repo", dashNoRepoHint(len(bindings)), false, "/repos", "Enable a repo")
 						}
-					</li>
-					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
 						if ranAny {
-							@badge.Badge() {
-								done
-							}
-							First run
-							@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
-								View jobs
-							}
+							@setupRow(badge.VariantDefault, "done", "First run", "", false, "/jobs", "View jobs")
 						} else {
-							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-								waiting
-							}
-							First run
-							<span class="text-muted-foreground text-xs">push a commit, and GitHub calls the webhook</span>
+							@setupRow(badge.VariantOutline, "waiting", "First run", "push a commit, and GitHub calls the webhook", false, "", "")
 						}
-					</li>
-					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3">
 						if passedAny {
-							@badge.Badge() {
-								done
-							}
-							Passing Check Run
+							@setupRow(badge.VariantDefault, "done", "Passing Check Run", "", false, "", "")
 						} else if ranAny {
-							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-								not yet
-							}
-							Passing Check Run
-							<span class="text-muted-foreground text-xs">a run finished, but none has passed — open it to see why</span>
+							@setupRow(badge.VariantOutline, "not yet", "Passing Check Run", "a run finished, but none has passed — open it to see why", false, "", "")
 						} else {
-							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-								waiting
-							}
-							Passing Check Run
-							<span class="text-muted-foreground text-xs">the commit gets a green check here and on GitHub</span>
+							@setupRow(badge.VariantOutline, "waiting", "Passing Check Run", "the commit gets a green check here and on GitHub", false, "", "")
 						}
-					</li>
-					<li class="flex flex-wrap items-baseline gap-x-3 gap-y-2 py-3 last:pb-0">
 						if len(coolify) > 0 {
-							@badge.Badge() {
-								done
-							}
-							Coolify
-							<span class="text-muted-foreground text-xs">{ itoa(len(coolify)) } configured · optional</span>
-							@button.Button(button.Props{Href: "/coolify", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Manage
-							}
+							@setupRow(badge.VariantDefault, "done", "Coolify", itoa(len(coolify))+" configured · optional", false, "/coolify", "Manage")
 						} else {
-							@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-								optional
-							}
-							Coolify
-							<span class="text-muted-foreground text-xs">server inventory and a repo picker</span>
-							@button.Button(button.Props{Href: "/coolify", Variant: button.VariantLink, Size: button.SizeSm}) {
-								Add an instance
-							}
+							@setupRow(badge.VariantSecondary, "optional", "Coolify", "server inventory and a repo picker", false, "/coolify", "Add an instance")
 						}
-					</li>
-				</ul>
-			}
-		}
-		}
-		@card.Card(card.Props{Class: "mb-6"}) {
-			@card.Header() {
-				@card.Title() {
-					Active runs
+					</ul>
 				}
 			}
+		}
+		@layouts.SectionHead("Active runs") {
+			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
+				View jobs
+			}
+		}
+		@card.Card(card.Props{Class: "mb-6"}) {
 			@card.Content() {
 				if len(inflight) > 0 {
 					@jobTable(inflight, true)
 				} else {
-					@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
+					@empty.Empty(empty.Props{Class: emptyInCardClass}) {
 						@empty.Header() {
 							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
 								@icon.Workflow()
@@ -200,26 +111,17 @@ templ Dashboard(p web.Page) {
 								Queued and in-flight runs show up here. Finished work is under Recent jobs.
 							}
 						}
-						@empty.Content() {
-							@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
-								View jobs
-							}
-						}
 					}
 				}
 			}
 		}
+		@layouts.SectionHead("Recent jobs")
 		@card.Card(card.Props{Class: "mb-6"}) {
-			@card.Header() {
-				@card.Title() {
-					Recent jobs
-				}
-			}
 			@card.Content() {
 				if len(jobs) > 0 {
 					@jobTable(jobs, true)
 				} else {
-					@empty.Empty(empty.Props{Class: "border-0 px-0 py-4"}) {
+					@empty.Empty(empty.Props{Class: emptyInCardClass}) {
 						@empty.Header() {
 							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
 								@icon.Inbox()
@@ -241,12 +143,11 @@ templ Dashboard(p web.Page) {
 			}
 		}
 		if len(cards) > 0 {
-			<div class="mb-3 flex items-baseline justify-between">
-				<h2 class="text-base font-semibold">Enabled repos</h2>
+			@layouts.SectionHead("Enabled repos") {
 				@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
 					View all
 				}
-			</div>
+			}
 			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 				for _, c := range cards {
 					@card.Card(card.Props{Size: card.SizeSm}) {
@@ -254,34 +155,57 @@ templ Dashboard(p web.Page) {
 							@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
 								// The repo's own page, not its last run: the card is
 								// about the repository, and one commit is not.
-								<a class="hover:underline" href={ templ.SafeURL("/repos/" + itoa64(c.ID)) }>{ c.Repo }</a>
+								<a class="hover:underline" href={ templ.SafeURL("/repos/" + itoa64(c.ID)) } title={ c.Repo }>{ c.Repo }</a>
 							}
 						}
 						@card.Content() {
-							if c.LastJob.ID != "" {
-								<div class="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-									@StatusBadge(c.LastJob)
-									<a class="text-primary font-mono hover:underline" href={ templ.SafeURL("/runs/" + c.LastJob.ID) }>
-										{ web.ShortSHA(c.LastJob.SHA) }
-									</a>
-									if c.LastJob.Ref != "" {
-										<span class="font-mono">{ c.LastJob.Ref }</span>
-									}
-									if c.LastJob.StartedAt != nil {
-										<span class="tabular-nums">{ web.HumanDuration(c.LastJob.Duration()) }</span>
-									}
-									<span>{ web.Ago(c.LastJob.CreatedAt) }</span>
-								</div>
-								if repoFailureReason(c.LastJob) != "" {
-									<p class="text-muted-foreground mt-2 text-xs">{ repoFailureReason(c.LastJob) }</p>
-								}
-							} else {
-								<p class="text-muted-foreground text-xs">no runs</p>
-							}
+							@LastRun(c.LastJob)
 						}
 					}
 				}
 			</div>
+		}
+	}
+}
+
+// setupRow is one line of the setup checklist. The state badge sits in a fixed
+// column so every label starts at the same x, whatever the badge says.
+templ setupRow(variant badge.Variant, state, label, detail string, mono bool, href, action string) {
+	<li class="grid grid-cols-[4.5rem_1fr] items-baseline gap-x-3 py-3 first:pt-0 last:pb-0">
+		<span>
+			@badge.Badge(badge.Props{Variant: variant}) {
+				{ state }
+			}
+		</span>
+		<div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+			<span>{ label }</span>
+			if detail != "" {
+				if mono {
+					<span class="text-muted-foreground font-mono text-xs">{ detail }</span>
+				} else {
+					<span class="text-muted-foreground text-xs">{ detail }</span>
+				}
+			}
+			if href != "" {
+				@button.Button(button.Props{Href: href, Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
+					{ action }
+				}
+			}
+		</div>
+	</li>
+}
+
+// statCard is one number on the Overview strip. A tile rather than a row in a
+// table: the number is the point, and a table buries it in a column.
+templ statCard(s dashStat) {
+	@card.Card() {
+		@card.Content(card.ContentProps{Class: "flex flex-col gap-1"}) {
+			<div class="flex items-center justify-between gap-2">
+				<span class="text-muted-foreground text-xs font-medium">{ s.Label }</span>
+				@icon.Icon(s.Icon)(icon.Props{Class: "text-muted-foreground size-4 shrink-0"})
+			</div>
+			<span class="text-2xl leading-none font-semibold tracking-tight tabular-nums">{ s.Value }</span>
+			<span class="text-muted-foreground text-xs">{ s.Caption }</span>
 		}
 	}
 }

@@ -11,3 +11,28 @@ templ StatusBadge(j store.Job) {
 		{ web.JobStatusLabel(j) }
 	}
 }
+
+// LastRun is the one-line summary of a repository's most recent job. Both the
+// dashboard and the Repos page show it, so they show the same fields.
+templ LastRun(j store.Job) {
+	if j.ID != "" {
+		<div class="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+			@StatusBadge(j)
+			<a class="text-primary font-mono hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>
+				{ web.ShortSHA(j.SHA) }
+			</a>
+			if j.Ref != "" {
+				<span class="font-mono">{ j.Ref }</span>
+			}
+			if j.StartedAt != nil {
+				<span class="tabular-nums">{ web.HumanDuration(j.Duration()) }</span>
+			}
+			<span>{ web.Ago(j.CreatedAt) }</span>
+		</div>
+		if repoFailureReason(j) != "" {
+			<p class="text-muted-foreground mt-2 line-clamp-2 text-xs" title={ repoFailureReason(j) }>{ repoFailureReason(j) }</p>
+		}
+	} else {
+		<p class="text-muted-foreground text-xs">no runs</p>
+	}
+}

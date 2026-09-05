@@ -2,6 +2,7 @@ package pages
 
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
@@ -10,6 +11,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
+	selectcomp "github.com/openpreflight/openpreflight/internal/web/components/select"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
@@ -66,12 +68,11 @@ templ reposList(p web.Page) {
 				@card.Card(card.Props{Size: card.SizeSm}) {
 					@card.Header() {
 						@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
-							{ row.Binding.Repo }
+							<a class="hover:underline" href={ templ.SafeURL("/repos/" + itoa64(row.Binding.ID)) } title={ row.Binding.Repo }>{ row.Binding.Repo }</a>
 						}
-					}
-					@card.Content(card.ContentProps{Class: "space-y-2"}) {
-						{{ filter := bindingFilterLine(row) }}
-						<div class="flex flex-wrap gap-1">
+						// Whether the repo is checked at all is the one thing worth
+						// reading without moving your eyes off the name.
+						@card.Action() {
 							if row.Binding.Enabled {
 								@badge.Badge() {
 									on
@@ -81,6 +82,11 @@ templ reposList(p web.Page) {
 									off
 								}
 							}
+						}
+					}
+					@card.Content(card.ContentProps{Class: "space-y-2"}) {
+						{{ filter := bindingFilterLine(row) }}
+						<div class="flex flex-wrap items-center gap-2">
 							if row.Binding.ShareableLogs {
 								@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
 									shareable
@@ -90,27 +96,13 @@ templ reposList(p web.Page) {
 									private
 								}
 							}
+							<span class="text-muted-foreground min-w-0 truncate text-xs" title={ filter }>{ filter }</span>
 						</div>
-						<p class="text-muted-foreground min-w-0 truncate text-xs" title={ filter }>
-							{ filter }
-						</p>
-						if row.LastJob.ID != "" {
-							<div class="flex flex-wrap items-center gap-2 text-xs">
-								@StatusBadge(row.LastJob)
-								<span class="font-mono">{ web.ShortSHA(row.LastJob.SHA) }</span>
-								<span class="text-muted-foreground">{ web.Ago(row.LastJob.CreatedAt) }</span>
-							</div>
-						} else {
-							<p class="text-muted-foreground text-xs">no runs</p>
-						}
+						@LastRun(row.LastJob)
 					}
+					// Edit and Dry run live on the repo's own page, one click through
+					// the title. The footer keeps the two actions that change state.
 					@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
-						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
-							Edit
-						}
-						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/resolve", Variant: button.VariantLink, Size: button.SizeSm}) {
-							Dry run
-						}
 						<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
 							@layouts.CSRF(p.CSRFToken)
 							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
@@ -121,14 +113,14 @@ templ reposList(p web.Page) {
 								}
 							}
 						</form>
-						@layouts.ConfirmDelete(
-							"del-bind-"+itoa64(row.Binding.ID),
-							p.CSRFToken,
-							"/api/v1/bindings/"+itoa64(row.Binding.ID)+"/delete",
-							"Remove",
-							"Remove this binding?",
-							"The repo stops being checked.",
-						)
+						@layouts.Confirm(layouts.ConfirmProps{
+							ID:          "del-bind-" + itoa64(row.Binding.ID),
+							Token:       p.CSRFToken,
+							Action:      "/api/v1/bindings/" + itoa64(row.Binding.ID) + "/delete",
+							Trigger:     "Remove",
+							Title:       "Remove this binding?",
+							Description: "The repo stops being checked.",
+						})
 					}
 				}
 			}
@@ -192,42 +184,48 @@ templ reposApps(p web.Page) {
 	{{ selectedCoolify := asInt64(m, "SelectedCoolifyID") }}
 	{{ picker := pickerOf(m) }}
 	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Pick repositories
-			}
-		}
 		@card.Content(card.ContentProps{Class: "space-y-4"}) {
-			<form method="get" action="/repos/pick" class="grid gap-4 sm:grid-cols-3">
+			// onchange sits on the form, not on each select: the component
+			// submits its value through a hidden input whose change event
+			// bubbles, and picking a source should reload the list without a
+			// second click, exactly as it did before.
+			<form method="get" action="/repos/pick" class="grid gap-4 sm:grid-cols-3" onchange="this.submit()">
 				@field.Field() {
 					@field.Label(field.LabelProps{For: "app_id"}) {
 						CI GitHub App
 					}
-					<select id="app_id" name="app_id" class={ selectClass } onchange="this.form.submit()">
-						<option value="">- select -</option>
-						for _, a := range apps {
-							if a.ID == selectedApp {
-								<option value={ itoa64(a.ID) } selected>{ a.Name }</option>
-							} else {
-								<option value={ itoa64(a.ID) }>{ a.Name }</option>
+					@selectcomp.Select(selectcomp.Props{ID: "app_id-list", Name: "app_id", DefaultValue: idValue(selectedApp)}) {
+						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app_id", Class: "w-full"}) {
+							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "- select -"})
+						}
+						@selectcomp.Content() {
+							for _, a := range apps {
+								@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(a.ID)}) {
+									{ a.Name }
+								}
 							}
 						}
-					</select>
+					}
 				}
 				@field.Field() {
 					@field.Label(field.LabelProps{For: "coolify_id"}) {
 						Repo list from
 					}
-					<select id="coolify_id" name="coolify_id" class={ selectClass } onchange="this.form.submit()">
-						<option value="">This App's installations</option>
-						for _, inst := range instances {
-							if inst.ID == selectedCoolify {
-								<option value={ itoa64(inst.ID) } selected>Coolify: { inst.Name }</option>
-							} else {
-								<option value={ itoa64(inst.ID) }>Coolify: { inst.Name }</option>
+					@selectcomp.Select(selectcomp.Props{ID: "coolify_id-list", Name: "coolify_id", DefaultValue: idValue(selectedCoolify)}) {
+						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "coolify_id", Class: "w-full"}) {
+							@selectcomp.Value(selectcomp.ValueProps{Placeholder: appInstallationsLabel})
+						}
+						@selectcomp.Content() {
+							@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
+								{ appInstallationsLabel }
+							}
+							for _, inst := range instances {
+								@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(inst.ID)}) {
+									Coolify: { inst.Name }
+								}
 							}
 						}
-					</select>
+					}
 					@field.Description() {
 						A Coolify connector's repo list is inventory only; the App above still does the webhook, the check and the clone.
 					}
@@ -239,8 +237,10 @@ templ reposApps(p web.Page) {
 				</div>
 			</form>
 			if pickerError(m) != "" {
-				@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
-					{ pickerError(m) }
+				@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
+					@alert.Title() {
+						{ pickerError(m) }
+					}
 				}
 			}
 			if len(picker) > 0 {
@@ -298,13 +298,7 @@ templ reposApps(p web.Page) {
 }
 
 templ reposEditor(p web.Page) {
-	{{ editing := has(asMap(p.Data), "Edit") }}
 	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				{ bindingFormTitle(editing) }
-			}
-		}
 		@card.Content() {
 			@reposEditorForm(p)
 		}
@@ -320,151 +314,167 @@ templ reposEditorForm(p web.Page) {
 	{{ edit := bindingOf(m) }}
 	<form method="post" action="/api/v1/bindings" class="flex flex-col gap-4">
 		@layouts.CSRF(p.CSRFToken)
-				<div class="grid gap-4 sm:grid-cols-3">
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_repo"}) {
-							Repo (owner/name)
-						}
-						@input.Input(input.Props{ID: "b_repo", Name: "repo", Type: "text", Class: "font-mono", Required: true, Value: edit.Repo, ReadOnly: editing})
+		<div class="grid gap-4 sm:grid-cols-3">
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_repo"}) {
+					Repo (owner/name)
+				}
+				@input.Input(input.Props{ID: "b_repo", Name: "repo", Type: "text", Class: "font-mono", Required: true, Value: edit.Repo, ReadOnly: editing})
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_app"}) {
+					CI GitHub App
+				}
+				// A native select submits its first option when nothing is chosen.
+				// This one submits only what is selected, so the first App is the
+				// explicit default on a new binding rather than an accident of order.
+				@selectcomp.Select(selectcomp.Props{ID: "b_app-list", Name: "github_app_id", Required: true, DefaultValue: editAppValue(editing, edit.GitHubAppID, apps)}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_app", Class: "w-full"}) {
+						@selectcomp.Value(selectcomp.ValueProps{Placeholder: firstAppName(apps)})
 					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_app"}) {
-							CI GitHub App
-						}
-						<select id="b_app" name="github_app_id" required class={ selectClass }>
-							for _, a := range apps {
-								if editAppSelected(editing, a.ID, edit.GitHubAppID) {
-									<option value={ itoa64(a.ID) } selected>{ a.Name }</option>
-								} else {
-									<option value={ itoa64(a.ID) }>{ a.Name }</option>
-								}
+					@selectcomp.Content() {
+						for _, a := range apps {
+							@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(a.ID)}) {
+								{ a.Name }
 							}
-						</select>
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_coolify"}) {
-							Coolify instance
 						}
-						<select id="b_coolify" name="coolify_instance_id" class={ selectClass }>
-							<option value="0">none</option>
-							for _, inst := range instances {
-								if editInstSelected(editing, inst.ID, edit.CoolifyInstanceID) {
-									<option value={ itoa64(inst.ID) } selected>{ inst.Name }</option>
-								} else {
-									<option value={ itoa64(inst.ID) }>{ inst.Name }</option>
-								}
-							}
-						</select>
-					}
-				</div>
-				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_branches"}) {
-							Branches
-						}
-						@input.Input(input.Props{ID: "b_branches", Name: "branches", Type: "text", Placeholder: branchesPlaceholder, Value: edit.Branches})
-						@field.Description() {
-							Empty allows every branch.
-						}
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_paths"}) {
-							Paths
-						}
-						@input.Input(input.Props{ID: "b_paths", Name: "paths", Type: "text", Placeholder: "frontend/**, packages/api/**", Value: edit.Paths})
-						@field.Description() {
-							Empty allows every path. Skip (Check Run conclusion skipped) when no changed file matches.
-						}
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_on_empty"}) {
-							Empty pipeline
-						}
-						<select
-							id="b_on_empty"
-							name="on_empty_pipeline"
-							class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-						>
-							<option value="skip" selected?={ edit.OnEmptyPipeline != "fail" }>Skip the job</option>
-							<option value="fail" selected?={ edit.OnEmptyPipeline == "fail" }>Fail the job</option>
-						</select>
-						@field.Description() {
-							What to do when nothing resolves to run: no pipeline file, no commands
-							here, and no recognisable project. Usually a misconfiguration rather
-							than an intention.
-						}
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_check"}) {
-							Check name
-						}
-						@input.Input(input.Props{ID: "b_check", Name: "check_name", Type: "text", Placeholder: settings.DefaultCheckName, Value: edit.CheckName})
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_file"}) {
-							Pipeline file
-						}
-						@input.Input(input.Props{ID: "b_file", Name: "pipeline_file", Type: "text", Placeholder: settings.DefaultPipelineFile, Value: edit.PipelineFile})
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_timeout"}) {
-							Timeout (seconds)
-						}
-						@input.Input(input.Props{ID: "b_timeout", Name: "timeout_seconds", Type: "number", Placeholder: itoa(settings.DefaultTimeoutSeconds), Value: timeoutVal(edit.TimeoutSeconds), Attributes: templ.Attributes{"min": "0"}})
-						@field.Description() {
-							0 or blank inherits.
-						}
-					}
-				</div>
-				<h2 class="text-base font-semibold">Command overrides</h2>
-				<p class="text-muted-foreground text-xs">Used only when the repo has no pipeline file. Leave blank to fall back to Node defaults inferred from package.json.</p>
-				<div class="grid gap-4 sm:grid-cols-3">
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_install"}) {
-							install
-						}
-						@input.Input(input.Props{ID: "b_install", Name: "install_cmd", Type: "text", Class: "font-mono", Value: edit.InstallCmd})
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_test"}) {
-							test
-						}
-						@input.Input(input.Props{ID: "b_test", Name: "test_cmd", Type: "text", Class: "font-mono", Value: edit.TestCmd})
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "b_build"}) {
-							build
-						}
-						@input.Input(input.Props{ID: "b_build", Name: "build_cmd", Type: "text", Class: "font-mono", Value: edit.BuildCmd})
-					}
-				</div>
-				@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
-					@checkbox.Checkbox(checkbox.Props{ID: "b_enabled", Name: "enabled", Value: "1", DefaultChecked: bindingEnabledChecked(editing, edit.Enabled)})
-					@field.Label(field.LabelProps{For: "b_enabled"}) {
-						Enabled
 					}
 				}
-				@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
-					@checkbox.Checkbox(checkbox.Props{ID: "b_shareable", Name: "shareable_logs", Value: "1", DefaultChecked: shareableChecked(editing, edit.ShareableLogs)})
-					@field.Label(field.LabelProps{For: "b_shareable"}) {
-						Shareable logs
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_coolify"}) {
+					Coolify instance
+				}
+				@selectcomp.Select(selectcomp.Props{ID: "b_coolify-list", Name: "coolify_instance_id", DefaultValue: editInstValue(editing, edit.CoolifyInstanceID)}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_coolify", Class: "w-full"}) {
+						@selectcomp.Value(selectcomp.ValueProps{Placeholder: "none"})
+					}
+					@selectcomp.Content() {
+						@selectcomp.Item(selectcomp.ItemProps{Value: "0"}) {
+							none
+						}
+						for _, inst := range instances {
+							@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(inst.ID)}) {
+								{ inst.Name }
+							}
+						}
+					}
+				}
+			}
+		</div>
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_branches"}) {
+					Branches
+				}
+				@input.Input(input.Props{ID: "b_branches", Name: "branches", Type: "text", Placeholder: branchesPlaceholder, Value: edit.Branches})
+				@field.Description() {
+					Empty allows every branch.
+				}
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_paths"}) {
+					Paths
+				}
+				@input.Input(input.Props{ID: "b_paths", Name: "paths", Type: "text", Placeholder: "frontend/**, packages/api/**", Value: edit.Paths})
+				@field.Description() {
+					Empty allows every path. Skip (Check Run conclusion skipped) when no changed file matches.
+				}
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_on_empty"}) {
+					Empty pipeline
+				}
+				@selectcomp.Select(selectcomp.Props{ID: "b_on_empty-list", Name: "on_empty_pipeline", DefaultValue: onEmptyValue(edit.OnEmptyPipeline)}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_on_empty", Class: "w-full"}) {
+						@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Skip the job"})
+					}
+					@selectcomp.Content() {
+						@selectcomp.Item(selectcomp.ItemProps{Value: "skip"}) {
+							Skip the job
+						}
+						@selectcomp.Item(selectcomp.ItemProps{Value: "fail"}) {
+							Fail the job
+						}
 					}
 				}
 				@field.Description() {
-					Off by default. On, anyone with a job's /runs/id link can read its full build output without signing in. Job ids are random, but treat the link as a secret.
+					What to do when nothing resolves to run: no pipeline file, no commands
+					here, and no recognisable project. Usually a misconfiguration rather
+					than an intention.
 				}
-				<div class="flex flex-wrap items-center gap-2">
-					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-						{ bindingSubmitLabel(editing) }
-					}
-					if editing {
-						@button.Button(button.Props{Href: "/repos/" + itoa64(edit.ID) + "/resolve", Variant: button.VariantOutline, Size: button.SizeSm}) {
-							Test configuration
-						}
-					}
-					@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
-						Cancel
-					}
-				</div>
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_check"}) {
+					Check name
+				}
+				@input.Input(input.Props{ID: "b_check", Name: "check_name", Type: "text", Placeholder: settings.DefaultCheckName, Value: edit.CheckName})
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_file"}) {
+					Pipeline file
+				}
+				@input.Input(input.Props{ID: "b_file", Name: "pipeline_file", Type: "text", Placeholder: settings.DefaultPipelineFile, Value: edit.PipelineFile})
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_timeout"}) {
+					Timeout (seconds)
+				}
+				@input.Input(input.Props{ID: "b_timeout", Name: "timeout_seconds", Type: "number", Placeholder: itoa(settings.DefaultTimeoutSeconds), Value: timeoutVal(edit.TimeoutSeconds), Attributes: templ.Attributes{"min": "0"}})
+				@field.Description() {
+					0 or blank inherits.
+				}
+			}
+		</div>
+		<h2 class="text-base font-semibold">Command overrides</h2>
+		<p class="text-muted-foreground text-xs">Used only when the repo has no pipeline file. Leave blank to fall back to Node defaults inferred from package.json.</p>
+		<div class="grid gap-4 sm:grid-cols-3">
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_install"}) {
+					install
+				}
+				@input.Input(input.Props{ID: "b_install", Name: "install_cmd", Type: "text", Class: "font-mono", Value: edit.InstallCmd})
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_test"}) {
+					test
+				}
+				@input.Input(input.Props{ID: "b_test", Name: "test_cmd", Type: "text", Class: "font-mono", Value: edit.TestCmd})
+			}
+			@field.Field() {
+				@field.Label(field.LabelProps{For: "b_build"}) {
+					build
+				}
+				@input.Input(input.Props{ID: "b_build", Name: "build_cmd", Type: "text", Class: "font-mono", Value: edit.BuildCmd})
+			}
+		</div>
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
+			@checkbox.Checkbox(checkbox.Props{ID: "b_enabled", Name: "enabled", Value: "1", DefaultChecked: bindingEnabledChecked(editing, edit.Enabled)})
+			@field.Label(field.LabelProps{For: "b_enabled"}) {
+				Enabled
+			}
+		}
+		@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
+			@checkbox.Checkbox(checkbox.Props{ID: "b_shareable", Name: "shareable_logs", Value: "1", DefaultChecked: shareableChecked(editing, edit.ShareableLogs)})
+			@field.Label(field.LabelProps{For: "b_shareable"}) {
+				Shareable logs
+			}
+		}
+		@field.Description() {
+			Off by default. On, anyone with a job's /runs/id link can read its full build output without signing in. Job ids are random, but treat the link as a secret.
+		}
+		<div class="flex flex-wrap items-center gap-2">
+			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+				{ bindingSubmitLabel(editing) }
+			}
+			if editing {
+				@button.Button(button.Props{Href: "/repos/" + itoa64(edit.ID) + "/resolve", Variant: button.VariantOutline, Size: button.SizeSm}) {
+					Test configuration
+				}
+			}
+			@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
+				Cancel
+			}
+		</div>
 	</form>
 }

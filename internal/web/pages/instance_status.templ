@@ -22,7 +22,7 @@ templ InstanceStatus(p web.Page) {
 			}
 		}
 		@card.Card(card.Props{Class: "mb-6"}) {
-			@card.Content(card.ContentProps{Class: "px-0"}) {
+			@card.Content() {
 				@table.Table() {
 					@table.Header() {
 						@table.Row() {
@@ -67,12 +67,14 @@ templ InstanceStatus(p web.Page) {
 				}
 			}
 			@card.Content() {
-				<dl class="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
-					<dt class="text-muted-foreground">Version</dt>
-					<dd class="font-mono text-xs">{ report.Version }</dd>
-					<dt class="text-muted-foreground">Detail as JSON</dt>
-					<dd class="font-mono text-xs">GET /health?verbose=1</dd>
-				</dl>
+				@detailList() {
+					@detailRow("Version") {
+						<span class="font-mono">{ report.Version }</span>
+					}
+					@detailRow("Detail as JSON") {
+						<span class="font-mono">GET /health?verbose=1</span>
+					}
+				}
 				<p class="text-muted-foreground mt-3 text-xs">
 					Plain <code>GET /health</code> is unchanged and unauthenticated: it answers liveness for your
 					healthcheck. The breakdown above needs a session or a bearer token, because it names your

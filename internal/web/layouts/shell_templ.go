@@ -418,7 +418,7 @@ func Crumbs(p web.Page) templ.Component {
 							var templ_7745c5c3_Var16 string
 							templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(p.Title)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 85, Col: 15}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 85, Col: 15}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 							if templ_7745c5c3_Err != nil {
@@ -466,7 +466,7 @@ func Crumbs(p web.Page) templ.Component {
 									var templ_7745c5c3_Var19 string
 									templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 93, Col: 17}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 93, Col: 17}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 									if templ_7745c5c3_Err != nil {
@@ -494,7 +494,7 @@ func Crumbs(p web.Page) templ.Component {
 									var templ_7745c5c3_Var21 string
 									templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 97, Col: 17}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 97, Col: 17}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 									if templ_7745c5c3_Err != nil {
@@ -788,7 +788,7 @@ func AppSidebar(p web.Page) templ.Component {
 										var templ_7745c5c3_Var35 string
 										templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(p.InFlightCount))
 										if templ_7745c5c3_Err != nil {
-											return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 141, Col: 32}
+											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 141, Col: 32}
 										}
 										_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 										if templ_7745c5c3_Err != nil {
@@ -1317,7 +1317,7 @@ func AppSidebar(p web.Page) templ.Component {
 				var templ_7745c5c3_Var56 string
 				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(dockerLabel(p.DockerAvailable))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 215, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 215, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
@@ -1335,7 +1335,7 @@ func AppSidebar(p web.Page) templ.Component {
 					var templ_7745c5c3_Var57 string
 					templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(p.DockerHost)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 218, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 218, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 					if templ_7745c5c3_Err != nil {
@@ -1354,7 +1354,7 @@ func AppSidebar(p web.Page) templ.Component {
 					var templ_7745c5c3_Var58 string
 					templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(p.User.Username)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/shell.templ`, Line: 221, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 221, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 					if templ_7745c5c3_Err != nil {

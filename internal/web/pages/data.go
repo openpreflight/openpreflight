@@ -3,6 +3,7 @@ package pages
 import (
 	"encoding/json"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -199,11 +200,15 @@ func healthLabel(lastError string, seen bool) string {
 	return "never"
 }
 
-const selectClass = "border-input bg-transparent dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-full min-w-0 rounded-lg border px-2.5 py-1 text-sm outline-none focus-visible:ring-3"
+// filterLabelClass is the label beside a control on a toolbar row, where the
+// label is a hint rather than the caption of a stacked field.
+const filterLabelClass = "text-muted-foreground text-xs font-medium"
 
-const selectToolbarClass = "border-input bg-transparent dark:bg-input/30 focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-[11rem] shrink-0 rounded-lg border px-2.5 py-1 text-sm outline-none focus-visible:ring-3"
+const allStatuses = "All statuses"
 
-const emptyInCardClass = "border-0 bg-transparent px-4 py-10"
+const appInstallationsLabel = "This App's installations"
+
+const emptyInCardClass = "border-0 bg-transparent px-6 py-12"
 
 const emptyPageClass = "mb-6"
 
@@ -370,8 +375,9 @@ func jobsPath(repo, status string, limit, offset int) string {
 func inflightOf(m map[string]any) []store.Job {
 	return get[[]store.Job](m, "InFlight")
 }
-func cardsOf(m map[string]any) []dashRepo  { return get[[]dashRepo](m, "RepoCards") }
-func rowsOf(m map[string]any) []bindingRow { return get[[]bindingRow](m, "Bindings") }
+func cardsOf(m map[string]any) []dashRepo   { return get[[]dashRepo](m, "RepoCards") }
+func recentOf(m map[string]any) []store.Job { return get[[]store.Job](m, "Recent") }
+func rowsOf(m map[string]any) []bindingRow  { return get[[]bindingRow](m, "Bindings") }
 func pickerOf(m map[string]any) []pickerRepo {
 	return get[[]pickerRepo](m, "PickerRepos")
 }
@@ -421,14 +427,6 @@ func dashNeedRepo(apps, enabled int) bool {
 }
 func dashHaveSetup(apps, enabled int) bool {
 	return apps > 0 && enabled > 0
-}
-
-func editAppSelected(editing bool, id, editID int64) bool {
-	return editing && id == editID
-}
-
-func editInstSelected(editing bool, id, editID int64) bool {
-	return editing && id == editID
 }
 
 func bindingEnabledChecked(editing bool, enabled bool) bool {
@@ -546,4 +544,134 @@ func originsOf(j store.Job) []pipeline.Origin {
 // dry run's is: two definitions of "what is wrong" would drift.
 func reportOf(m map[string]any) health.Report {
 	return get[health.Report](m, "Report")
+}
+
+// dashNoRepoHint says why the checklist is still waiting: bound but switched
+// off reads differently from nothing bound at all.
+func dashNoRepoHint(bound int) string {
+	if bound > 0 {
+		return itoa(bound) + " bound, none enabled"
+	}
+	return "the worker runs nothing without one"
+}
+
+// dashStat is one tile in the Overview strip. The caption names the window the
+// number came from: these are the recent jobs the page already loaded, not an
+// all-time figure, and a bare percentage that implies otherwise is a lie.
+type dashStat struct {
+	Icon    string
+	Label   string
+	Value   string
+	Caption string
+}
+
+// dashStats reads the same recent-jobs slice the repo cards are built from, so
+// the numbers and the cards under them always describe the same runs. Skipped
+// and in-flight jobs are not results, so they count towards nothing.
+func dashStats(recent []store.Job, inflight, enabled, bound int) []dashStat {
+	done, passed := 0, 0
+	var durs []time.Duration
+	for _, j := range recent {
+		if j.InFlight() || j.Status == store.JobSkipped {
+			continue
+		}
+		done++
+		if j.Status == store.JobSuccess {
+			passed++
+		}
+		if d := j.Duration(); d > 0 {
+			durs = append(durs, d)
+		}
+	}
+	rate, rateCaption := "-", "no finished runs yet"
+	if done > 0 {
+		rate = itoa(passed*100/done) + "%"
+		rateCaption = itoa(passed) + " of " + itoa(done) + " finished"
+	}
+	// Median, not mean: one job that hung for the full timeout would drag an
+	// average somewhere no run has ever been.
+	mid, midCaption := "-", "nothing timed yet"
+	if len(durs) > 0 {
+		sort.Slice(durs, func(a, b int) bool { return durs[a] < durs[b] })
+		mid = web.HumanDuration(durs[len(durs)/2])
+		midCaption = "median of " + itoa(len(durs)) + " runs"
+	}
+	return []dashStat{
+		{Icon: "circle-check", Label: "Pass rate", Value: rate, Caption: rateCaption},
+		{Icon: "loader", Label: "In flight", Value: itoa(inflight), Caption: "queued or running"},
+		{Icon: "git-branch", Label: "Enabled repos", Value: itoa(enabled), Caption: "of " + itoa(bound) + " bound"},
+		{Icon: "timer", Label: "Run time", Value: mid, Caption: midCaption},
+	}
+}
+
+// appSubtitle names an App without repeating its own title: the slug is only
+// worth a line when it differs from the name it was derived from.
+func appSubtitle(a store.GitHubApp) string {
+	if a.Slug != "" && a.Slug != a.Name {
+		return a.Slug + " · App ID " + itoa64(a.AppID)
+	}
+	return "App ID " + itoa64(a.AppID)
+}
+
+// idValue renders a foreign key for a Select's DefaultValue. Zero means "not
+// chosen", which the component spells as the empty string so the trigger shows
+// its placeholder.
+func idValue(id int64) string {
+	if id == 0 {
+		return ""
+	}
+	return strconv.FormatInt(id, 10)
+}
+
+// editAppValue picks the App a binding form opens on: the stored one when
+// editing, otherwise the first App in the list. A native select did this
+// implicitly by selecting its first option; this says it out loud.
+func editAppValue(editing bool, editID int64, apps []store.GitHubApp) string {
+	if editing && editID != 0 {
+		return strconv.FormatInt(editID, 10)
+	}
+	if len(apps) > 0 {
+		return strconv.FormatInt(apps[0].ID, 10)
+	}
+	return ""
+}
+
+func firstAppName(apps []store.GitHubApp) string {
+	if len(apps) > 0 {
+		return apps[0].Name
+	}
+	return "- select -"
+}
+
+// editInstValue mirrors editAppValue for the optional Coolify instance, where
+// "0" is a real option meaning none rather than an absent choice.
+func editInstValue(editing bool, editID int64) string {
+	if editing && editID != 0 {
+		return strconv.FormatInt(editID, 10)
+	}
+	return "0"
+}
+
+func onEmptyValue(v string) string {
+	if v == "fail" {
+		return "fail"
+	}
+	return "skip"
+}
+
+// jobPageNumber is 1-based and derived, not stored: the jobs index pages by
+// offset, and the number exists only to tell the operator how far in they are.
+func jobPageNumber(offset, limit int) int {
+	if limit <= 0 {
+		return 1
+	}
+	return offset/limit + 1
+}
+
+// cancelJobDescription names the run being cancelled. The jobs table can show
+// two in-flight runs of the same repo on adjacent rows, so the dialog repeats
+// the commit rather than asking "cancel this run?" about an unnamed one.
+func cancelJobDescription(j store.Job) string {
+	return "Cancelling stops " + j.Repo + " at " + web.ShortSHA(j.SHA) +
+		" where it is, and the Check Run is reported as cancelled. Re-running starts the whole pipeline again."
 }

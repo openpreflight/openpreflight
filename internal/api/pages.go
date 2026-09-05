@@ -85,6 +85,7 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		"Bindings":        bindings,
 		"EnabledBindings": enabled,
 		"Jobs":            jobs,
+		"Recent":          recent,
 		"InFlight":        inflight,
 		"RepoCards":       cards,
 	}))

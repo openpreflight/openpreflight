@@ -6,6 +6,9 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
+	"github.com/openpreflight/openpreflight/internal/web/components/label"
+	"github.com/openpreflight/openpreflight/internal/web/components/pagination"
+	selectcomp "github.com/openpreflight/openpreflight/internal/web/components/select"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
@@ -29,24 +32,29 @@ templ Jobs(p web.Page) {
 templ jobsFilter(repo, status string) {
 	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5" aria-label="Filter jobs">
 		<div class="flex items-center gap-2">
-			<label for="status" class="text-muted-foreground text-xs font-medium">Status</label>
-			<select id="status" name="status" class={ selectToolbarClass } aria-label="Status">
-				if status == "" {
-					<option value="" selected>All statuses</option>
-				} else {
-					<option value="">All statuses</option>
+			@label.Label(label.Props{For: "status", Class: filterLabelClass}) {
+				Status
+			}
+			@selectcomp.Select(selectcomp.Props{ID: "status-list", Name: "status", DefaultValue: status}) {
+				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[11rem] shrink-0"}) {
+					@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})
 				}
-				for _, st := range store.JobStatuses {
-					if status == st {
-						<option value={ st } selected>{ st }</option>
-					} else {
-						<option value={ st }>{ st }</option>
+				@selectcomp.Content() {
+					@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
+						{ allStatuses }
+					}
+					for _, st := range store.JobStatuses {
+						@selectcomp.Item(selectcomp.ItemProps{Value: st}) {
+							{ st }
+						}
 					}
 				}
-			</select>
+			}
 		</div>
 		<div class="flex min-w-0 items-center gap-2">
-			<label for="repo" class="text-muted-foreground text-xs font-medium">Repo</label>
+			@label.Label(label.Props{For: "repo", Class: filterLabelClass}) {
+				Repo
+			}
 			@input.Input(input.Props{
 				ID:          "repo",
 				Name:        "repo",
@@ -76,17 +84,29 @@ templ jobsPager(m map[string]any, n int) {
 	{{ limit := jobLimitOf(m) }}
 	{{ offset := jobOffsetOf(m) }}
 	if offset > 0 || n == limit {
-		<nav class="mt-4 flex flex-wrap gap-3" aria-label="Jobs pagination">
-			if offset > 0 {
-				@button.Button(button.Props{Href: jobsPath(repo, status, limit, jobPrevOffset(offset, limit)), Variant: button.VariantLink, Size: button.SizeSm}) {
-					Previous
+		// The list is keyset-free: the server knows there is a next page only
+		// because this one came back full. So there is no last page to jump to
+		// and no total to count against - Previous, where you are, Next.
+		@pagination.Pagination(pagination.Props{Class: "mt-4 justify-start", Attributes: templ.Attributes{"aria-label": "Jobs pagination"}}) {
+			@pagination.Content() {
+				@pagination.Item() {
+					@pagination.Previous(pagination.PreviousProps{
+						Href:     jobsPath(repo, status, limit, jobPrevOffset(offset, limit)),
+						Disabled: offset == 0,
+					})
+				}
+				@pagination.Item() {
+					@pagination.Link(pagination.LinkProps{IsActive: true, Attributes: templ.Attributes{"aria-current": "page"}}) {
+						{ itoa(jobPageNumber(offset, limit)) }
+					}
+				}
+				@pagination.Item() {
+					@pagination.Next(pagination.NextProps{
+						Href:     jobsPath(repo, status, limit, offset+limit),
+						Disabled: n < limit,
+					})
 				}
 			}
-			if n == limit {
-				@button.Button(button.Props{Href: jobsPath(repo, status, limit, offset+limit), Variant: button.VariantLink, Size: button.SizeSm}) {
-					Next
-				}
-			}
-		</nav>
+		}
 	}
 }

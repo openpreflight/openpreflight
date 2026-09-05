@@ -1,0 +1,87 @@
+package pages
+
+import (
+	"github.com/openpreflight/openpreflight/internal/pipeline"
+	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/empty"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
+	"github.com/openpreflight/openpreflight/internal/web/components/table"
+)
+
+// detailList is a bordered label/value grid. These rows are identifiers a
+// reader compares line by line - a job id against a delivery id, a resolved
+// pipeline file against the default - and an unruled dl makes that harder than
+// it needs to be.
+templ detailList() {
+	<dl class="divide-border divide-y overflow-hidden rounded-lg border">
+		{ children... }
+	</dl>
+}
+
+// detailRow is one label and its value. The label keeps its own tinted column
+// so every value starts at the same x, whatever the label says.
+templ detailRow(label string) {
+	<div class="grid sm:grid-cols-[9rem_1fr]">
+		<dt class="bg-muted/40 text-muted-foreground border-b px-3 py-2 text-xs sm:border-r sm:border-b-0">{ label }</dt>
+		<dd class="min-w-0 px-3 py-2 text-xs break-words">
+			{ children... }
+		</dd>
+	</div>
+}
+
+// originsTable is the "where every value came from" table. The run page and
+// the dry run both answer that question about the same []pipeline.Origin, and
+// showing them differently made the same fact look like two facts.
+//
+// Source is a category, not a value, so it wears a badge: an operator scanning
+// the column is asking "which layer won", not reading prose.
+templ originsTable(origins []pipeline.Origin) {
+	if len(origins) > 0 {
+		@table.Table() {
+			@table.Header() {
+				@table.Row() {
+					@table.Head() {
+						Value
+					}
+					@table.Head() {
+						Resolved to
+					}
+					@table.Head() {
+						From
+					}
+				}
+			}
+			@table.Body() {
+				for _, o := range origins {
+					@table.Row() {
+						@table.Cell(table.CellProps{Class: "font-medium"}) {
+							{ o.Field }
+						}
+						@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+							{ o.Value }
+						}
+						@table.Cell(table.CellProps{Class: "text-xs"}) {
+							@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+								{ o.Source }
+							}
+						}
+					}
+				}
+			}
+		}
+	} else {
+		@empty.Empty(empty.Props{Class: emptyInCardClass}) {
+			@empty.Header() {
+				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+					@icon.Layers()
+				}
+				@empty.Title() {
+					Nothing was resolved
+				}
+				@empty.Description() {
+					No layer supplied a value, so there is nothing to attribute. This usually means the run stopped before configuration was read.
+				}
+			}
+		}
+	}
+}

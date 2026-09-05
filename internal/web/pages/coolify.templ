@@ -2,6 +2,7 @@ package pages
 
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
+	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
@@ -19,11 +20,7 @@ templ Coolify(p web.Page) {
 	{{ editing := has(m, "Edit") }}
 	{{ edit := instOf(m, "Edit") }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Coolify instances", "One row is one (base URL, API token) pair. A Coolify API token is scoped to a single team, so a row covers that team - not the whole host. A second team on the same host is a second row.") {
-			@button.Button(button.Props{Href: "#add", Size: button.SizeSm}) {
-				Add an instance
-			}
-		}
+		@layouts.PageHead("Coolify instances", "One row is one (base URL, API token) pair. A Coolify API token is scoped to a single team, so a row covers that team - not the whole host. A second team on the same host is a second row.")
 		if len(instances) > 0 {
 			<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 				for _, inst := range instances {
@@ -61,20 +58,20 @@ templ Coolify(p web.Page) {
 									Test
 								}
 							</form>
-							@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID), Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID) + "#add", Variant: button.VariantLink, Size: button.SizeSm}) {
 								Edit
 							}
-							@button.Button(button.Props{Href: "/coolify?inspect=" + itoa64(inst.ID), Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/coolify?inspect=" + itoa64(inst.ID) + "#inspect", Variant: button.VariantLink, Size: button.SizeSm}) {
 								Inspect
 							}
-							@layouts.ConfirmDelete(
-								"del-coolify-"+itoa64(inst.ID),
-								p.CSRFToken,
-								"/api/v1/coolify/"+itoa64(inst.ID)+"/delete",
-								"Remove",
-								"Remove this Coolify instance?",
-								"Bindings that name it keep working.",
-							)
+							@layouts.Confirm(layouts.ConfirmProps{
+								ID:          "del-coolify-" + itoa64(inst.ID),
+								Token:       p.CSRFToken,
+								Action:      "/api/v1/coolify/" + itoa64(inst.ID) + "/delete",
+								Trigger:     "Remove",
+								Title:       "Remove this Coolify instance?",
+								Description: "Bindings that name it keep working.",
+							})
 						}
 					}
 				}
@@ -98,7 +95,7 @@ templ Coolify(p web.Page) {
 			{{ inspect := instOf(m, "Inspect") }}
 			{{ servers := serversOf(m) }}
 			{{ connectors := connectorsOf(m) }}
-			@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Card(card.Props{ID: "inspect", Class: "mb-6 scroll-mt-6"}) {
 				@card.Header() {
 					@card.Title() {
 						{ inspect.Name }
@@ -106,8 +103,10 @@ templ Coolify(p web.Page) {
 				}
 				@card.Content(card.ContentProps{Class: "space-y-4"}) {
 					if errMsg := str(m, "InspectError"); errMsg != "" {
-						@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
-							{ errMsg }
+						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
+							@alert.Title() {
+								{ errMsg }
+							}
 						}
 					}
 					if len(servers) > 0 {
@@ -228,7 +227,7 @@ templ Coolify(p web.Page) {
 				}
 			}
 		}
-		@card.Card(card.Props{ID: "add"}) {
+		@card.Card(card.Props{ID: "add", Class: "scroll-mt-6"}) {
 			@card.Header() {
 				@card.Title() {
 					if editing {

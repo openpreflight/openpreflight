@@ -139,3 +139,11 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* A card whose content is nothing but a table runs the table edge to edge.
+   Cards that mix a table with prose or headings keep their padding. */
+@layer components {
+  [data-slot="card-content"]:has(> [data-slot="table-container"]:only-child) {
+    padding-inline: 0;
+  }
+}

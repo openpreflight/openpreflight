@@ -15,22 +15,22 @@ templ Settings(p web.Page) {
 	{{ section := settingsSectionOf(m) }}
 	@layouts.Shell(p) {
 		switch section {
-		case "runner":
-			@settingsShell("runner", "Runner", "How many jobs this process runs at once, the default Docker image, and fork PRs.") {
-				@settingsRunner(p)
-			}
-		case "logs":
-			@settingsShell("logs", "Logs", "How large a job log may grow, and how long rows are kept.") {
-				@settingsLogs(p)
-			}
-		case "admin":
-			@settingsShell("admin", "Admin", "Change the operator password.") {
-				@settingsAdmin(p)
-			}
-		default:
-			@settingsShell("configuration", "Settings", "Global defaults. A repo binding overrides its GitHub App, which overrides these.") {
-				@settingsConfiguration(p)
-			}
+			case "runner":
+				@settingsShell("runner", "Runner", "How many jobs this process runs at once, the default Docker image, and fork PRs.") {
+					@settingsRunner(p)
+				}
+			case "logs":
+				@settingsShell("logs", "Logs", "How large a job log may grow, and how long rows are kept.") {
+					@settingsLogs(p)
+				}
+			case "admin":
+				@settingsShell("admin", "Admin", "Change the operator password.") {
+					@settingsAdmin(p)
+				}
+			default:
+				@settingsShell("configuration", "Settings", "Global defaults. A repo binding overrides its GitHub App, which overrides these.") {
+					@settingsConfiguration(p)
+				}
 		}
 	}
 }
@@ -79,11 +79,6 @@ templ settingsConfiguration(p web.Page) {
 		@layouts.CSRF(p.CSRFToken)
 		<input type="hidden" name="next" value="/settings"/>
 		@card.Card() {
-			@card.Header() {
-				@card.Title() {
-					Configuration
-				}
-			}
 			@card.Content(card.ContentProps{Class: "space-y-4"}) {
 				@field.Field() {
 					@field.Label(field.LabelProps{For: "public_base_url"}) {
@@ -133,11 +128,6 @@ templ settingsRunner(p web.Page) {
 		@layouts.CSRF(p.CSRFToken)
 		<input type="hidden" name="next" value="/settings/runner"/>
 		@card.Card() {
-			@card.Header() {
-				@card.Title() {
-					Runner
-				}
-			}
 			@card.Content(card.ContentProps{Class: "space-y-4"}) {
 				<div class="grid gap-4 sm:grid-cols-2">
 					@field.Field() {
@@ -182,11 +172,6 @@ templ settingsLogs(p web.Page) {
 		@layouts.CSRF(p.CSRFToken)
 		<input type="hidden" name="next" value="/settings/logs"/>
 		@card.Card() {
-			@card.Header() {
-				@card.Title() {
-					Logs
-				}
-			}
 			@card.Content(card.ContentProps{Class: "space-y-4"}) {
 				<div class="grid gap-4 sm:grid-cols-2">
 					@field.Field() {
@@ -220,11 +205,6 @@ templ settingsLogs(p web.Page) {
 
 templ settingsAdmin(p web.Page) {
 	@card.Card() {
-		@card.Header() {
-			@card.Title() {
-				Change admin password
-			}
-		}
 		@card.Content() {
 			<form method="post" action="/api/v1/password" class="flex flex-col gap-4">
 				@layouts.CSRF(p.CSRFToken)

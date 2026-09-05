@@ -4,7 +4,9 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -134,9 +136,28 @@ templ Error(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	if p.User != nil {
 		@layouts.Shell(p) {
-			@layouts.PageHead(str(m, "Heading"), str(m, "Message")) {
-				@button.Button(button.Props{Href: "/", Size: button.SizeSm, Variant: button.VariantOutline}) {
-					Back to overview
+			// A PageHead on its own leaves the operator on a page that is
+			// mostly blank and says nothing about what to do next.
+			@layouts.PageHead(str(m, "Heading"), "")
+			@empty.Empty(empty.Props{Class: emptyPageClass}) {
+				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.CircleAlert()
+					}
+					@empty.Title() {
+						{ str(m, "Heading") }
+					}
+					@empty.Description() {
+						{ str(m, "Message") }
+					}
+				}
+				@empty.Content() {
+					@button.Button(button.Props{Href: "/", Size: button.SizeSm}) {
+						Back to overview
+					}
+					@button.Button(button.Props{Href: "/jobs", Variant: button.VariantOutline, Size: button.SizeSm}) {
+						View jobs
+					}
 				}
 			}
 		}

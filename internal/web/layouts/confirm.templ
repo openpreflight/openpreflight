@@ -5,33 +5,91 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 )
 
-templ ConfirmDelete(id, token, action, triggerLabel, title, desc string) {
-	@alertdialog.AlertDialog(alertdialog.Props{ID: id}) {
+// ConfirmProps describes one guarded POST: a trigger that opens a dialog, and
+// a dialog whose only affirmative control submits the form.
+//
+// The fields exist because "Remove this binding" and "Cancel this run" are the
+// same interaction wearing different words. Everything optional has a default
+// that suits a delete, which is what most of these are.
+type ConfirmProps struct {
+	// ID must be unique on the page; it links trigger to dialog.
+	ID     string
+	Token  string
+	Action string
+
+	// Trigger is the label on the button in the page.
+	Trigger string
+	// TriggerVariant defaults to ghost, which is right for a control sitting
+	// in a card footer or a dense table row next to other link-styled actions.
+	TriggerVariant button.Variant
+	// TriggerClass defaults to "ml-auto text-destructive": pushed to the end
+	// of a footer row, and coloured so the destructive action is the one you
+	// have to aim at rather than the one you land on.
+	TriggerClass string
+
+	Title       string
+	Description string
+
+	// Confirm is the affirmative button in the dialog. It should repeat the
+	// verb from Trigger, not say "OK" - the operator is reading it to check
+	// they opened the dialog they meant to.
+	Confirm string
+	// Dismiss defaults to "Cancel". Override it wherever "Cancel" is also the
+	// name of the action being confirmed, which would otherwise put the word
+	// on both buttons.
+	Dismiss string
+}
+
+func confirmDefaults(p ConfirmProps) ConfirmProps {
+	// The class default belongs to the variant default: a caller that picks
+	// its own variant has picked its own look, and inheriting ml-auto would
+	// shove its button to the far end of whatever row it landed in.
+	if p.TriggerVariant == "" {
+		p.TriggerVariant = button.VariantGhost
+		if p.TriggerClass == "" {
+			p.TriggerClass = "ml-auto text-destructive"
+		}
+	}
+	if p.Confirm == "" {
+		p.Confirm = p.Trigger
+	}
+	if p.Dismiss == "" {
+		p.Dismiss = "Cancel"
+	}
+	return p
+}
+
+// Confirm guards a state-changing POST behind an AlertDialog. The form lives
+// inside the dialog, so the action cannot fire without the dialog having been
+// opened - there is no path where a stray click on the trigger submits.
+templ Confirm(props ConfirmProps) {
+	{{ p := confirmDefaults(props) }}
+	@alertdialog.AlertDialog(alertdialog.Props{ID: p.ID}) {
 		@button.Button(button.Props{
-			Variant:    button.VariantGhost,
+			Variant:    p.TriggerVariant,
 			Size:       button.SizeSm,
-			Class:      "text-destructive",
-			Attributes: alertdialog.TriggerFor(id),
+			Class:      p.TriggerClass,
+			Attributes: alertdialog.TriggerFor(p.ID),
 		}) {
-			{ triggerLabel }
+			{ p.Trigger }
 		}
 		@alertdialog.Content() {
 			@alertdialog.Header() {
 				@alertdialog.Title() {
-					{ title }
+					{ p.Title }
 				}
 				@alertdialog.Description() {
-					{ desc }
+					{ p.Description }
 				}
 			}
 			@alertdialog.Footer() {
 				@alertdialog.Cancel() {
-					Cancel
+					{ p.Dismiss }
 				}
-				<form method="post" action={ templ.SafeURL(action) } class="m-0">
-					@CSRF(token)
+				<form method="post" action={ templ.SafeURL(p.Action) } class="m-0">
+					@CSRF(p.Token)
 					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive, Size: button.SizeSm}) {
-						Remove
+						{ p.Confirm }
 					}
 				</form>
 			}

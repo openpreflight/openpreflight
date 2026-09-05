@@ -13,7 +13,64 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 )
 
-func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Component {
+// ConfirmProps describes one guarded POST: a trigger that opens a dialog, and
+// a dialog whose only affirmative control submits the form.
+//
+// The fields exist because "Remove this binding" and "Cancel this run" are the
+// same interaction wearing different words. Everything optional has a default
+// that suits a delete, which is what most of these are.
+type ConfirmProps struct {
+	// ID must be unique on the page; it links trigger to dialog.
+	ID     string
+	Token  string
+	Action string
+
+	// Trigger is the label on the button in the page.
+	Trigger string
+	// TriggerVariant defaults to ghost, which is right for a control sitting
+	// in a card footer or a dense table row next to other link-styled actions.
+	TriggerVariant button.Variant
+	// TriggerClass defaults to "ml-auto text-destructive": pushed to the end
+	// of a footer row, and coloured so the destructive action is the one you
+	// have to aim at rather than the one you land on.
+	TriggerClass string
+
+	Title       string
+	Description string
+
+	// Confirm is the affirmative button in the dialog. It should repeat the
+	// verb from Trigger, not say "OK" - the operator is reading it to check
+	// they opened the dialog they meant to.
+	Confirm string
+	// Dismiss defaults to "Cancel". Override it wherever "Cancel" is also the
+	// name of the action being confirmed, which would otherwise put the word
+	// on both buttons.
+	Dismiss string
+}
+
+func confirmDefaults(p ConfirmProps) ConfirmProps {
+	// The class default belongs to the variant default: a caller that picks
+	// its own variant has picked its own look, and inheriting ml-auto would
+	// shove its button to the far end of whatever row it landed in.
+	if p.TriggerVariant == "" {
+		p.TriggerVariant = button.VariantGhost
+		if p.TriggerClass == "" {
+			p.TriggerClass = "ml-auto text-destructive"
+		}
+	}
+	if p.Confirm == "" {
+		p.Confirm = p.Trigger
+	}
+	if p.Dismiss == "" {
+		p.Dismiss = "Cancel"
+	}
+	return p
+}
+
+// Confirm guards a state-changing POST behind an AlertDialog. The form lives
+// inside the dialog, so the action cannot fire without the dialog having been
+// opened - there is no path where a stray click on the trigger submits.
+func Confirm(props ConfirmProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -34,6 +91,7 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		p := confirmDefaults(props)
 		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -59,9 +117,9 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 				}
 				ctx = templ.InitializeContext(ctx)
 				var templ_7745c5c3_Var4 string
-				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(triggerLabel)
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(p.Trigger)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 16, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 74, Col: 14}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -70,10 +128,10 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 				return nil
 			})
 			templ_7745c5c3_Err = button.Button(button.Props{
-				Variant:    button.VariantGhost,
+				Variant:    p.TriggerVariant,
 				Size:       button.SizeSm,
-				Class:      "text-destructive",
-				Attributes: alertdialog.TriggerFor(id),
+				Class:      p.TriggerClass,
+				Attributes: alertdialog.TriggerFor(p.ID),
 			}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -119,9 +177,9 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 						}
 						ctx = templ.InitializeContext(ctx)
 						var templ_7745c5c3_Var8 string
-						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(p.Title)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 21, Col: 12}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 79, Col: 14}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 						if templ_7745c5c3_Err != nil {
@@ -150,9 +208,9 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 						}
 						ctx = templ.InitializeContext(ctx)
 						var templ_7745c5c3_Var10 string
-						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(desc)
+						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(p.Description)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 24, Col: 11}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 82, Col: 20}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
@@ -198,7 +256,12 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "Cancel")
+						var templ_7745c5c3_Var13 string
+						templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(p.Dismiss)
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 87, Col: 16}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -208,28 +271,28 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " <form method=\"post\" action=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " <form method=\"post\" action=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var13 templ.SafeURL
-					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(action))
+					var templ_7745c5c3_Var14 templ.SafeURL
+					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(p.Action))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `openpreflight/internal/web/layouts/confirm.templ`, Line: 31, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 89, Col: 56}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"m-0\">")
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = CSRF(token).Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"m-0\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Var14 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_Err = CSRF(p.Token).Render(ctx, templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Var15 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 						templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 						templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 						if !templ_7745c5c3_IsBuffer {
@@ -241,17 +304,22 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "Remove")
+						var templ_7745c5c3_Var16 string
+						templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(p.Confirm)
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/confirm.templ`, Line: 92, Col: 17}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive, Size: button.SizeSm}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var14), templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantDestructive, Size: button.SizeSm}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var15), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -269,7 +337,7 @@ func ConfirmDelete(id, token, action, triggerLabel, title, desc string) templ.Co
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = alertdialog.AlertDialog(alertdialog.Props{ID: id}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = alertdialog.AlertDialog(alertdialog.Props{ID: p.ID}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
