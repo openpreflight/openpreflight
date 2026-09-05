@@ -35,7 +35,7 @@ jobs:
 
       # v1.2.3 -> :1.2.3, :1.2, :latest. A prerelease tag (v1.2.3-rc1) gets
       # only its full version; `latest=auto` keeps it off the floating tags.
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@v6
         id: meta
         with:
           images: ${{ env.IMAGE }}
