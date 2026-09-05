@@ -20,9 +20,14 @@ type CommitFile struct {
 	Status           string `json:"status"`
 }
 
-// CommitFiles is the changed-path list for one SHA. Truncated means the list
+// CommitFiles is the changed-path list for one commit. Truncated means the list
 // is incomplete (explicit flag or the 300-file cap) and callers should fail-open.
+//
+// SHA is the commit the endpoint resolved to. It matters because the ref may
+// have been a branch name: a dry run asks for `main` and needs the immutable
+// SHA back so it can check out the same commit the worker would.
 type CommitFiles struct {
+	SHA       string
 	Files     []CommitFile
 	Truncated bool
 }
@@ -46,17 +51,20 @@ func (c CommitFiles) ChangedPaths() []string {
 }
 
 // CommitFiles lists paths changed in a commit (installation token, contents:read).
-func (c *Client) CommitFiles(ctx context.Context, installationID int64, repo, sha string) (CommitFiles, error) {
+// `ref` may be a SHA, a branch or a tag; the resolved SHA comes back on the
+// result.
+func (c *Client) CommitFiles(ctx context.Context, installationID int64, repo, ref string) (CommitFiles, error) {
 	repo = strings.TrimSpace(repo)
-	sha = strings.TrimSpace(sha)
+	sha := strings.TrimSpace(ref)
 	if repo == "" || sha == "" {
-		return CommitFiles{}, errors.New("githubapp: repo and sha are required")
+		return CommitFiles{}, errors.New("githubapp: repo and a ref are required")
 	}
 	token, err := c.InstallationToken(ctx, installationID)
 	if err != nil {
 		return CommitFiles{}, err
 	}
 	var raw struct {
+		SHA       string       `json:"sha"`
 		Files     []CommitFile `json:"files"`
 		Truncated bool         `json:"truncated"`
 	}
@@ -65,6 +73,7 @@ func (c *Client) CommitFiles(ctx context.Context, installationID int64, repo, sh
 		return CommitFiles{}, err
 	}
 	return CommitFiles{
+		SHA:       raw.SHA,
 		Files:     raw.Files,
 		Truncated: raw.Truncated || len(raw.Files) >= maxCommitFiles,
 	}, nil

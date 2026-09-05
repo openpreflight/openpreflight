@@ -550,6 +550,7 @@ func TestAuthenticatedPagesRender(t *testing.T) {
 		"/coolify", "/github-apps", "/github-apps/new",
 		"/github-apps/" + itoa(ts.app.ID) + "/edit",
 		"/repos", "/repos/pick", "/repos/new",
+		"/repos/" + itoa(binding.ID),
 		"/repos/" + itoa(binding.ID) + "/edit",
 		"/jobs",
 		"/coolify?edit=" + itoa(inst.ID),
@@ -1207,3 +1208,55 @@ func htmlForm(method, path, body, session, csrf string) *http.Request {
 
 // itoa keeps the request-literal helpers readable.
 func itoa(v int64) string { return strconv.FormatInt(v, 10) }
+
+// TestRepoPageShowsConfigurationAndRuns covers the per-repo page. /repos is a
+// management list and /repos/{id}/edit is a form; neither answers "what has this
+// repository been doing", which is the question an operator arrives with.
+func TestRepoPageShowsConfigurationAndRuns(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	binding, err := ts.store.UpsertBinding(store.BindingInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", Enabled: true,
+		Branches: "main", Paths: "src/**",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := ts.store.EnqueueJob(store.JobInput{
+		GitHubAppID: ts.app.ID, Repo: "acme/api", SHA: "abc1234def", Ref: "main", Event: "check_suite.requested",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.store.FinishJobWithSkipReason(job.ID, store.JobSkipped, "skipped", "[]", "",
+		store.SkipReasonPathFilter); err != nil {
+		t.Fatal(err)
+	}
+
+	body := authedHTML(t, ts, token, "/repos/"+itoa(binding.ID))
+	for _, want := range []string{
+		"acme/api",        // the repository it is about
+		"src/**",          // its path filter
+		"main",            // its branch list
+		"abc1234",         // the last run's commit
+		"no changed path", // why that run skipped, in words
+		"/runs/" + job.ID, // and a way into it
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("/repos/{id} missing %q", want)
+		}
+	}
+}
+
+// TestRepoPageRedirectsUnknownBinding keeps a stale or guessed id from
+// rendering a page, following the same convention as the edit routes.
+func TestRepoPageRedirectsUnknownBinding(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	req := htmlReq(http.MethodGet, "/repos/99999")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := ts.do(req)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/repos" {
+		t.Fatalf("status %d location %q", rec.Code, rec.Header().Get("Location"))
+	}
+}

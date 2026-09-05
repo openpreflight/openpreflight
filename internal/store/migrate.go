@@ -153,6 +153,42 @@ ALTER TABLE settings DROP COLUMN max_workspace_bytes;
 	{"0005_binding_paths", `
 ALTER TABLE repo_bindings ADD COLUMN paths TEXT NOT NULL DEFAULT '';
 `},
+	// skip_reason separates the kinds of skip that used to be indistinguishable.
+	// A path-filter miss is intentional; an empty pipeline is a configuration
+	// problem; a fork PR was refused by policy. All three concluded `skipped`
+	// with no way to tell which, and the fork case did not even produce a
+	// Check Run. See queue.Runner.runJob.
+	//
+	// max_workspace_bytes comes back after 0004 dropped it, and this time it is
+	// enforced: workspace.Usage is measured after clone and between steps. The
+	// column is only worth having with that enforcement, which is exactly what
+	// 0004's comment said.
+	{"0006_skip_reason_and_workspace_cap", `
+ALTER TABLE jobs ADD COLUMN skip_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE repo_bindings ADD COLUMN on_empty_pipeline TEXT NOT NULL DEFAULT '';
+ALTER TABLE settings ADD COLUMN max_workspace_bytes INTEGER NOT NULL DEFAULT 1073741824;
+`},
+	// The runner resolves the executor and where the commands came from after
+	// the clone, printed both to the log, and threw them away. They are the two
+	// questions an operator asks about a run they did not watch — "what ran
+	// this?" and "where did these commands come from?" — so they are recorded
+	// the same way check_run_id and check_name already are.
+	{"0007_job_plan", `
+ALTER TABLE jobs ADD COLUMN runtime TEXT NOT NULL DEFAULT '';
+ALTER TABLE jobs ADD COLUMN plan_source TEXT NOT NULL DEFAULT '';
+`},
+
+	// 0008 records the per-value provenance, not just one summary string.
+	// plan_source says where the *commands* came from; it cannot say that the
+	// timeout came from settings while the image came from the pipeline file,
+	// which is the question an operator actually asks about a finished run.
+	//
+	// Stored as JSON rather than a table: it is a small, ordered, write-once
+	// list that is only ever read whole, and a row per value would be four
+	// joins to render one page.
+	{"0008_job_plan_origins", `
+ALTER TABLE jobs ADD COLUMN plan_origins TEXT NOT NULL DEFAULT '';
+`},
 }
 
 func (s *Store) migrate() error {
@@ -187,4 +223,34 @@ func (s *Store) migrate() error {
 		}
 	}
 	return nil
+}
+
+// Schema is what this database is at, next to what this binary expects. The
+// migrations table has always been written and never read back, so the one
+// question an upgrade raises — did my database actually move? — had no answer
+// short of opening SQLite by hand.
+type Schema struct {
+	// Applied is the last migration this database has run, e.g. "0008_job_plan_origins".
+	Applied string `json:"applied"`
+	// Count is how many migrations this database has run.
+	Count int `json:"count"`
+	// Expected is how many this binary carries. Count below Expected means a
+	// migration did not run, which Open would normally have refused to start
+	// on — so seeing it here means something is wrong that is worth saying out
+	// loud rather than inferring.
+	Expected int `json:"expected"`
+}
+
+// UpToDate reports whether every migration this binary carries has been applied.
+func (s Schema) UpToDate() bool { return s.Count >= s.Expected }
+
+// SchemaVersion reads the migrations table back.
+func (s *Store) SchemaVersion() (Schema, error) {
+	out := Schema{Expected: len(migrations)}
+	err := s.db.QueryRow(
+		`SELECT COALESCE(MAX(name), ''), count(*) FROM schema_migrations`).Scan(&out.Applied, &out.Count)
+	if err != nil {
+		return Schema{}, fmt.Errorf("store: schema version: %w", err)
+	}
+	return out, nil
 }

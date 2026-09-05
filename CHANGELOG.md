@@ -4,7 +4,122 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.1.0] - 2026-09-05
+
+Correctness, a dry run, and a worker that says what is wrong with it. Image
+`ghcr.io/openpreflight/openpreflight:2.1.0`.
+
+### Fixed
+
+- **`on_empty_pipeline` is settable.** It shipped readable by the runner but
+  absent from the JSON API and the binding form, so no operator could actually
+  choose it. That is the same mistake migration `0004` exists to undo.
+- **Cancel and timeout now actually stop a Docker job.** `Docker.Run` killed the
+  `docker` CLI and waited on pipes the container still held, so a cancelled
+  `runtime:` job reported cancelled on the Check Run and kept building. It also
+  kept its concurrency slot and workspace, which stalled the queue on an
+  instance running `max_concurrent_jobs: 1`. The container is now removed
+  engine-side and the process group killed, matching the process executor.
+- **A job requeued after a crash reuses its Check Run.** `RequeueStaleJobs`
+  keeps `check_run_id`, and the runner reopens that run instead of creating a
+  second one. Previously the first run was left `in_progress` with nothing ever
+  completing it, so a required check on that commit never resolved. One
+  repository + commit + pipeline is one logical Check Run, across restarts.
+- **Fork pull requests now get a completed Check Run.** A fork PR refused by
+  policy was answered at the webhook with no job and no check, so a required
+  check waited forever with nothing explaining why. It is queued instead and
+  concludes `skipped`, with a summary naming the settings an operator can
+  change. Unbound repositories still produce nothing.
+- **The Docker probe no longer fails a job on a busy host.** `Available` used a
+  3-second budget and, like `Run`, ignored it when a child held the output
+  pipes. A slow-but-healthy engine could fail a job with "the engine is not
+  reachable". The budget is 15s and actually enforced.
+
+### Added
+
+- **A page per repository** at `/repos/{id}`: what the binding is configured to
+  do, its last run with duration and the reason it did not pass, and that
+  repository's recent runs. `/repos` is a management list and `/repos/{id}/edit`
+  is a form; neither answered "what has this repo been doing".
+- **Executor and plan source on the run page.** Whether a job ran in the worker
+  process or `docker:<image>`, and whether its commands came from `.ci.yml`,
+  binding overrides or inference, both existed only in the log body. They are
+  recorded on the job now (migration `0007`) and shown.
+- **The onboarding checklist tracks the whole arc**, adding *First run* and
+  *Passing Check Run* to the four configuration steps, and **retires itself**
+  once the arc is complete. A finished install should not still be shown
+  instructions; it returns if a step regresses.
+- **The Check Run title names the failing step** — `Failed: test (exit 1)`
+  rather than `Failed`. The title is the only part visible in a pull request's
+  collapsed check list.
+- **`on_empty_pipeline`** on a binding: `skip` (the default, unchanged
+  behaviour) or `fail`. A pipeline that resolves to no steps is usually a
+  configuration mistake, and it used to be indistinguishable from an intentional
+  path-filter skip.
+- **`skip_reason`** on a job (`path_filter`, `no_pipeline`, `fork_disabled`,
+  `fork_no_docker`, `fork_no_runtime`), exposed on the Jobs API. Every kind of
+  skip concluded `skipped` with no way to tell which.
+- **Path-filter diagnostics.** Changed count, matched count, the filter, and the
+  decision now appear in the log on every outcome, and in the Check Run summary
+  on a skip. A fail-open says so in words rather than only in the worker log.
+- **`max_workspace_bytes`** is back, and enforced this time: measured after
+  clone and between steps, failing the job rather than filling the disk. Default
+  1 GiB; `0` disables. Migration `0004` dropped the column precisely because
+  nothing read it.
+- **A dry run.** `GET /repos/{id}/resolve` and
+  `POST /api/v1/bindings/{id}/resolve` answer "what would this repository run,
+  on this ref?" — checking out a real commit, resolving the plan the worker
+  would resolve, evaluating the path filter, and reporting every configuration
+  problem at once. It writes no Check Run, no job row and nothing to the queue.
+  Until now the only way to find out what a configuration did was to push a
+  commit and read the result afterwards.
+- **Per-value provenance.** Every resolved value records which of the four
+  layers supplied it — the pipeline file in the commit, the binding, settings,
+  or a built-in default. Shown on the dry run and on the run page for a finished
+  job (migration `0008`), and returned by the jobs API. One `plan_source` string
+  could say where the *commands* came from but not that the timeout came from
+  settings while the image came from `.ci.yml`.
+- **Pre-flight validation.** A bad `timeout:`, a rejected `runtime:` image, an
+  unreadable pipeline file and an empty plan are reported together by the dry
+  run, before a real commit fails on the first of them.
+- **Inference for Go, Rust and Python**, not only Node. `go.mod`, `Cargo.toml`
+  and `pyproject.toml`/`requirements.txt` each yield at most the same three
+  steps. Node is still checked first, so no repository that works today changes
+  plan, and a repository matching two ecosystems gets a warning rather than a
+  silent pick. Python's test step is emitted only where something says tests
+  exist: `pytest` exits 5 on "no tests collected", which would fail a check for
+  a repository that simply has none.
+- **`GET /health?verbose=1`** reports six components — Database, Webhook,
+  GitHub, Repositories, Worker, Docker — each with the reason it is not ok and
+  what to do about it. The plain `GET /health` body and its status codes are
+  unchanged, deliberately: a proxy health check must not start failing on an
+  upgrade. The detail names the base URL and the installed Apps, so it is
+  returned only to an authenticated caller; anonymous callers still get
+  liveness.
+- **A `/status` page** in the Workspace group renders the same report, for the
+  case where the thing that is broken is the reason you cannot use `curl`
+  comfortably. Docker is not an error when nothing in the configuration needs an
+  engine, and the worker reports queued rows and running goroutines separately —
+  they differ exactly when a crash left something behind.
+- **The binary reports its own version.** `internal/build.Version` is set at
+  link time in the Dockerfile and in both release build steps, so a running
+  worker and its image tag can be compared rather than assumed.
+- **The fork runtime fallback names itself.** A fork commit inheriting
+  `settings.default_runtime` used to be credited to the pipeline file. It is the
+  one resolved value with security consequences, so it now says where it came
+  from like every other value.
+
+### Upgrade
+
+Run migrations `0006`, `0007` and `0008` (automatic on boot). No configuration
+change is required: `on_empty_pipeline` defaults to today's behaviour and
+`max_workspace_bytes` defaults to 1 GiB. If a repository's checkout plus build
+legitimately exceeds 1 GiB, raise it in Settings → Runner or set it to `0`.
+
+A dry run clones to the workspace directory and deletes the checkout when it is
+done. It does not take a concurrency slot, so it can run alongside a job; on a
+disk-constrained host, note that it is one extra checkout for the duration of
+the call.
 
 ## [2.0.2] - 2026-09-02
 
@@ -26,6 +141,11 @@ Operator UI refresh on the 2.0.0 binary. Image
 - GitHub Apps is a list. Add is `/github-apps/new`; edit is
   `/github-apps/{id}/edit`. `/github-apps?edit=` redirects to the edit page.
 
+### Upgrade
+
+No action required. The 2.0.2 image is the 2.0.0 binary with the operator UI
+rebuilt; no migration, no configuration change, no API change.
+
 ## [2.0.0] - 2026-09-02
 
 Job query, live logs, Create with GitHub, and path filters. Image
@@ -45,6 +165,12 @@ Job query, live logs, Create with GitHub, and path filters. Image
 - `GET /jobs` and `GET /api/v1/jobs` accept `repo`, `status`, `limit`, and
   `offset` query parameters. Unknown `status` is 400. The Jobs page has a
   GET form for repo and status.
+
+### Upgrade
+
+Migration `0005_binding_paths` runs on boot and adds the binding `paths`
+column. No configuration change is required: an empty filter means every
+path, which is the behaviour every install had before it.
 
 ## [1.1.0] - 2026-09-01
 
@@ -68,6 +194,13 @@ Operator chrome and the docker.sock workspace mount rewrite. Image
 - `runtime:` jobs using the host `docker.sock` mount the checkout from the
   host path behind `WORKSPACE_DIR` (via `/proc/self/mountinfo`, or
   `CI_WORKSPACE_HOST`). Sibling containers no longer see an empty `/work`.
+
+### Upgrade
+
+No schema change and no configuration change. One caveat rather than a blanket
+"no action": `runtime:` jobs now resolve the host workspace path themselves
+through `/proc/self/mountinfo`. If your deployment mounts the workspace in a
+way that detection cannot see, set `CI_WORKSPACE_HOST` to the host path.
 
 ## [1.0.0] - 2026-08-29
 
@@ -129,7 +262,13 @@ v1 of the configurator and worker in one Go binary.
 - Job containers: `--security-opt no-new-privileges`, `--cap-drop ALL`, no
   engine socket.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.0.2...HEAD
+### Upgrade
+
+First release. Migrations `0001`–`0004` create the schema on first boot;
+there is nothing to upgrade from.
+
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.0
 [2.0.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.2
 [2.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.0
 [1.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.1.0

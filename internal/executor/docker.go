@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -21,6 +22,23 @@ type Docker struct {
 	Image string
 	// Bin is the docker CLI. Empty means "docker". Tests inject a fake.
 	Bin string
+	// ProbeTimeout bounds Available. Empty means defaultProbeTimeout.
+	ProbeTimeout time.Duration
+}
+
+// defaultProbeTimeout bounds `docker info`. It is deliberately generous: the
+// probe's answer decides whether a job fails with "the engine is not
+// reachable", so a false negative fails a build that would have worked. A busy
+// engine — or a busy host, which is what a CI box is — can take seconds to
+// answer, and this was originally 3s, which timed out against a *fake* docker
+// under load.
+const defaultProbeTimeout = 15 * time.Second
+
+func (d Docker) probeTimeout() time.Duration {
+	if d.ProbeTimeout > 0 {
+		return d.ProbeTimeout
+	}
+	return defaultProbeTimeout
 }
 
 func (d Docker) bin() string {
@@ -31,14 +49,36 @@ func (d Docker) bin() string {
 }
 
 // Available reports whether the docker CLI can reach an engine.
+//
+// Bounded the same way Run is, and for the same reason: exec.CommandContext
+// kills the client but Wait still blocks on pipes a grandchild inherited, so a
+// hung probe would ignore its own timeout. Stdout and Stderr are left nil so
+// os/exec attaches /dev/null directly instead of creating those pipes.
 func (d Docker) Available(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, d.probeTimeout())
 	defer cancel()
-	cmd := exec.CommandContext(ctx, d.bin(), "info")
+	cmd := exec.Command(d.bin(), "info")
 	cmd.Env = d.cmdEnv()
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-	return cmd.Run() == nil
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return false
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		return err == nil
+	case <-ctx.Done():
+		killGroup(cmd)
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+		}
+		return false
+	}
 }
 
 func (d Docker) cmdEnv() []string {
@@ -92,33 +132,107 @@ func (d Docker) Run(ctx context.Context, step Step, out io.Writer) Result {
 		}
 		args = append(args, "--env", key+"="+val)
 	}
+	// The container id is written here so cancellation can remove the container
+	// engine-side. Killing the `docker run` client does not stop the container
+	// it started, so without this a cancelled job keeps building.
+	cidDir, err := os.MkdirTemp("", "openpreflight-cid-")
+	if err != nil {
+		res.Err = err.Error()
+		res.ExitCode = -1
+		res.Duration = time.Since(start)
+		return res
+	}
+	defer os.RemoveAll(cidDir)
+	// docker refuses to start if the cidfile already exists, so name it inside
+	// a directory we just made rather than creating the file.
+	cidPath := filepath.Join(cidDir, "cid")
+	args = append(args, "--cidfile", cidPath)
+
 	args = append(args, d.Image, "/bin/sh", "-c", step.Command)
 
-	cmd := exec.CommandContext(ctx, d.bin(), args...)
+	// Deliberately not exec.CommandContext: it SIGKILLs the client only, and
+	// Wait would still block on the stdout/stderr pipes that grandchildren
+	// inherited. This mirrors Process.Run — own process group, explicit kill,
+	// bounded wait — so the two executors cannot drift apart again.
+	cmd := exec.Command(d.bin(), args...)
 	cmd.Env = d.cmdEnv()
 	cmd.Stdout = out
 	cmd.Stderr = out
 	cmd.Stdin = nil
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	err = cmd.Run()
-	res.Duration = time.Since(start)
-	res.ExitCode = exitCode(err)
-	if ctx.Err() != nil {
+	if err := cmd.Start(); err != nil {
+		res.Err = err.Error()
+		res.ExitCode = -1
+		res.Duration = time.Since(start)
+		return res
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		res.Duration = time.Since(start)
+		res.ExitCode = exitCode(err)
+		// A step can finish at the same moment the deadline passes; report the
+		// deadline, since that is what the operator sees on the Check Run.
+		if ctx.Err() != nil {
+			res.TimedOut = errors.Is(ctx.Err(), context.DeadlineExceeded)
+			if res.TimedOut {
+				res.Err = "timed out"
+			} else {
+				res.Err = "cancelled"
+			}
+			if res.ExitCode == 0 {
+				res.ExitCode = -1
+			}
+			return res
+		}
+		if err != nil && res.ExitCode == -1 {
+			res.Err = err.Error()
+		}
+		return res
+	case <-ctx.Done():
+		// Remove the container first: the client is what holds the pipes open,
+		// so killing it before the container is gone can orphan the container.
+		d.removeContainer(cidPath)
+		killGroup(cmd)
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+		}
+		res.Duration = time.Since(start)
 		res.TimedOut = errors.Is(ctx.Err(), context.DeadlineExceeded)
+		res.ExitCode = -1
 		if res.TimedOut {
 			res.Err = "timed out"
 		} else {
 			res.Err = "cancelled"
 		}
-		if res.ExitCode == 0 {
-			res.ExitCode = -1
-		}
 		return res
 	}
-	if err != nil && res.ExitCode == -1 {
-		res.Err = err.Error()
+}
+
+// removeContainer force-removes the container named by the cidfile. Best effort:
+// the file may not exist yet if cancellation beat `docker run` to writing it, in
+// which case no container was started either.
+func (d Docker) removeContainer(cidPath string) {
+	cid, err := os.ReadFile(cidPath)
+	if err != nil {
+		return
 	}
-	return res
+	id := strings.TrimSpace(string(cid))
+	if id == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	rm := exec.CommandContext(ctx, d.bin(), "rm", "-f", id)
+	rm.Env = d.cmdEnv()
+	rm.Stdout = io.Discard
+	rm.Stderr = io.Discard
+	_ = rm.Run()
 }
 
 // Ping is Available with a background context, for callers that have none.

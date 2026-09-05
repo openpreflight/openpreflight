@@ -24,6 +24,10 @@ type GitHub struct {
 	tokens      int
 	failNext    map[string]int
 	commitFiles map[string]commitFilesStub
+	// refs maps a branch or tag to the SHA it points at, so a dry run can ask
+	// for "main" and get an immutable commit back the way real GitHub does.
+	refs          map[string]string
+	defaultBranch string
 }
 
 type commitFilesStub struct {
@@ -31,16 +35,23 @@ type commitFilesStub struct {
 	truncated bool
 }
 
-// CheckRunCall records one Check Runs API call.
+// CheckRunCall records one Check Runs API call. ID is the Check Run the call
+// addressed, and is zero for a create (the id does not exist yet).
 type CheckRunCall struct {
 	Repo string
+	ID   string
 	Body map[string]any
 }
 
 // NewGitHub starts the fake. Bare repos live at <root>/<owner>/<name>.git.
 func NewGitHub(t *testing.T, root string) *GitHub {
 	t.Helper()
-	f := &GitHub{failNext: map[string]int{}, commitFiles: map[string]commitFilesStub{}}
+	f := &GitHub{
+		failNext:      map[string]int{},
+		commitFiles:   map[string]commitFilesStub{},
+		refs:          map[string]string{},
+		defaultBranch: "main",
+	}
 	git := &GitServer{root: root}
 
 	mux := http.NewServeMux()
@@ -92,10 +103,33 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 		repo := r.PathValue("owner") + "/" + r.PathValue("repo")
+		id := r.PathValue("id")
 		f.mu.Lock()
-		f.patched = append(f.patched, CheckRunCall{Repo: repo, Body: body})
+		f.patched = append(f.patched, CheckRunCall{Repo: repo, ID: id, Body: body})
 		f.mu.Unlock()
+		// A reopen is a PATCH like a completion; let a test make it fail so the
+		// create-instead fallback can be exercised.
+		if body["status"] == "in_progress" && f.shouldFail("reopen-check") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+			return
+		}
 		json.NewEncoder(w).Encode(map[string]any{"id": 555})
+	})
+	mux.HandleFunc("GET /repos/{owner}/{repo}", func(w http.ResponseWriter, r *http.Request) {
+		if f.shouldFail("repo") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+			return
+		}
+		f.mu.Lock()
+		branch := f.defaultBranch
+		f.mu.Unlock()
+		json.NewEncoder(w).Encode(map[string]any{
+			"full_name":      r.PathValue("owner") + "/" + r.PathValue("repo"),
+			"default_branch": branch,
+			"private":        true,
+		})
 	})
 	mux.HandleFunc("GET /repos/{owner}/{repo}/commits/{sha}", func(w http.ResponseWriter, r *http.Request) {
 		if f.shouldFail("commit-files") {
@@ -103,15 +137,25 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 			w.Write([]byte(`{"message":"server error"}`))
 			return
 		}
+		ref := r.PathValue("sha")
 		f.mu.Lock()
-		stub, ok := f.commitFiles[r.PathValue("sha")]
+		// A ref registered with SetRef resolves to its SHA, the way the real
+		// endpoint accepts "a SHA, a branch or a tag".
+		sha, isRef := f.refs[ref]
+		if !isRef {
+			sha = ref
+		}
+		stub, ok := f.commitFiles[sha]
+		if !ok {
+			stub, ok = f.commitFiles[ref]
+		}
 		f.mu.Unlock()
 		files := stub.files
 		if files == nil {
 			files = []map[string]any{}
 		}
 		json.NewEncoder(w).Encode(map[string]any{
-			"sha":       r.PathValue("sha"),
+			"sha":       sha,
 			"files":     files,
 			"truncated": ok && stub.truncated,
 		})
@@ -130,7 +174,8 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 	return f
 }
 
-// FailNext makes the named operation fail once ("token", "create-check", "commit-files").
+// FailNext makes the named operation fail once ("token", "create-check",
+// "reopen-check", "commit-files", "repo").
 func (f *GitHub) FailNext(op string) {
 	f.mu.Lock()
 	f.failNext[op]++
@@ -159,6 +204,21 @@ func (f *GitHub) CompletedCheckRuns() []CheckRunCall {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]CheckRunCall(nil), f.patched...)
+}
+
+// SetRef points a branch or tag at a SHA, so GET /repos/{}/commits/{ref}
+// resolves it the way GitHub does.
+func (f *GitHub) SetRef(ref, sha string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.refs[ref] = sha
+}
+
+// SetDefaultBranch changes what GET /repos/{owner}/{repo} reports.
+func (f *GitHub) SetDefaultBranch(branch string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.defaultBranch = branch
 }
 
 // SetCommitFiles is the fake GET /repos/{}/commits/{sha} body for a SHA.

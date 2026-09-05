@@ -17,7 +17,7 @@ import (
 // install's check would leave its branch protection rule permanently
 // unsatisfiable ("Expected — waiting for status to be reported"). Existing
 // installs keep the name already in their database until an operator changes it
-// in the UI. See https://docs.openpreflight.xyz/start/configuration/.
+// in the UI. See https://docs.openpreflight.xyz/configure/configuration/.
 func defaultSettings() Settings {
 	return Settings{
 		DefaultCheckName:      "openpreflight",
@@ -25,6 +25,7 @@ func defaultSettings() Settings {
 		DefaultTimeoutSeconds: 900,
 		MaxConcurrentJobs:     1,
 		MaxLogBytes:           10 << 20,
+		MaxWorkspaceBytes:     1 << 30,
 		LogRetentionDays:      14,
 		SkipForkPRs:           true,
 		DefaultRuntime:        "",
@@ -39,14 +40,14 @@ func (s *Store) Settings() (Settings, error) {
 		skipForks   int
 		scanErr     error
 		selectQuery = `SELECT public_base_url, default_check_name, default_pipeline_file,
-			default_timeout_seconds, max_concurrent_jobs, max_log_bytes,
+			default_timeout_seconds, max_concurrent_jobs, max_log_bytes, max_workspace_bytes,
 			log_retention_days, skip_fork_prs, default_runtime
 			FROM settings WHERE id = 1`
 	)
 	scanErr = s.db.QueryRow(selectQuery).Scan(
 		&out.PublicBaseURL, &out.DefaultCheckName, &out.DefaultPipelineFile,
 		&out.DefaultTimeoutSeconds, &out.MaxConcurrentJobs, &out.MaxLogBytes,
-		&out.LogRetentionDays, &skipForks, &out.DefaultRuntime,
+		&out.MaxWorkspaceBytes, &out.LogRetentionDays, &skipForks, &out.DefaultRuntime,
 	)
 	if errors.Is(scanErr, sql.ErrNoRows) {
 		d := defaultSettings()
@@ -66,10 +67,10 @@ func (s *Store) seedSettings(v Settings) error {
 	ts := formatTime(now())
 	_, err := s.db.Exec(`INSERT INTO settings (id, public_base_url, default_check_name,
 		default_pipeline_file, default_timeout_seconds, max_concurrent_jobs, max_log_bytes,
-		log_retention_days, skip_fork_prs, default_runtime, created_at, updated_at)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		max_workspace_bytes, log_retention_days, skip_fork_prs, default_runtime, created_at, updated_at)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		v.PublicBaseURL, v.DefaultCheckName, v.DefaultPipelineFile, v.DefaultTimeoutSeconds,
-		v.MaxConcurrentJobs, v.MaxLogBytes, v.LogRetentionDays,
+		v.MaxConcurrentJobs, v.MaxLogBytes, v.MaxWorkspaceBytes, v.LogRetentionDays,
 		boolInt(v.SkipForkPRs), v.DefaultRuntime, ts, ts)
 	if err != nil {
 		return fmt.Errorf("store: seed settings: %w", err)
@@ -85,10 +86,10 @@ func (s *Store) SaveSettings(v Settings) error {
 	}
 	_, err := s.db.Exec(`UPDATE settings SET public_base_url = ?, default_check_name = ?,
 		default_pipeline_file = ?, default_timeout_seconds = ?, max_concurrent_jobs = ?,
-		max_log_bytes = ?, log_retention_days = ?,
+		max_log_bytes = ?, max_workspace_bytes = ?, log_retention_days = ?,
 		skip_fork_prs = ?, default_runtime = ?, updated_at = ? WHERE id = 1`,
 		v.PublicBaseURL, v.DefaultCheckName, v.DefaultPipelineFile, v.DefaultTimeoutSeconds,
-		v.MaxConcurrentJobs, v.MaxLogBytes, v.LogRetentionDays,
+		v.MaxConcurrentJobs, v.MaxLogBytes, v.MaxWorkspaceBytes, v.LogRetentionDays,
 		boolInt(v.SkipForkPRs), v.DefaultRuntime, formatTime(now()))
 	if err != nil {
 		return fmt.Errorf("store: save settings: %w", err)

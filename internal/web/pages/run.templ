@@ -32,6 +32,7 @@ templ Run(p web.Page) {
 }
 
 templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string, shared bool, commitURL string) {
+	{{ origins := originsOf(job) }}
 	@layouts.PageHead(job.Repo, "") {
 		if p.User != nil {
 			<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + job.ID + "/rerun") } class="m-0">
@@ -112,6 +113,24 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 						{ "-" }
 					}
 				</dd>
+				<dt class="text-muted-foreground">Executor</dt>
+				<dd class="text-xs">
+					if job.Runtime != "" {
+						<span class="font-mono">docker: { job.Runtime }</span>
+					} else if job.Status == store.JobSkipped {
+						{ "-" }
+					} else {
+						worker process
+					}
+				</dd>
+				<dt class="text-muted-foreground">Plan from</dt>
+				<dd class="text-xs">
+					if job.PlanSource != "" {
+						{ job.PlanSource }
+					} else {
+						{ "-" }
+					}
+				</dd>
 				<dt class="text-muted-foreground">Check name</dt>
 				<dd class="text-xs">
 					if job.CheckName != "" {
@@ -172,6 +191,50 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 									} else {
 										{ web.HumanDuration(s.Duration) }
 									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(origins) > 0 {
+		@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Header() {
+				@card.Title() {
+					Where every value came from
+				}
+				@card.Description() {
+					Recorded when this commit was resolved, so it says what applied to this run and not what would apply today.
+				}
+			}
+			@card.Content(card.ContentProps{Class: "px-0"}) {
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() {
+								Value
+							}
+							@table.Head() {
+								Resolved to
+							}
+							@table.Head() {
+								From
+							}
+						}
+					}
+					@table.Body() {
+						for _, o := range origins {
+							@table.Row() {
+								@table.Cell(table.CellProps{Class: "font-medium"}) {
+									{ o.Field }
+								}
+								@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+									{ o.Value }
+								}
+								@table.Cell(table.CellProps{Class: "text-muted-foreground text-xs"}) {
+									{ o.Source }
 								}
 							}
 						}

@@ -108,6 +108,9 @@ templ reposList(p web.Page) {
 						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
 							Edit
 						}
+						@button.Button(button.Props{Href: "/repos/" + itoa64(row.Binding.ID) + "/resolve", Variant: button.VariantLink, Size: button.SizeSm}) {
+							Dry run
+						}
 						<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
 							@layouts.CSRF(p.CSRFToken)
 							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
@@ -374,6 +377,24 @@ templ reposEditorForm(p web.Page) {
 						}
 					}
 					@field.Field() {
+						@field.Label(field.LabelProps{For: "b_on_empty"}) {
+							Empty pipeline
+						}
+						<select
+							id="b_on_empty"
+							name="on_empty_pipeline"
+							class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+						>
+							<option value="skip" selected?={ edit.OnEmptyPipeline != "fail" }>Skip the job</option>
+							<option value="fail" selected?={ edit.OnEmptyPipeline == "fail" }>Fail the job</option>
+						</select>
+						@field.Description() {
+							What to do when nothing resolves to run: no pipeline file, no commands
+							here, and no recognisable project. Usually a misconfiguration rather
+							than an intention.
+						}
+					}
+					@field.Field() {
 						@field.Label(field.LabelProps{For: "b_check"}) {
 							Check name
 						}
@@ -435,6 +456,11 @@ templ reposEditorForm(p web.Page) {
 				<div class="flex flex-wrap items-center gap-2">
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
 						{ bindingSubmitLabel(editing) }
+					}
+					if editing {
+						@button.Button(button.Props{Href: "/repos/" + itoa64(edit.ID) + "/resolve", Variant: button.VariantOutline, Size: button.SizeSm}) {
+							Test configuration
+						}
 					}
 					@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
 						Cancel

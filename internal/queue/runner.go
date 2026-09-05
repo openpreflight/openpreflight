@@ -123,6 +123,13 @@ func (r *Runner) drain(ctx context.Context) {
 	}
 }
 
+// Active is how many jobs are actually running in this process. It is not the
+// same number as store.CountInFlight, which counts rows: a job killed by a
+// SIGKILL leaves an in_progress row behind with no goroutine, which is what
+// RequeueStaleJobs exists to clean up. The gap between the two is diagnostic,
+// so both are reported rather than one being presented as the truth.
+func (r *Runner) Active() int { return r.activeCount() }
+
 func (r *Runner) activeCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -237,29 +244,58 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 
 	// The Check Run goes up before any git work so a slow clone still shows a
 	// running check on the commit rather than nothing at all.
-	run, err := client.CreateCheckRun(ctx, job.InstallationID, githubapp.CreateCheckRunInput{
-		Repo:       job.Repo,
-		Name:       checkName,
-		HeadSHA:    job.SHA,
-		DetailsURL: detailsURL,
-		Status:     "in_progress",
-		Output:     &githubapp.CheckOutput{Title: "Running", Summary: "Starting pipeline…"},
-	})
-	if err != nil {
-		msg := fmt.Sprintf("could not create the Check Run: %v", err)
-		w.Printf("%s\n", msg)
-		r.fail(job, nil, "", msg)
-		return err
+	//
+	// A job requeued after a crash or a redeploy already has a Check Run id, and
+	// it must be reused: creating a second one leaves the first in_progress
+	// forever, and a required check on that commit never resolves. This is the
+	// invariant "one repository + commit + pipeline = one logical Check Run",
+	// and it has to survive SIGKILL to mean anything.
+	checkRunID := job.CheckRunID
+	if checkRunID != 0 {
+		err := client.ReopenCheckRun(ctx, job.InstallationID, githubapp.ReopenCheckRunInput{
+			Repo:       job.Repo,
+			CheckRunID: checkRunID,
+			DetailsURL: detailsURL,
+			Output:     &githubapp.CheckOutput{Title: "Running", Summary: "Restarted after an interruption; re-running the pipeline…"},
+		})
+		if err != nil {
+			// The run may have been deleted, or the App reinstalled. Falling
+			// back to create is exactly what this code did before, so the worst
+			// case is the old behaviour rather than a failed job.
+			r.log.Warn("could not reopen check run; creating a new one",
+				"job", job.ID, "check_run", checkRunID, "error", err)
+			w.Printf("could not reopen check run %d (%v); creating a new one\n", checkRunID, err)
+			checkRunID = 0
+		} else {
+			w.Printf("reusing check run %d (%s) after an interruption\n\n", checkRunID, checkName)
+		}
 	}
-	if err := r.store.SetJobCheckRun(job.ID, run.ID); err != nil {
-		r.log.Error("record check run id", "job", job.ID, "error", err)
+	if checkRunID == 0 {
+		run, err := client.CreateCheckRun(ctx, job.InstallationID, githubapp.CreateCheckRunInput{
+			Repo:       job.Repo,
+			Name:       checkName,
+			HeadSHA:    job.SHA,
+			DetailsURL: detailsURL,
+			Status:     "in_progress",
+			Output:     &githubapp.CheckOutput{Title: "Running", Summary: "Starting pipeline…"},
+		})
+		if err != nil {
+			msg := fmt.Sprintf("could not create the Check Run: %v", err)
+			w.Printf("%s\n", msg)
+			r.fail(job, nil, "", msg)
+			return err
+		}
+		checkRunID = run.ID
+		if err := r.store.SetJobCheckRun(job.ID, checkRunID); err != nil {
+			r.log.Error("record check run id", "job", job.ID, "error", err)
+		}
+		w.Printf("check run %d (%s)\n\n", checkRunID, checkName)
 	}
-	w.Printf("check run %d (%s)\n\n", run.ID, checkName)
 
 	complete := func(conclusion string, results []executor.Result, note string) {
 		body, _ := logs.Tail(r.cfg.LogDir(), job.ID, 50<<10)
 		out := githubapp.CheckOutput{
-			Title:   checkTitle(conclusion),
+			Title:   titleFor(conclusion, results),
 			Summary: summarise(conclusion, results, note, detailsURL),
 		}
 		if body != "" {
@@ -267,7 +303,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		}
 		if err := client.CompleteCheckRun(ctx, job.InstallationID, githubapp.CompleteCheckRunInput{
 			Repo:       job.Repo,
-			CheckRunID: run.ID,
+			CheckRunID: checkRunID,
 			Conclusion: conclusion,
 			DetailsURL: detailsURL,
 			Output:     &out,
@@ -279,6 +315,21 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		}
 	}
 
+	// The webhook decided this job cannot run — a fork PR under the current
+	// policy. It is enqueued anyway rather than dropped, so the Check Run exists
+	// and *completes*: a required check with no check at all hangs the pull
+	// request with nothing on screen to explain it.
+	if job.SkipReason != "" {
+		msg := skipExplanation(job.SkipReason)
+		w.Printf("%s\n", msg)
+		if err := r.store.FinishJobWithSkipReason(
+			job.ID, store.JobSkipped, "skipped", "[]", "", job.SkipReason); err != nil {
+			r.log.Error("finish pre-flight skip", "job", job.ID, "error", err)
+		}
+		complete("skipped", nil, msg)
+		return nil
+	}
+
 	binding := store.RepoBinding{}
 	if job.BindingID != 0 {
 		if b, err := r.store.Binding(job.BindingID); err == nil {
@@ -287,6 +338,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 
 	var token string
+	var filterNote string
 	if strings.TrimSpace(binding.Paths) != "" {
 		var err error
 		token, err = client.InstallationToken(ctx, job.InstallationID)
@@ -298,15 +350,37 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 			return err
 		}
 		files, ferr := client.CommitFiles(ctx, job.InstallationID, job.Repo, job.SHA)
-		if ferr != nil || files.Truncated {
-			w.Printf("path filter: fail-open (error=%v truncated=%v); running the job\n", ferr, files.Truncated)
+		switch {
+		case ferr != nil || files.Truncated:
+			// Fail open: skipping a commit because we could not see the file
+			// list is worse than an extra run. Say so on the Check Run, not
+			// only in this log — a reader on GitHub cannot see this file.
+			why := "the file list was truncated by GitHub"
+			if ferr != nil {
+				why = "the changed-file lookup failed"
+			}
+			filterNote = fmt.Sprintf(
+				"Path filter could not be evaluated (%s); the pipeline was executed.", why)
+			w.Printf("path filter: fail-open (%s); running the job\n", why)
+			w.Printf("  filter: %s\n\n", binding.Paths)
 			r.log.Warn("path filter fail-open", "job", job.ID, "error", ferr, "truncated", files.Truncated)
-		} else if !binding.PathAllowed(files.ChangedPaths()) {
-			msg := "no changed path matched binding paths"
-			w.Printf("%s\n", msg)
-			r.store.FinishJob(job.ID, store.JobSkipped, "skipped", "[]", "")
-			complete("skipped", nil, msg)
-			return nil
+		default:
+			changed := files.ChangedPaths()
+			matched := binding.MatchedPaths(changed)
+			allowed := len(matched) > 0
+			diag := PathFilterDiagnostic(binding.Paths, len(changed), len(matched), allowed)
+			// Log the diagnostic on every outcome, not only on a skip: "why did
+			// this run?" is as common a question as "why did it not?".
+			w.Printf("%s\n", diag)
+			if !allowed {
+				filterNote = diag
+				if err := r.store.FinishJobWithSkipReason(
+					job.ID, store.JobSkipped, "skipped", "[]", "", store.SkipReasonPathFilter); err != nil {
+					r.log.Error("finish path-filter skip", "job", job.ID, "error", err)
+				}
+				complete("skipped", nil, diag)
+				return nil
+			}
 		}
 	}
 
@@ -340,7 +414,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		Repo:       job.Repo,
 		SHA:        job.SHA,
 		Token:      token,
-		BaseURL:    gitBaseURL(app.APIURL),
+		BaseURL:    githubapp.GitBaseURL(app.APIURL),
 		PullNumber: job.PullNumber,
 	}, w); err != nil {
 		msg := fmt.Sprintf("clone failed: %v", err)
@@ -356,16 +430,52 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 	w.Printf("checked out %s in %s\n\n", shortSHA(job.SHA), time.Since(cloneStart).Round(time.Millisecond))
 
+	// A repository larger than the cap fails here rather than part way through a
+	// build. Filling the server's disk takes down the whole worker, not one job.
+	//
+	// JobFailure rather than JobError, matching the between-steps check below:
+	// it is the same condition and an operator should not have to know which
+	// check caught it to find the job in the list.
+	if err := ws.CheckSize(settings.MaxWorkspaceBytes); err != nil {
+		w.Printf("%v\n", err)
+		if ferr := r.store.FinishJob(job.ID, store.JobFailure, "failure", "[]", err.Error()); ferr != nil {
+			r.log.Error("finish oversized workspace", "job", job.ID, "error", ferr)
+		}
+		complete("failure", nil, err.Error())
+		return err
+	}
+
 	pipelineFile := firstNonEmpty(binding.PipelineFile, settings.DefaultPipelineFile, ".ci.yml")
-	plan, err := pipeline.Resolve(ws.Repo, pipelineFile, pipeline.Overrides{
-		Install: binding.InstallCmd,
-		Test:    binding.TestCmd,
-		Build:   binding.BuildCmd,
-	}, timeout)
+	plan, err := pipeline.Resolve(ws.Repo, pipeline.Inputs{
+		PipelineFile:       pipelineFile,
+		PipelineFileSource: pipeline.Layer(binding.PipelineFile != "", settings.DefaultPipelineFile != ""),
+		Overrides: pipeline.Overrides{
+			Install: binding.InstallCmd,
+			Test:    binding.TestCmd,
+			Build:   binding.BuildCmd,
+		},
+		DefaultTimeout:       timeout,
+		DefaultTimeoutSource: pipeline.Layer(binding.TimeoutSeconds > 0, settings.DefaultTimeoutSeconds > 0),
+		DefaultRuntime:       settings.DefaultRuntime,
+		IsFork:               job.IsFork,
+	})
 	if errors.Is(err, pipeline.ErrNothingToRun) {
-		msg := fmt.Sprintf("no %s, no binding commands and no package.json — nothing to run", pipelineFile)
+		msg := fmt.Sprintf("no %s, no binding commands and no recognisable project — nothing to run", pipelineFile)
 		w.Printf("%s\n", msg)
-		r.store.FinishJob(job.ID, store.JobSkipped, "skipped", "[]", "")
+		// An empty pipeline is a different thing from a path-filter skip: the
+		// filter case is intentional, this one is usually a misconfiguration.
+		// Which of the two happened is now recorded, and an operator who wants
+		// the mistake to be loud can set on_empty_pipeline: fail.
+		if binding.OnEmptyPipeline == store.OnEmptyPipelineFail {
+			note := msg + "\n\nThis binding sets on_empty_pipeline: fail."
+			r.fail(job, nil, "", msg)
+			complete("failure", nil, note)
+			return nil
+		}
+		if err := r.store.FinishJobWithSkipReason(
+			job.ID, store.JobSkipped, "skipped", "[]", "", store.SkipReasonNoPipeline); err != nil {
+			r.log.Error("finish empty-pipeline skip", "job", job.ID, "error", err)
+		}
 		complete("skipped", nil, msg)
 		return nil
 	}
@@ -377,10 +487,12 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	}
 
 	w.Printf("plan from %s\n", plan.Source)
-	image := strings.TrimSpace(plan.Runtime)
-	if job.IsFork && image == "" {
-		image = strings.TrimSpace(settings.DefaultRuntime)
+	for _, warning := range plan.Warnings {
+		w.Printf("warning: %s\n", warning)
 	}
+	// plan.Runtime already includes the fork fallback to settings.default_runtime,
+	// applied inside Resolve so that it carries an origin like every other value.
+	image := strings.TrimSpace(plan.Runtime)
 	exec := r.exec
 	if image != "" {
 		if err := executor.ValidImage(image); err != nil {
@@ -401,6 +513,18 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		w.Printf("runtime %s via docker\n", image)
 	} else {
 		w.Printf("runtime: worker process\n")
+	}
+	// Record what was resolved. These values are decided here, after the clone,
+	// and used to exist only in this log file. The origins are what let the run
+	// page say the timeout came from settings while the image came from the
+	// pipeline file, which one summary string cannot.
+	origins, err := json.Marshal(plan.Origins)
+	if err != nil {
+		r.log.Error("encode plan origins", "job", job.ID, "error", err)
+		origins = nil
+	}
+	if err := r.store.SetJobPlan(job.ID, image, plan.Source, string(origins)); err != nil {
+		r.log.Error("record job plan", "job", job.ID, "error", err)
 	}
 	// A pipeline file may set its own timeout, which the outer context does not
 	// know about. Tighten (or extend) here.
@@ -426,6 +550,7 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	})
 
 	var results []executor.Result
+	var workspaceErr error
 	failed := false
 	for _, step := range plan.Steps {
 		if failed {
@@ -444,6 +569,17 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 		w.Printf("\n--- %s: %s in %s ---\n", step.Name, outcome(res), res.Duration.Round(time.Millisecond))
 		if !res.OK() {
 			failed = true
+			continue
+		}
+		// Between steps rather than during: a walk is cheap next to a compile,
+		// and an install step is what usually blows the budget.
+		if err := ws.CheckSize(settings.MaxWorkspaceBytes); err != nil {
+			w.Printf("\n%v\n", err)
+			res.Err = err.Error()
+			res.ExitCode = -1
+			results[len(results)-1] = res
+			failed = true
+			workspaceErr = err
 		}
 	}
 
@@ -451,13 +587,17 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 	switch {
 	case ctx.Err() != nil || anyTimedOut(results):
 		r.finishCancelled(job, results, firstNonNilErr(ctx.Err(), errors.New("timed out")))
-		complete(conclusionForResults(ctx, results), results, "")
+		complete(conclusionForResults(ctx, results), results, filterNote)
 	case failed:
-		r.store.FinishJob(job.ID, store.JobFailure, "failure", string(stepsJSON), "")
-		complete("failure", results, "")
+		note := filterNote
+		if workspaceErr != nil {
+			note = workspaceErr.Error()
+		}
+		r.store.FinishJob(job.ID, store.JobFailure, "failure", string(stepsJSON), errString(workspaceErr))
+		complete("failure", results, note)
 	default:
 		r.store.FinishJob(job.ID, store.JobSuccess, "success", string(stepsJSON), "")
-		complete("success", results, "")
+		complete("success", results, filterNote)
 	}
 	return nil
 }
@@ -531,27 +671,6 @@ func (r *Runner) pruneOnce() {
 	}
 }
 
-// gitBaseURL derives the git origin from the App's API URL so GitHub Enterprise
-// works: api.github.com → https://github.com, ghe.example.com/api/v3 →
-// https://ghe.example.com.
-func gitBaseURL(apiURL string) string {
-	if apiURL == "" {
-		return "https://github.com"
-	}
-	u, err := url.Parse(apiURL)
-	if err != nil || u.Host == "" {
-		return "https://github.com"
-	}
-	if u.Host == "api.github.com" {
-		return "https://github.com"
-	}
-	scheme := u.Scheme
-	if scheme == "" {
-		scheme = "https"
-	}
-	return scheme + "://" + u.Host
-}
-
 func firstNonEmpty(vals ...string) string {
 	for _, v := range vals {
 		if strings.TrimSpace(v) != "" {
@@ -618,4 +737,13 @@ func orDash(v string) string {
 		return "—"
 	}
 	return v
+}
+
+// errString is "" for a nil error, so a job row's error column stays empty on an
+// ordinary build failure.
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }

@@ -86,31 +86,6 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fork PRs run untrusted code on the host unless Docker isolation is on.
-	if ev.IsFork && settings.SkipForkPRs {
-		s.log.Info("webhook: fork skipped", "repo", ev.Repo, "sha", ev.SHA)
-		writeJSON(w, http.StatusAccepted, map[string]string{
-			"status": "ignored", "reason": "fork pull requests are not run",
-		})
-		return
-	}
-	if ev.IsFork {
-		if !s.dockerAvailable() {
-			writeJSON(w, http.StatusAccepted, map[string]string{
-				"status": "ignored",
-				"reason": "fork pull requests require a working Docker executor",
-			})
-			return
-		}
-		if strings.TrimSpace(settings.DefaultRuntime) == "" {
-			writeJSON(w, http.StatusAccepted, map[string]string{
-				"status": "ignored",
-				"reason": "fork pull requests require settings.default_runtime",
-			})
-			return
-		}
-	}
-
 	binding, err := s.store.EnabledBinding(app.ID, ev.Repo)
 	if errors.Is(err, store.ErrNotFound) {
 		// The bindings table *is* the allow-list: an unknown or disabled repo
@@ -132,6 +107,31 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			"reason": "branch " + ev.Branch + " is not in this binding's branch list",
 		})
 		return
+	}
+
+	// Fork PRs run untrusted code, so policy may refuse them. That decision is
+	// recorded on the job rather than answered with a bare 202: the runner then
+	// opens and *completes* a `skipped` Check Run, so a required check resolves
+	// instead of leaving the pull request waiting for a check that will never
+	// arrive.
+	//
+	// This sits after the binding and branch checks on purpose. Enqueuing needs
+	// binding.ID, the check name and the installation id, and the bindings table
+	// stays the allow-list: an unknown or disabled repo still produces nothing.
+	skipReason := ""
+	if ev.IsFork {
+		switch {
+		case settings.SkipForkPRs:
+			skipReason = store.SkipReasonForkDisabled
+		case !s.dockerAvailable():
+			skipReason = store.SkipReasonForkNoDocker
+		case strings.TrimSpace(settings.DefaultRuntime) == "":
+			skipReason = store.SkipReasonForkNoRuntime
+		}
+		if skipReason != "" {
+			s.log.Info("webhook: fork will be skipped with a check",
+				"repo", ev.Repo, "sha", ev.SHA, "reason", skipReason)
+		}
 	}
 
 	// Dedup only while a job for this delivery is still in flight. GitHub's
@@ -192,6 +192,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		ShareableLogs:  binding.ShareableLogs,
 		IsFork:         ev.IsFork,
 		PullNumber:     ev.PullNumber,
+		SkipReason:     skipReason,
 	})
 	if err != nil {
 		s.log.Error("webhook: enqueue", "repo", ev.Repo, "error", err)
@@ -199,6 +200,14 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.runner.Notify()
+	if skipReason != "" {
+		s.log.Info("job queued to report a skip", "job", job.ID, "repo", job.Repo,
+			"sha", job.SHA, "reason", skipReason)
+		writeJSON(w, http.StatusAccepted, map[string]string{
+			"status": "queued", "job": job.ID, "will_skip": skipReason,
+		})
+		return
+	}
 	s.log.Info("job queued", "job", job.ID, "repo", job.Repo, "sha", job.SHA, "event", job.Event)
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "queued", "job": job.ID})
 }

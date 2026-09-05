@@ -11,6 +11,8 @@ import (
 	"github.com/openpreflight/openpreflight/internal/coolify"
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/githubapp"
+	"github.com/openpreflight/openpreflight/internal/health"
+	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
@@ -144,6 +146,7 @@ func agoPtr(t *time.Time) string {
 }
 
 type dashRepo struct {
+	ID      int64
 	Repo    string
 	LastJob store.Job
 }
@@ -379,7 +382,13 @@ func instOf(m map[string]any, key string) store.CoolifyInstance {
 	return get[store.CoolifyInstance](m, key)
 }
 func bindingOf(m map[string]any) store.RepoBinding { return get[store.RepoBinding](m, "Edit") }
-func jobOf(m map[string]any) store.Job             { return get[store.Job](m, "Job") }
+
+// bindingKeyOf reads a binding stored under an explicit key, so a page can hold
+// more than one.
+func bindingKeyOf(m map[string]any, key string) store.RepoBinding {
+	return get[store.RepoBinding](m, key)
+}
+func jobOf(m map[string]any) store.Job { return get[store.Job](m, "Job") }
 func stepsOf(m map[string]any) []executor.Result {
 	return get[[]executor.Result](m, "Steps")
 }
@@ -397,6 +406,16 @@ func connectorsOf(m map[string]any) []coolify.GitHubApp {
 }
 
 func dashNeedApp(n int) bool { return n == 0 }
+
+// dashSetupDone reports whether the whole first-run arc is complete: configured,
+// wired, and proved by a check that actually passed. Only then does the setup
+// card retire — a finished install should not be told how to install.
+//
+// It comes back if a step regresses (the App is deleted, every binding is
+// disabled), because then it is true again.
+func dashSetupDone(baseURL string, apps, enabled int, passedAny bool) bool {
+	return baseURL != "" && apps > 0 && enabled > 0 && passedAny
+}
 func dashNeedRepo(apps, enabled int) bool {
 	return apps > 0 && enabled == 0
 }
@@ -442,4 +461,89 @@ func coolifyFormAction(editing bool, id int64) string {
 		return "/api/v1/coolify/" + itoa64(id)
 	}
 	return "/api/v1/coolify"
+}
+
+// repoSubtitle is the one-line description under a repository's name.
+func repoSubtitle(b store.RepoBinding) string {
+	if !b.Enabled {
+		return "This binding is disabled, so webhooks for it are dropped."
+	}
+	return "What this repository is configured to run, and what it has been running."
+}
+
+// repoFailureReason is the short "why" for a run that did not pass. A skip says
+// which kind of skip, since those used to be indistinguishable.
+func repoFailureReason(j store.Job) string {
+	if j.SkipReason != "" {
+		return skipReasonLabel(j.SkipReason)
+	}
+	return j.Error
+}
+
+// skipReasonLabel turns a stored skip reason into something an operator reads.
+func skipReasonLabel(reason string) string {
+	switch reason {
+	case store.SkipReasonPathFilter:
+		return "no changed path matched the filter"
+	case store.SkipReasonNoPipeline:
+		return "nothing to run: no pipeline, commands, or recognisable project"
+	case store.SkipReasonForkDisabled:
+		return "fork pull requests are not run"
+	case store.SkipReasonForkNoDocker:
+		return "fork pull requests need a reachable Docker engine"
+	case store.SkipReasonForkNoRuntime:
+		return "fork pull requests need settings.default_runtime"
+	default:
+		return reason
+	}
+}
+
+func orDash(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return "—"
+	}
+	return v
+}
+
+func orAll(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return "all"
+	}
+	return v
+}
+
+func orDefault(v, def string) string {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	return v
+}
+
+// resolutionOf is the dry run's result. It is the pipeline package's own type
+// rather than a mirror struct here, so the page and the JSON endpoint cannot
+// drift apart.
+func resolutionOf(m map[string]any) pipeline.Resolution {
+	return get[pipeline.Resolution](m, "Resolution")
+}
+
+// originsOf decodes the per-value provenance recorded on a job. A job from
+// before migration 0008, or one that never got as far as resolving a plan, has
+// none — an empty list, not an error, because the run page still has everything
+// else worth showing.
+func originsOf(j store.Job) []pipeline.Origin {
+	if strings.TrimSpace(j.PlanOrigins) == "" {
+		return nil
+	}
+	var out []pipeline.Origin
+	if err := json.Unmarshal([]byte(j.PlanOrigins), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+// reportOf is the instance self-report rendered by the status page. It is the
+// health package's own type rather than a mirror here, for the same reason the
+// dry run's is: two definitions of "what is wrong" would drift.
+func reportOf(m map[string]any) health.Report {
+	return get[health.Report](m, "Report")
 }
