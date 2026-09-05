@@ -4,7 +4,10 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [2.1.0] - 2026-09-05
+
+Correctness, a dry run, and a worker that says what is wrong with it. Image
+`ghcr.io/openpreflight/openpreflight:2.1.0`.
 
 ### Fixed
 
@@ -86,6 +89,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   silent pick. Python's test step is emitted only where something says tests
   exist: `pytest` exits 5 on "no tests collected", which would fail a check for
   a repository that simply has none.
+- **`GET /health?verbose=1`** reports six components — Database, Webhook,
+  GitHub, Repositories, Worker, Docker — each with the reason it is not ok and
+  what to do about it. The plain `GET /health` body and its status codes are
+  unchanged, deliberately: a proxy health check must not start failing on an
+  upgrade. The detail names the base URL and the installed Apps, so it is
+  returned only to an authenticated caller; anonymous callers still get
+  liveness.
+- **A `/status` page** in the Workspace group renders the same report, for the
+  case where the thing that is broken is the reason you cannot use `curl`
+  comfortably. Docker is not an error when nothing in the configuration needs an
+  engine, and the worker reports queued rows and running goroutines separately —
+  they differ exactly when a crash left something behind.
+- **The binary reports its own version.** `internal/build.Version` is set at
+  link time in the Dockerfile and in both release build steps, so a running
+  worker and its image tag can be compared rather than assumed.
 - **The fork runtime fallback names itself.** A fork commit inheriting
   `settings.default_runtime` used to be credited to the pipeline file. It is the
   one resolved value with security consequences, so it now says where it came
@@ -249,7 +267,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.0.2...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.0
 [2.0.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.2
 [2.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.0
 [1.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v1.1.0
