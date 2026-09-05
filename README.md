@@ -25,7 +25,7 @@ publishing release images on a `v*` tag, which this tool does not do.
 
 One Go binary that is both a **configurator** — GitHub Apps and repo bindings in a web UI or over JSON — and a **worker** that receives webhooks, runs install/test/build on the exact commit, and reports one Check Run with full logs.
 
-[Website](https://openpreflight.xyz) · [Documentation](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/start/quickstart/)
+[Website](https://openpreflight.xyz) · [Documentation](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/)
 
 </div>
 
@@ -33,7 +33,7 @@ One Go binary that is both a **configurator** — GitHub Apps and repo bindings 
 
 It is the smallest useful version of GitHub-native CI: a self-hosted Check Runs runner for teams that want CI on their own server, without Actions and without learning a pipeline DSL. Full platforms, hosted control planes, and Kubernetes-oriented runners already fill this slot. This one is a binary and a SQLite file on a box you already pay for.
 
-Runs are gated on the commit the way Zuul does it — trigger on the check suite, build the immutable SHA, one live run per commit, result written back as a Check Run. See [ADR 005](https://docs.openpreflight.xyz/adr/005-check-suite-gating/) for what that borrows, what it rejects, and where the ceiling is.
+Runs are gated on the commit the way Zuul does it — trigger on the check suite, build the immutable SHA, one live run per commit, result written back as a Check Run. See [ADR 005](https://docs.openpreflight.xyz/reference/decisions/005-check-suite-gating/) for what that borrows, what it rejects, and where the ceiling is.
 
 ## What you get
 
@@ -49,11 +49,13 @@ Published at **[docs.openpreflight.xyz](https://docs.openpreflight.xyz)** ([open
 
 | | |
 | --- | --- |
-| Start | [Quickstart](https://docs.openpreflight.xyz/start/quickstart/) · [Configuration](https://docs.openpreflight.xyz/start/configuration/) · [FAQ](https://docs.openpreflight.xyz/start/faq/) |
-| Setup | [GitHub App](https://docs.openpreflight.xyz/setup/github-app/) · [Bindings](https://docs.openpreflight.xyz/setup/bindings/) · [Coolify](https://docs.openpreflight.xyz/setup/coolify/) |
-| Using | [Pipelines](https://docs.openpreflight.xyz/using/pipelines/) · [Logs](https://docs.openpreflight.xyz/using/logs/) · [API](https://docs.openpreflight.xyz/using/api/) · [Troubleshooting](https://docs.openpreflight.xyz/using/troubleshooting/) |
-| Understanding | [Architecture](https://docs.openpreflight.xyz/understanding/architecture/) · [Security model](https://docs.openpreflight.xyz/understanding/security-model/) · [Deployment](https://docs.openpreflight.xyz/understanding/deployment/) |
-| Project | [ADRs](https://docs.openpreflight.xyz/adr/001-database/) · [Development](https://docs.openpreflight.xyz/contributing/development/) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) |
+| Getting started | [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/) · [FAQ](https://docs.openpreflight.xyz/getting-started/faq/) · [Comparison](https://docs.openpreflight.xyz/getting-started/comparison/) |
+| Deploy | [Deployment](https://docs.openpreflight.xyz/deploy/deployment/) · [Coolify](https://docs.openpreflight.xyz/deploy/coolify/) · [Networking](https://docs.openpreflight.xyz/deploy/networking/) |
+| Configure | [Configuration](https://docs.openpreflight.xyz/configure/configuration/) · [GitHub App](https://docs.openpreflight.xyz/configure/github-app/) · [Bindings](https://docs.openpreflight.xyz/configure/bindings/) · [Resolution](https://docs.openpreflight.xyz/configure/resolution/) · [Path filters](https://docs.openpreflight.xyz/configure/path-filters/) |
+| Use | [Pipelines](https://docs.openpreflight.xyz/use/pipelines/) · [Runs](https://docs.openpreflight.xyz/use/runs/) · [Logs](https://docs.openpreflight.xyz/use/logs/) |
+| Operate | [Operations](https://docs.openpreflight.xyz/operate/operations/) · [Troubleshooting](https://docs.openpreflight.xyz/operate/troubleshooting/) |
+| Reference | [API](https://docs.openpreflight.xyz/reference/api/) · [Architecture](https://docs.openpreflight.xyz/reference/architecture/) · [Security model](https://docs.openpreflight.xyz/reference/security-model/) · [ADRs](https://docs.openpreflight.xyz/reference/decisions/001-database/) |
+| Project | [Development](https://docs.openpreflight.xyz/contributing/development/) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) |
 
 ## Run it
 
@@ -65,7 +67,7 @@ export CI_SECRET_KEY="$(openssl rand -base64 48)"   # keep it forever
 docker compose -f compose.prod.yaml up -d
 ```
 
-That pulls the published image; no checkout is needed. Open <http://localhost:8080>, complete the wizard, register your GitHub App, and enable bindings. Full walkthrough: [Quickstart](https://docs.openpreflight.xyz/start/quickstart/).
+That pulls the published image; no checkout is needed. Open <http://localhost:8080>, complete the wizard, register your GitHub App, and enable bindings. Full walkthrough: [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/).
 
 To build from source instead:
 
@@ -85,7 +87,7 @@ docker compose up --build
 
 ### Requirements
 
-- A GitHub App you own ([permissions and events](https://docs.openpreflight.xyz/setup/github-app/))
+- A GitHub App you own ([permissions and events](https://docs.openpreflight.xyz/configure/github-app/))
 - A public HTTPS URL GitHub can reach
 - `git` in the worker image (clone happens here). Node is needed in this image only when a job has no `runtime:` and runs as a process
 - A reachable Docker engine (`CI_DOCKER_HOST` or a mounted `docker.sock`) if you use `runtime:` or opt into fork PRs

@@ -5,8 +5,8 @@ SQLite file, configuration in the UI rather than a pile of env vars.
 
 ## Before you start
 
-- Read [Architecture](https://docs.openpreflight.xyz/understanding/architecture/)
-  and the [decision records](https://docs.openpreflight.xyz/adr/005-check-suite-gating/).
+- Read [Architecture](https://docs.openpreflight.xyz/reference/architecture/)
+  and the [decision records](https://docs.openpreflight.xyz/reference/decisions/005-check-suite-gating/).
   Both live in [openpreflight/docs](https://github.com/openpreflight/docs); a
   change here that alters documented behaviour needs a pull request there too.
 - Security-sensitive reports go to [SECURITY.md](SECURITY.md), not a public

@@ -17,7 +17,7 @@ import (
 // install's check would leave its branch protection rule permanently
 // unsatisfiable ("Expected — waiting for status to be reported"). Existing
 // installs keep the name already in their database until an operator changes it
-// in the UI. See https://docs.openpreflight.xyz/start/configuration/.
+// in the UI. See https://docs.openpreflight.xyz/configure/configuration/.
 func defaultSettings() Settings {
 	return Settings{
 		DefaultCheckName:      "openpreflight",
