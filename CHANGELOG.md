@@ -4,6 +4,33 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.1.2] - 2026-09-07
+
+Flash becomes a toast, and the run log looks like the Check Run it is.
+No schema change and no contract change. Image
+`ghcr.io/openpreflight/openpreflight:2.1.2`.
+
+### Changed
+
+- **Flash messages are toasts.** The banner at the top of every page ate a
+  row of the layout for a sentence that belongs in the corner. A success
+  dismisses itself; an error stays longer. The log stream disconnect notice
+  uses the same toaster instead of an alert inside the card.
+- **The run log is a dark Check Run panel** in light or dark chrome. An
+  in-progress badge pulses so a live row is not the same grey as a queued
+  one.
+- **The shell header sticks, tables breathe, empty cards go.** Dashboard
+  stats render even with no recent jobs. The Coolify empty state was a card
+  that said to use the form below the card. Health errors sit on the badge
+  `title` and a toast, not as a paragraph on the card.
+- **Inter and JetBrains Mono**, a real focus ring, and
+  `prefers-reduced-motion`.
+
+### Upgrade
+
+No action required. No migration, no configuration change, and no endpoint
+or JSON field is added, renamed or removed.
+
 ## [2.1.1] - 2026-09-07
 
 The operator UI finishes its move onto the component registry, and the binary
@@ -329,7 +356,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.1...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.2...HEAD
+[2.1.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.2
 [2.1.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.1
 [2.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.0
 [2.0.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.2
