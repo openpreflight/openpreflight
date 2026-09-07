@@ -4,7 +4,6 @@ import (
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
@@ -58,7 +57,7 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			}
 		}
 	}
-	<div class="text-muted-foreground mb-6 flex flex-wrap items-center gap-2 text-sm">
+	<div class="mb-8 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
 		@StatusBadge(job)
 		if commitURL != "" {
 			<a class="text-primary font-mono hover:underline" href={ templ.SafeURL(commitURL) }>{ web.ShortSHA(job.SHA) }</a>
@@ -66,13 +65,13 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			<span class="font-mono">{ web.ShortSHA(job.SHA) }</span>
 		}
 		if job.Ref != "" {
-			<span>on <span class="font-mono">{ job.Ref }</span></span>
+			<span class="text-muted-foreground font-mono text-xs">{ job.Ref }</span>
 		}
-		<span>· { job.Event }</span>
+		<span class="text-muted-foreground">{ job.Event }</span>
 		if job.StartedAt != nil {
-			<span>· { web.HumanDuration(job.Duration()) }</span>
+			<span class="text-muted-foreground tabular-nums">{ web.HumanDuration(job.Duration()) }</span>
 		}
-		<span>· { web.Ago(job.CreatedAt) }</span>
+		<span class="text-muted-foreground">{ web.Ago(job.CreatedAt) }</span>
 		if job.ShareableLogs {
 			@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
 				shareable
@@ -91,10 +90,101 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			}
 		}
 	</div>
-	@card.Card(card.Props{Class: "mb-6"}) {
+	if job.Error != "" {
+		@layouts.Toast(job.Error, "err")
+	}
+	if len(steps) > 0 {
+		@card.Card(card.Props{Class: "mb-8"}) {
+			@card.Header() {
+				@card.Title() {
+					Steps
+				}
+			}
+			@card.Content() {
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() {
+								<span class="sr-only">Result</span>
+							}
+							@table.Head() {
+								Step
+							}
+							@table.Head() {
+								Command
+							}
+							@table.Head() {
+								Took
+							}
+						}
+					}
+					@table.Body() {
+						for _, s := range steps {
+							@table.Row() {
+								@table.Cell(table.CellProps{Class: stepMarkClass(s)}) {
+									{ s.Mark() }
+								}
+								@table.Cell() {
+									{ s.Name }
+								}
+								@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
+									{ s.Command }
+								}
+								@table.Cell(table.CellProps{Class: "text-xs tabular-nums"}) {
+									if s.Skipped {
+										{ "-" }
+									} else {
+										{ web.HumanDuration(s.Duration) }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if job.InFlight() || logBody != "" {
+		@card.Card(card.Props{Class: "check-run mb-8 gap-0 border-[#2a2f2a] bg-[#121412] py-0 text-[#e8ebe6]"}) {
+			<div class="flex h-11 items-center justify-between gap-3 border-b border-white/10 px-4">
+				<span class="font-mono text-xs tracking-wide text-white/55">Log</span>
+				if job.InFlight() {
+					<span id="job-log-state" class="font-mono text-xs text-white/45" role="status" aria-live="polite">connecting…</span>
+				}
+			</div>
+			<div class="px-4 py-3">
+				<pre id="job-log" data-job-id={ job.ID } class="max-h-[32rem] overflow-auto font-mono text-xs leading-relaxed whitespace-pre-wrap">{ logBody }</pre>
+				if job.InFlight() && logBody == "" {
+					<div id="job-log-waiting" class="space-y-2 py-2">
+						@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-2/5 bg-white/10"})
+						@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-4/5 bg-white/10"})
+						@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-3/5 bg-white/10"})
+					</div>
+				}
+			</div>
+		}
+		if job.InFlight() {
+			@runLogStream()
+		}
+	} else {
+		@empty.Empty(empty.Props{Class: "mb-8"}) {
+			@empty.Header() {
+				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+					@icon.ScrollText()
+				}
+				@empty.Title() {
+					No log yet
+				}
+				@empty.Description() {
+					The log appears when the runner starts, or after the job finishes writing it.
+				}
+			}
+		}
+	}
+	@card.Card(card.Props{Class: "mb-8"}) {
 		@card.Header() {
 			@card.Title() {
-				Run
+				Details
 			}
 		}
 		@card.Content() {
@@ -142,67 +232,11 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 				@detailRow("Log size") {
 					<span class="tabular-nums">{ itoa64(job.LogBytes) } bytes</span>
 				}
-				if job.Error != "" {
-					@detailRow("Error") {
-						<span class="text-destructive">{ job.Error }</span>
-					}
-				}
-			}
-		}
-	}
-	if len(steps) > 0 {
-		@card.Card(card.Props{Class: "mb-6"}) {
-			@card.Header() {
-				@card.Title() {
-					Steps
-				}
-			}
-			@card.Content() {
-				@table.Table() {
-					@table.Header() {
-						@table.Row() {
-							@table.Head() {
-								<span class="sr-only">Result</span>
-							}
-							@table.Head() {
-								Step
-							}
-							@table.Head() {
-								Command
-							}
-							@table.Head() {
-								Took
-							}
-						}
-					}
-					@table.Body() {
-						for _, s := range steps {
-							@table.Row() {
-								@table.Cell(table.CellProps{Class: "font-mono"}) {
-									{ s.Mark() }
-								}
-								@table.Cell() {
-									{ s.Name }
-								}
-								@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-									{ s.Command }
-								}
-								@table.Cell(table.CellProps{Class: "text-xs"}) {
-									if s.Skipped {
-										{ "-" }
-									} else {
-										{ web.HumanDuration(s.Duration) }
-									}
-								}
-							}
-						}
-					}
-				}
 			}
 		}
 	}
 	if len(origins) > 0 {
-		@card.Card(card.Props{Class: "mb-6"}) {
+		@card.Card(card.Props{Class: "mb-8"}) {
 			@card.Header() {
 				@card.Title() {
 					Where every value came from
@@ -213,65 +247,6 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			}
 			@card.Content() {
 				@originsTable(origins)
-			}
-		}
-	}
-	if job.InFlight() || logBody != "" {
-		@card.Card(card.Props{Class: "bg-muted"}) {
-			@card.Header() {
-				@card.Title() {
-					Log
-				}
-				if job.InFlight() {
-					@card.Action() {
-						// Says which of the three things is true: streaming,
-						// reconnect needed, or finished. Without it a stalled
-						// stream is indistinguishable from a slow build.
-						<span id="job-log-state" class="text-muted-foreground text-xs" role="status" aria-live="polite">connecting…</span>
-					}
-				}
-			}
-			@card.Content() {
-				<pre id="job-log" data-job-id={ job.ID } class="max-h-[32rem] overflow-auto font-mono text-xs whitespace-pre-wrap">{ logBody }</pre>
-				if job.InFlight() {
-					// Hidden until the stream actually gives up. Inside the
-					// card rather than after it: it is about this log, and a
-					// notice that floats free of the panel reads as a page error.
-					@alert.Alert(alert.Props{ID: "job-log-error", Variant: alert.VariantDestructive, Class: "mt-3 hidden"}) {
-						@alert.Title() {
-							The log stream disconnected
-						}
-						@alert.Description() {
-							The run is still going on the server — this page stopped receiving it. Reload to pick the log back up.
-						}
-					}
-				}
-				if job.InFlight() && logBody == "" {
-					// The runner has the job but has not written a byte yet.
-					// An empty <pre> reads as "no output"; this reads as "not yet".
-					<div id="job-log-waiting" class="space-y-2">
-						@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-2/5"})
-						@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-4/5"})
-						@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-3/5"})
-					</div>
-				}
-			}
-		}
-		if job.InFlight() {
-			@runLogStream()
-		}
-	} else {
-		@empty.Empty() {
-			@empty.Header() {
-				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-					@icon.ScrollText()
-				}
-				@empty.Title() {
-					No log yet
-				}
-				@empty.Description() {
-					The log appears when the runner starts, or after the job finishes writing it.
-				}
 			}
 		}
 	}
@@ -286,7 +261,6 @@ templ runLogStream() {
 			var pre = document.getElementById("job-log");
 			if (!pre || !window.EventSource) return;
 			var state = document.getElementById("job-log-state");
-			var failure = document.getElementById("job-log-error");
 			var waiting = document.getElementById("job-log-waiting");
 			function say(text) { if (state) state.textContent = text; }
 			function stopWaiting() {
@@ -320,7 +294,14 @@ templ runLogStream() {
 				}
 				stopWaiting();
 				say("disconnected");
-				if (failure) failure.classList.remove("hidden");
+				if (window.tui && window.tui.toast) {
+					window.tui.toast.add({
+						type: "error",
+						title: "Log stream disconnected",
+						description: "The run is still going on the server — reload to pick the log back up.",
+						timeout: 14000,
+					});
+				}
 			};
 		})();
 	</script>

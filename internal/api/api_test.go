@@ -958,7 +958,7 @@ func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
 		t.Fatalf("setup: %d", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[440px]") {
+	if !strings.Contains(body, `class="brand`) || !strings.Contains(body, "max-w-[440px]") {
 		t.Fatalf("setup is missing brand chrome: %s", body)
 	}
 	if strings.Contains(body, "Sign out") {
@@ -971,7 +971,7 @@ func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
 		t.Fatalf("login: %d", rec.Code)
 	}
 	body = rec.Body.String()
-	if !strings.Contains(body, `class="brand"`) || !strings.Contains(body, "max-w-[440px]") {
+	if !strings.Contains(body, `class="brand`) || !strings.Contains(body, "max-w-[440px]") {
 		t.Fatalf("login is missing brand chrome")
 	}
 	if strings.Contains(body, "Sign out") || strings.Contains(body, ">Overview<") {

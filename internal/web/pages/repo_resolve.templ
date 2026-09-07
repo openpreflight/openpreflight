@@ -3,7 +3,6 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
@@ -30,7 +29,7 @@ templ RepoResolve(p web.Page) {
 				Back to repo
 			}
 		}
-		<form method="get" action={ templ.SafeURL("/repos/" + itoa64(b.ID) + "/resolve") } class="mb-6 flex flex-wrap items-end gap-3">
+		<form method="get" action={ templ.SafeURL("/repos/" + itoa64(b.ID) + "/resolve") } class="mb-8 flex flex-wrap items-end gap-3">
 			@field.Field() {
 				@field.Label(field.LabelProps{For: "ref"}) {
 					Branch, tag or commit
@@ -42,14 +41,7 @@ templ RepoResolve(p web.Page) {
 			}
 		</form>
 		if failure != "" {
-			@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Class: "mb-6"}) {
-				@alert.Title() {
-					The dry run could not be attempted
-				}
-				@alert.Description() {
-					{ failure }
-				}
-			}
+			@layouts.Toast("The dry run could not be attempted: "+failure, "err")
 		} else {
 			@card.Card(card.Props{Class: "mb-6"}) {
 				@card.Header() {
@@ -80,24 +72,10 @@ templ RepoResolve(p web.Page) {
 				}
 			}
 			for _, msg := range res.Errors {
-				@alert.Alert(alert.Props{Variant: alert.VariantDestructive, Class: "mb-3"}) {
-					@alert.Title() {
-						Error
-					}
-					@alert.Description() {
-						{ msg }
-					}
-				}
+				@layouts.Toast(msg, "err")
 			}
 			for _, msg := range res.Warnings {
-				@alert.Alert(alert.Props{Class: "mb-3"}) {
-					@alert.Title() {
-						Warning
-					}
-					@alert.Description() {
-						{ msg }
-					}
-				}
+				@layouts.Toast(msg, "warn")
 			}
 			<div class="mt-6 grid gap-4">
 				@card.Card() {

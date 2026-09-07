@@ -136,7 +136,7 @@ func jobsFilter(repo, status string) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"get\" action=\"/jobs\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5\" aria-label=\"Filter jobs\"><div class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"get\" action=\"/jobs\" class=\"flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3\" aria-label=\"Filter jobs\"><div class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

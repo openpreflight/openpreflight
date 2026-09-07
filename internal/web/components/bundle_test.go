@@ -18,3 +18,12 @@ func TestBundleStillCarriesDialogScript(t *testing.T) {
 		}
 	}
 }
+
+func TestBundleCarriesToastScript(t *testing.T) {
+	js, _ := buildBundle(TemplFiles)
+	for _, want := range []string{"window.tui.toast", "data-tui-toaster"} {
+		if !strings.Contains(string(js), want) {
+			t.Fatalf("component bundle lost %q; layout toasts need it", want)
+		}
+	}
+}

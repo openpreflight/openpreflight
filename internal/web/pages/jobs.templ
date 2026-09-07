@@ -30,7 +30,7 @@ templ Jobs(p web.Page) {
 }
 
 templ jobsFilter(repo, status string) {
-	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5" aria-label="Filter jobs">
+	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3" aria-label="Filter jobs">
 		<div class="flex items-center gap-2">
 			@label.Label(label.Props{For: "status", Class: filterLabelClass}) {
 				Status

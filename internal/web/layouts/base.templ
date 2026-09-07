@@ -3,7 +3,7 @@ package layouts
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components"
-	"github.com/openpreflight/openpreflight/internal/web/components/alert"
+	"github.com/openpreflight/openpreflight/internal/web/components/toast"
 )
 
 templ Base(p web.Page) {
@@ -32,6 +32,8 @@ templ Base(p web.Page) {
 		<body class="min-h-svh bg-background text-foreground">
 			<a class="bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5" href="#main">Skip to content</a>
 			{ children... }
+			@Toast(p.Flash, p.FlashKind)
+			@toast.Toaster(toast.ToasterProps{Timeout: 8000, Limit: 5})
 			<script>
 				(function () {
 					function apply(t) {
@@ -79,35 +81,21 @@ templ CSRF(token string) {
 	<input type="hidden" name="csrf" value={ token }/>
 }
 
-templ Flash(p web.Page) {
-	if p.Flash != "" {
-		{{ var variant alert.Variant }}
-		if p.FlashKind == "err" {
-			{{ variant = alert.VariantDestructive }}
-		}
-		@alert.Alert(alert.Props{Class: "mb-4", Variant: variant}) {
-			@alert.Title() {
-				{ p.Flash }
-			}
-		}
-	}
-}
-
 templ Brand() {
-	<a class="brand" href="/">
-		<img src="/assets/brand/logo.svg" width="28" height="28" alt="" class="size-7 shrink-0 rounded-md"/>
+	<a class="brand group-data-[collapsible=icon]:gap-0" href="/">
+		<img src="/assets/brand/logo.svg" width="28" height="28" alt="" class="size-7 shrink-0 rounded-md object-contain"/>
 		<span class="group-data-[collapsible=icon]:hidden">openpreflight</span>
 	</a>
 }
 
 templ PageHead(title, lede string) {
-	<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+	<div class="mb-8 flex flex-wrap items-start justify-between gap-4">
 		// basis-80 lets the lede wrap inside its own column instead of pushing
 		// the actions onto a line of their own.
 		<div class="min-w-0 flex-1 basis-80">
-			<h1 class="text-2xl font-semibold tracking-tight">{ title }</h1>
+			<h1 class="text-2xl font-semibold tracking-tight text-balance">{ title }</h1>
 			if lede != "" {
-				<p class="text-muted-foreground mt-1 text-sm">{ lede }</p>
+				<p class="text-muted-foreground mt-1.5 max-w-3xl text-sm leading-relaxed text-pretty">{ lede }</p>
 			}
 		</div>
 		<div class="flex shrink-0 flex-wrap items-center gap-2">

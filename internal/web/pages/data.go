@@ -117,6 +117,28 @@ func jobVariant(j store.Job) badge.Variant {
 	}
 }
 
+func jobBadgeClass(j store.Job) string {
+	if j.Status == store.JobInProgress {
+		return "status-live"
+	}
+	return ""
+}
+
+func stepMarkClass(s executor.Result) string {
+	return "font-mono " + stepTone(s)
+}
+
+func stepTone(s executor.Result) string {
+	switch {
+	case s.Skipped:
+		return "text-muted-foreground"
+	case s.OK():
+		return "text-primary"
+	default:
+		return "text-destructive"
+	}
+}
+
 func healthVariant(lastError string, seen bool) badge.Variant {
 	if lastError != "" {
 		return badge.VariantDestructive
@@ -135,6 +157,15 @@ func healthLabel(lastError string, seen bool) string {
 		return "ok"
 	}
 	return "never"
+}
+
+// healthTitle puts the stored error on the badge for hover, instead of dumping
+// it into the card body (flash toast carries the live Test result).
+func healthTitle(lastError string) templ.Attributes {
+	if lastError == "" {
+		return nil
+	}
+	return templ.Attributes{"title": lastError}
 }
 
 // filterLabelClass is the label beside a control on a toolbar row, where the

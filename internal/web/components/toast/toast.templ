@@ -1,0 +1,101 @@
+package toast
+
+import (
+	"strconv"
+
+	"github.com/openpreflight/openpreflight/internal/web/utils"
+)
+
+// Type mirrors the toast types the built-in renderer recognizes.
+type Type string
+
+const (
+	TypeSuccess Type = "success"
+	TypeInfo    Type = "info"
+	TypeWarning Type = "warning"
+	TypeError   Type = "error"
+	TypeLoading Type = "loading"
+)
+
+type ToasterProps struct {
+	ID         string
+	Class      string
+	Attributes templ.Attributes
+	// Timeout in ms before a toast hides. Defaults to 5000 (Base UI).
+	Timeout int
+	// Limit of toasts shown at once. Defaults to 3 (Base UI).
+	Limit int
+}
+
+type Props struct {
+	ID          string
+	Class       string
+	Attributes  templ.Attributes
+	Title       string
+	Description string
+	// Type renders a status icon: success, info, warning, error or loading.
+	Type Type
+	// Timeout in ms overrides the toaster timeout for this toast.
+	Timeout int
+}
+
+// Toaster is the pendant of shadcn's Toaster: the fixed viewport that hosts
+// the toasts, mounted once in the layout.
+templ Toaster(props ...ToasterProps) {
+	{{ var p ToasterProps }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	if p.Timeout == 0 {
+		{{ p.Timeout = 5000 }}
+	}
+	if p.Limit == 0 {
+		{{ p.Limit = 3 }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-slot="toast-viewport"
+		data-tui-toaster
+		data-tui-portal
+		data-tui-toaster-timeout={ strconv.Itoa(p.Timeout) }
+		data-tui-toaster-limit={ strconv.Itoa(p.Limit) }
+		class={ utils.CN(
+			"pointer-events-none fixed inset-x-4 bottom-4 z-50 mx-auto w-auto max-w-sm outline-none sm:right-4 sm:left-auto sm:mx-0 sm:w-full",
+			p.Class,
+		) }
+		{ p.Attributes... }
+	>
+		{ children... }
+	</div>
+}
+
+// Toast renders a toast server side (e.g. swapped into the Toaster via
+// htmx); the script adopts it, builds the markup, stacks it and starts its
+// timer.
+templ Toast(props ...Props) {
+	{{ var p Props }}
+	if len(props) > 0 {
+		{{ p = props[0] }}
+	}
+	<div
+		if p.ID != "" {
+			id={ p.ID }
+		}
+		data-tui-toast-ssr
+		if p.Type != "" {
+			data-type={ string(p.Type) }
+		}
+		if p.Timeout > 0 {
+			data-tui-toast-timeout={ strconv.Itoa(p.Timeout) }
+		}
+		if p.Title != "" {
+			data-tui-toast-title={ p.Title }
+		}
+		if p.Description != "" {
+			data-tui-toast-description={ p.Description }
+		}
+		class={ p.Class }
+	></div>
+}

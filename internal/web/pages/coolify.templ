@@ -2,13 +2,10 @@ package pages
 
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
-	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
-	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
@@ -20,9 +17,15 @@ templ Coolify(p web.Page) {
 	{{ editing := has(m, "Edit") }}
 	{{ edit := instOf(m, "Edit") }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Coolify instances", "One row is one (base URL, API token) pair. A Coolify API token is scoped to a single team, so a row covers that team - not the whole host. A second team on the same host is a second row.")
+		@layouts.PageHead("Coolify instances", "One row is one (base URL, API token) pair. A Coolify API token is scoped to a single team, so a row covers that team - not the whole host. A second team on the same host is a second row.") {
+			if len(instances) > 0 {
+				@button.Button(button.Props{Href: "/coolify#add", Size: button.SizeSm, Variant: button.VariantOutline}) {
+					Add an instance
+				}
+			}
+		}
 		if len(instances) > 0 {
-			<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+			<div class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 				for _, inst := range instances {
 					@card.Card(card.Props{Size: card.SizeSm}) {
 						@card.Header() {
@@ -35,7 +38,10 @@ templ Coolify(p web.Page) {
 						}
 						@card.Content(card.ContentProps{Class: "space-y-2"}) {
 							<div class="flex flex-wrap items-center gap-2">
-								@badge.Badge(badge.Props{Variant: healthVariant(inst.LastError, inst.LastSeenAt != nil)}) {
+								@badge.Badge(badge.Props{
+									Variant:    healthVariant(inst.LastError, inst.LastSeenAt != nil),
+									Attributes: healthTitle(inst.LastError),
+								}) {
 									{ healthLabel(inst.LastError, inst.LastSeenAt != nil) }
 								}
 								if inst.TeamName != "" {
@@ -45,23 +51,24 @@ templ Coolify(p web.Page) {
 								}
 							</div>
 							<div class="font-mono text-xs">{ inst.APITokenRedacted }</div>
-							if inst.LastError != "" {
-								<p class="text-muted-foreground text-xs">{ inst.LastError }</p>
-							} else if inst.LastSeenAt != nil {
+							if p.Flash == "" && inst.LastError != "" {
+								@layouts.Toast(inst.LastError, "err")
+							}
+							if inst.LastError == "" && inst.LastSeenAt != nil {
 								<p class="text-muted-foreground text-xs">{ agoPtr(inst.LastSeenAt) }</p>
 							}
 						}
 						@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
 							<form method="post" action={ templ.SafeURL("/api/v1/coolify/" + itoa64(inst.ID) + "/test") } class="m-0">
 								@layouts.CSRF(p.CSRFToken)
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
+								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
 									Test
 								}
 							</form>
-							@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID) + "#add", Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID) + "#add", Variant: button.VariantOutline, Size: button.SizeSm}) {
 								Edit
 							}
-							@button.Button(button.Props{Href: "/coolify?inspect=" + itoa64(inst.ID) + "#inspect", Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/coolify?inspect=" + itoa64(inst.ID) + "#inspect", Variant: button.VariantGhost, Size: button.SizeSm}) {
 								Inspect
 							}
 							@layouts.Confirm(layouts.ConfirmProps{
@@ -76,20 +83,6 @@ templ Coolify(p web.Page) {
 					}
 				}
 			</div>
-		} else {
-			@empty.Empty(empty.Props{Class: emptyPageClass}) {
-				@empty.Header() {
-					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-						@icon.Server()
-					}
-					@empty.Title() {
-						No instances yet
-					}
-					@empty.Description() {
-						Coolify is optional: inventory and a repo picker. The CI GitHub App is what runs checks. Add one with the form below.
-					}
-				}
-			}
 		}
 		if has(m, "Inspect") {
 			{{ inspect := instOf(m, "Inspect") }}
@@ -102,13 +95,7 @@ templ Coolify(p web.Page) {
 					}
 				}
 				@card.Content(card.ContentProps{Class: "space-y-4"}) {
-					if errMsg := str(m, "InspectError"); errMsg != "" {
-						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
-							@alert.Title() {
-								{ errMsg }
-							}
-						}
-					}
+					@layouts.Toast(str(m, "InspectError"), "err")
 					if len(servers) > 0 {
 						<h2 class="text-base font-semibold">Servers in this team</h2>
 						@table.Table() {

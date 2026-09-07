@@ -110,13 +110,13 @@ templ jobsRow(p web.Page, j store.Job) {
 			{ web.Ago(j.CreatedAt) }
 		}
 		@table.Cell(table.CellProps{Class: "whitespace-nowrap"}) {
-			<div class="flex items-center gap-2">
-				@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantLink, Size: button.SizeSm}) {
+			<div class="flex items-center justify-end gap-1">
+				@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantOutline, Size: button.SizeSm}) {
 					Logs
 				}
 				<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + j.ID + "/rerun") } class="m-0">
 					@layouts.CSRF(p.CSRFToken)
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
 						Re-run
 					}
 				</form>
@@ -190,7 +190,7 @@ templ jobTable(jobs []store.Job, showRepo bool) {
 						{ web.Ago(j.CreatedAt) }
 					}
 					@table.Cell(table.CellProps{Class: "whitespace-nowrap"}) {
-						@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantLink, Size: button.SizeSm}) {
+						@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantOutline, Size: button.SizeSm}) {
 							Logs
 						}
 					}
