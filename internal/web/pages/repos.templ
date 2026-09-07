@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
@@ -105,7 +104,7 @@ templ reposList(p web.Page) {
 					@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
 						<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
 							@layouts.CSRF(p.CSRFToken)
-							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
 								if row.Binding.Enabled {
 									Disable
 								} else {
@@ -236,13 +235,7 @@ templ reposApps(p web.Page) {
 					}
 				</div>
 			</form>
-			if pickerError(m) != "" {
-				@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
-					@alert.Title() {
-						{ pickerError(m) }
-					}
-				}
-			}
+			@layouts.Toast(pickerError(m), "err")
 			if len(picker) > 0 {
 				<form method="post" action="/api/v1/bindings/bulk" class="space-y-3">
 					@layouts.CSRF(p.CSRFToken)

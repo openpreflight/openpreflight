@@ -136,6 +136,7 @@ templ Error(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	if p.User != nil {
 		@layouts.Shell(p) {
+			@layouts.Toast(str(m, "Message"), "err")
 			// A PageHead on its own leaves the operator on a page that is
 			// mostly blank and says nothing about what to do next.
 			@layouts.PageHead(str(m, "Heading"), "")
@@ -163,6 +164,7 @@ templ Error(p web.Page) {
 		}
 	} else {
 		@layouts.Guest(p) {
+			@layouts.Toast(str(m, "Message"), "err")
 			@card.Card(card.Props{Class: "mx-auto max-w-[440px]"}) {
 				@card.Header() {
 					@card.Title() {

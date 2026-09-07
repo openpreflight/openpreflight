@@ -7,7 +7,7 @@ import (
 )
 
 templ StatusBadge(j store.Job) {
-	@badge.Badge(badge.Props{Variant: jobVariant(j)}) {
+	@badge.Badge(badge.Props{Variant: jobVariant(j), Class: jobBadgeClass(j)}) {
 		{ web.JobStatusLabel(j) }
 	}
 }

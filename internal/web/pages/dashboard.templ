@@ -35,50 +35,43 @@ templ Dashboard(p web.Page) {
 					Enable a repo
 				}
 			}
-			if dashHaveSetup(len(apps), enabled) {
-				@button.Button(button.Props{Href: "/jobs", Size: button.SizeSm}) {
-					View jobs
-				}
+		}
+		<div class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			for _, s := range dashStats(recent, len(inflight), enabled, len(bindings)) {
+				@statCard(s)
 			}
-		}
-		if len(recent) > 0 {
-			<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-				for _, s := range dashStats(recent, len(inflight), enabled, len(bindings)) {
-					@statCard(s)
-				}
-			</div>
-		}
+		</div>
 		if !dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny) {
 			@layouts.SectionHead("Setup")
-			@card.Card(card.Props{Class: "mb-6"}) {
+			@card.Card(card.Props{Class: "mb-8"}) {
 				@card.Content() {
 					<ul class="m-0 flex list-none flex-col divide-y p-0">
 						if settings.PublicBaseURL != "" {
 							@setupRow(badge.VariantDefault, "done", "Public base URL", settings.PublicBaseURL, true, "/settings", "Settings")
 						} else {
-							@setupRow(badge.VariantOutline, "needed", "Public base URL", "", false, "/settings", "Set it in Settings")
+							@setupRow(badge.VariantDestructive, "needed", "Public base URL", "", false, "/settings", "Set it in Settings")
 						}
 						if len(apps) > 0 {
 							@setupRow(badge.VariantDefault, "done", "CI GitHub App", itoa(len(apps))+" configured", false, "/github-apps", "Manage")
 						} else {
-							@setupRow(badge.VariantOutline, "needed", "CI GitHub App", "", false, "/github-apps/new", "Add one")
+							@setupRow(badge.VariantDestructive, "needed", "CI GitHub App", "", false, "/github-apps/new", "Add one")
 						}
 						if enabled > 0 {
 							@setupRow(badge.VariantDefault, "done", "Enabled repo", itoa(enabled)+" of "+itoa(len(bindings))+" enabled", false, "/repos", "Manage")
 						} else {
-							@setupRow(badge.VariantOutline, "needed", "Enabled repo", dashNoRepoHint(len(bindings)), false, "/repos", "Enable a repo")
+							@setupRow(badge.VariantDestructive, "needed", "Enabled repo", dashNoRepoHint(len(bindings)), false, "/repos", "Enable a repo")
 						}
 						if ranAny {
 							@setupRow(badge.VariantDefault, "done", "First run", "", false, "/jobs", "View jobs")
 						} else {
-							@setupRow(badge.VariantOutline, "waiting", "First run", "push a commit, and GitHub calls the webhook", false, "", "")
+							@setupRow(badge.VariantSecondary, "waiting", "First run", "push a commit, and GitHub calls the webhook", false, "", "")
 						}
 						if passedAny {
 							@setupRow(badge.VariantDefault, "done", "Passing Check Run", "", false, "", "")
 						} else if ranAny {
 							@setupRow(badge.VariantOutline, "not yet", "Passing Check Run", "a run finished, but none has passed — open it to see why", false, "", "")
 						} else {
-							@setupRow(badge.VariantOutline, "waiting", "Passing Check Run", "the commit gets a green check here and on GitHub", false, "", "")
+							@setupRow(badge.VariantSecondary, "waiting", "Passing Check Run", "the commit gets a green check here and on GitHub", false, "", "")
 						}
 						if len(coolify) > 0 {
 							@setupRow(badge.VariantDefault, "done", "Coolify", itoa(len(coolify))+" configured · optional", false, "/coolify", "Manage")
@@ -89,34 +82,24 @@ templ Dashboard(p web.Page) {
 				}
 			}
 		}
-		@layouts.SectionHead("Active runs") {
-			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
-				View jobs
+		if len(inflight) > 0 {
+			@layouts.SectionHead("Active runs") {
+				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
+					View jobs
+				}
 			}
-		}
-		@card.Card(card.Props{Class: "mb-6"}) {
-			@card.Content() {
-				if len(inflight) > 0 {
+			@card.Card(card.Props{Class: "mb-8"}) {
+				@card.Content() {
 					@jobTable(inflight, true)
-				} else {
-					@empty.Empty(empty.Props{Class: emptyInCardClass}) {
-						@empty.Header() {
-							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-								@icon.Workflow()
-							}
-							@empty.Title() {
-								No jobs queued or running
-							}
-							@empty.Description() {
-								Queued and in-flight runs show up here. Finished work is under Recent jobs.
-							}
-						}
-					}
 				}
 			}
 		}
-		@layouts.SectionHead("Recent jobs")
-		@card.Card(card.Props{Class: "mb-6"}) {
+		@layouts.SectionHead("Recent jobs") {
+			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
+				View all
+			}
+		}
+		@card.Card(card.Props{Class: "mb-8"}) {
 			@card.Content() {
 				if len(jobs) > 0 {
 					@jobTable(jobs, true)
@@ -171,7 +154,7 @@ templ Dashboard(p web.Page) {
 // setupRow is one line of the setup checklist. The state badge sits in a fixed
 // column so every label starts at the same x, whatever the badge says.
 templ setupRow(variant badge.Variant, state, label, detail string, mono bool, href, action string) {
-	<li class="grid grid-cols-[4.5rem_1fr] items-baseline gap-x-3 py-3 first:pt-0 last:pb-0">
+	<li class="grid grid-cols-[5rem_1fr] items-baseline gap-x-3 py-3 first:pt-0 last:pb-0">
 		<span>
 			@badge.Badge(badge.Props{Variant: variant}) {
 				{ state }

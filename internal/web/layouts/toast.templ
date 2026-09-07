@@ -1,0 +1,33 @@
+package layouts
+
+import "github.com/openpreflight/openpreflight/internal/web/components/toast"
+
+// Toast queues a floating notification via the shadcn-templ Toast SSR stub.
+// The toaster script adopts it on load.
+// kind is "ok" (default), "err", or "warn".
+templ Toast(message, kind string) {
+	if message != "" {
+		{{ var t toast.Type }}
+		{{ var title string }}
+		{{ var timeout int }}
+		if kind == "err" {
+			{{ t = toast.TypeError }}
+			{{ title = "Error" }}
+			{{ timeout = 14000 }}
+		} else if kind == "warn" {
+			{{ t = toast.TypeWarning }}
+			{{ title = "Warning" }}
+			{{ timeout = 10000 }}
+		} else {
+			{{ t = toast.TypeSuccess }}
+			{{ title = "Done" }}
+			{{ timeout = 7000 }}
+		}
+		@toast.Toast(toast.Props{
+			Title:       title,
+			Description: message,
+			Type:        t,
+			Timeout:     timeout,
+		})
+	}
+}

@@ -88,7 +88,7 @@ func TestRunPageGuardsCancelAndNamesTheStreamState(t *testing.T) {
 			t.Errorf("Run: cancel posts without a confirm dialog (no %q)", want)
 		}
 	}
-	for _, want := range []string{"job-log-state", "job-log-error", "job-log-waiting"} {
+	for _, want := range []string{"job-log-state", "job-log-waiting", "tui.toast"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Run: in-flight log is missing %q, so a dropped stream would be silent", want)
 		}

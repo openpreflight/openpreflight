@@ -149,7 +149,7 @@ templ Head(props ...HeadProps) {
 			id={ p.ID }
 		}
 		data-slot="table-head"
-		class={ utils.CN("text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&:has([data-slot=checkbox])]:pr-0", p.Class) }
+		class={ utils.CN("text-muted-foreground h-11 px-4 text-left align-middle text-xs font-medium tracking-wide whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&:has([data-slot=checkbox])]:pr-0", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }
@@ -168,7 +168,7 @@ templ Cell(props ...CellProps) {
 			id={ p.ID }
 		}
 		data-slot="table-cell"
-		class={ utils.CN("p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&:has([data-slot=checkbox])]:pr-0", p.Class) }
+		class={ utils.CN("px-4 py-2.5 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&:has([data-slot=checkbox])]:pr-0", p.Class) }
 		{ p.Attributes... }
 	>
 		{ children... }

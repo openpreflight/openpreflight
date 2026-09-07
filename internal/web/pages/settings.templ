@@ -52,8 +52,8 @@ templ settingsShell(section, title, lede string) {
 }
 
 templ settingsNav(current string) {
-	<nav class="text-sm xl:sticky xl:top-6 xl:self-start" aria-label="Settings">
-		<ul class="flex flex-col gap-1">
+	<nav class="text-sm xl:sticky xl:top-20 xl:self-start" aria-label="Settings">
+		<ul class="flex flex-row gap-1 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
 			@settingsNavItem("/settings", "Configuration", current == "configuration")
 			@settingsNavItem("/settings/runner", "Runner", current == "runner")
 			@settingsNavItem("/settings/logs", "Logs", current == "logs")
@@ -65,9 +65,9 @@ templ settingsNav(current string) {
 templ settingsNavItem(href, label string, active bool) {
 	<li>
 		if active {
-			<a class="bg-muted text-foreground block rounded-md px-3 py-1.5 font-medium" href={ templ.SafeURL(href) } aria-current="page">{ label }</a>
+			<a class="bg-muted text-foreground block whitespace-nowrap rounded-md px-3 py-1.5 font-medium" href={ templ.SafeURL(href) } aria-current="page">{ label }</a>
 		} else {
-			<a class="text-muted-foreground hover:bg-muted hover:text-foreground block rounded-md px-3 py-1.5" href={ templ.SafeURL(href) }>{ label }</a>
+			<a class="text-muted-foreground hover:bg-muted hover:text-foreground block whitespace-nowrap rounded-md px-3 py-1.5" href={ templ.SafeURL(href) }>{ label }</a>
 		}
 	</li>
 }
@@ -111,11 +111,6 @@ templ settingsConfiguration(p web.Page) {
 				}
 			}
 		}
-		<div class="flex justify-end">
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				Save settings
-			}
-		</div>
 	</form>
 }
 
@@ -157,11 +152,6 @@ templ settingsRunner(p web.Page) {
 				}
 			}
 		}
-		<div class="flex justify-end">
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				Save settings
-			}
-		</div>
 	</form>
 }
 
@@ -195,11 +185,6 @@ templ settingsLogs(p web.Page) {
 				</div>
 			}
 		}
-		<div class="flex justify-end">
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				Save settings
-			}
-		</div>
 	</form>
 }
 

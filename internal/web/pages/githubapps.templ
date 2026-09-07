@@ -3,7 +3,6 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/alert"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
@@ -27,7 +26,7 @@ templ GitHubApps(p web.Page) {
 			}
 		}
 		if len(apps) > 0 {
-			<div class="mb-6 grid gap-4 lg:grid-cols-2">
+			<div class="mb-8 grid gap-4">
 				for _, app := range apps {
 					@card.Card(card.Props{Size: card.SizeSm}) {
 						@card.Header() {
@@ -38,7 +37,10 @@ templ GitHubApps(p web.Page) {
 								{ appSubtitle(app) }
 							}
 							@card.Action() {
-								@badge.Badge(badge.Props{Variant: healthVariant(app.LastError, app.LastSeenAt != nil)}) {
+								@badge.Badge(badge.Props{
+									Variant:    healthVariant(app.LastError, app.LastSeenAt != nil),
+									Attributes: healthTitle(app.LastError),
+								}) {
 									{ healthLabel(app.LastError, app.LastSeenAt != nil) }
 								}
 							}
@@ -66,23 +68,24 @@ templ GitHubApps(p web.Page) {
 									Attributes: templ.Attributes{"aria-label": "Webhook URL for " + app.Name, "onfocus": "this.select()"},
 								})
 							}
-							if app.LastError != "" {
-								<p class="text-muted-foreground line-clamp-2 text-xs" title={ app.LastError }>{ app.LastError }</p>
-							} else if app.LastSeenAt != nil {
+							if p.Flash == "" && app.LastError != "" {
+								@layouts.Toast(app.LastError, "err")
+							}
+							if app.LastError == "" && app.LastSeenAt != nil {
 								<p class="text-muted-foreground text-xs">{ agoPtr(app.LastSeenAt) }</p>
 							}
 						}
 						@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
 							<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
 								@layouts.CSRF(p.CSRFToken)
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantLink, Size: button.SizeSm}) {
+								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
 									Test
 								}
 							</form>
-							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantOutline, Size: button.SizeSm}) {
 								Edit
 							}
-							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID) + "#inspect", Variant: button.VariantLink, Size: button.SizeSm}) {
+							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID) + "#inspect", Variant: button.VariantGhost, Size: button.SizeSm}) {
 								Installations
 							}
 							@layouts.Confirm(layouts.ConfirmProps{
@@ -128,13 +131,7 @@ templ GitHubApps(p web.Page) {
 					}
 				}
 				@card.Content(card.ContentProps{Class: "space-y-4"}) {
-					if errMsg := str(m, "InspectError"); errMsg != "" {
-						@alert.Alert(alert.Props{Variant: alert.VariantDestructive}) {
-							@alert.Title() {
-								{ errMsg }
-							}
-						}
-					}
+					@layouts.Toast(str(m, "InspectError"), "err")
 					if len(installs) > 0 {
 						@table.Table() {
 							@table.Header() {
@@ -219,25 +216,25 @@ templ GitHubAppsEditorPage(p web.Page) {
 			@card.Content() {
 				if !editing {
 					if settings.PublicBaseURL != "" {
-						<form method="post" action="/api/v1/github-apps/manifest/start" class="mb-4">
-							@layouts.CSRF(p.CSRFToken)
-							@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-								Create with GitHub
-							}
-						</form>
-						<p class="text-muted-foreground mb-4 text-xs">
-							GitHub shows a review screen with the permissions this worker needs. We store the App it returns.
-						</p>
+						<div class="bg-muted/40 mb-6 rounded-lg border px-4 py-4">
+							<p class="text-sm font-medium">Create the App on GitHub</p>
+							<p class="text-muted-foreground mt-1 text-xs leading-relaxed">
+								GitHub shows a review screen with the permissions this worker needs. We store the App it returns.
+							</p>
+							<form method="post" action="/api/v1/github-apps/manifest/start" class="mt-3">
+								@layouts.CSRF(p.CSRFToken)
+								@button.Button(button.Props{Type: button.TypeSubmit}) {
+									Create with GitHub
+								}
+							</form>
+						</div>
 					} else {
-						<p class="text-muted-foreground mb-4 text-xs">
-							Set the public base URL in
-							<a class="text-primary underline-offset-4 hover:underline" href="/settings">Settings</a>
-							before creating an App with GitHub. GitHub must be able to reach this host.
+						@layouts.Toast("Set the public base URL first. GitHub must be able to reach this host before creating an App.", "err")
+						<p class="text-muted-foreground mb-6 text-sm">
+							<a class="text-primary underline-offset-4 hover:underline" href="/settings">Open Settings</a>
 						</p>
 					}
-				}
-				if !editing {
-					<details class="mb-2">
+					<details>
 						<summary class="mb-4 cursor-pointer text-sm font-medium">Advanced: paste credentials</summary>
 						<p class="text-muted-foreground mb-3 text-xs">
 							Register the App on GitHub
