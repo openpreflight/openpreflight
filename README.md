@@ -1,21 +1,16 @@
 <div align="center">
 
-<picture>
-  <source
-    media="(prefers-color-scheme: dark)"
-    srcset="https://openpreflight.xyz/banner-dark.png"
-  />
-  <img
-    src="https://openpreflight.xyz/banner-light.png"
-    alt="openpreflight — Self-hosted CI without the CI platform. One Go binary, one SQLite file: every commit gets a native GitHub Check Run."
-    width="880"
-  />
-</picture>
+<img src="https://openpreflight.xyz/apple-touch-icon.png" alt="openpreflight" width="72" height="72" />
 
-[![Website](https://img.shields.io/badge/website-openpreflight.xyz-2f6f4f?style=flat-square)](https://openpreflight.xyz)
-[![Docs](https://img.shields.io/badge/docs-docs.openpreflight.xyz-2f6f4f?style=flat-square)](https://docs.openpreflight.xyz)
-[![License](https://img.shields.io/badge/license-Apache--2.0-8a8a84?style=flat-square)](LICENSE)
-[![Go](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
+# openpreflight
+
+**A small CI provider for private repos.**
+
+One Go binary · one SQLite file · one Check Run per commit
+
+[Website](https://openpreflight.xyz) · [Docs](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/) · [License](LICENSE)
+
+</div>
 
 **This repository is checked by openpreflight.** `go vet ./...` and `go test ./...`
 run on a self-hosted instance at [ci.openpreflight.xyz](https://ci.openpreflight.xyz),
@@ -24,10 +19,6 @@ you would register yours. GitHub Actions is kept for one job: building and
 publishing release images on a `v*` tag, which this tool does not do.
 
 One Go binary that is both a **configurator** — GitHub Apps and repo bindings in a web UI or over JSON — and a **worker** that receives webhooks, runs install/test/build on the exact commit, and reports one Check Run with full logs.
-
-[Website](https://openpreflight.xyz) · [Documentation](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/)
-
-</div>
 
 ## Why
 

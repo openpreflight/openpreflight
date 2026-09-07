@@ -51,13 +51,14 @@ func titleFor(conclusion string, results []executor.Result) string {
 	return checkTitle(conclusion)
 }
 
-// summarise renders the step table shown in the README:
+// summarise is the Check Run summary GitHub renders as markdown:
 //
-//	✓ install   8s
-//	✓ test     21s
-//	✓ build    13s
+//	✓ install  47s
+//	✓ test     12s
 //
-//	Passed in 42s
+//	**Passed in 59s**
+//
+//	[View full logs](detailsURL)
 func summarise(conclusion string, results []executor.Result, note, detailsURL string) string {
 	var b strings.Builder
 	if len(results) > 0 {
