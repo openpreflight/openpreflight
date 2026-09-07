@@ -4,6 +4,68 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.1.1] - 2026-09-07
+
+The operator UI finishes its move onto the component registry, and the binary
+carries only the code it runs. No schema change and no contract change: this is
+UI work and deletion. Image `ghcr.io/openpreflight/openpreflight:2.1.1`.
+
+### Changed
+
+- **The operator UI finishes its move onto the component registry.** Six raw
+  `<select>` elements, the jobs pager, three inline `<dl>` grids and two
+  hand-written copies of the "where every value came from" table are now the
+  registry `select` and `pagination` components, `detailList`, and one shared
+  `originsTable` with the empty state neither copy had. The pager shows the page
+  number it never showed, and Previous and Next go disabled at the ends instead
+  of vanishing and shifting the row beside them.
+- **Cancelling a run asks first.** It was a single click, and in a dense table
+  the neighbouring row is a different build, so the dialog names the repository
+  and the commit. `ConfirmDelete` becomes `Confirm` taking a props struct — its
+  six positional strings hardcoded the button as "Remove", which is why a cancel
+  had no dialog to reuse.
+- **The log stream says when it dies.** It closed silently, leaving a log that
+  had stopped growing — on the busiest screen in the app, indistinguishable from
+  a slow build. There is now a live region reporting the connection state, an
+  alert when `EventSource` gives up, and skeleton bars while the runner holds a
+  job it has not yet written to.
+- **A new binding's App is an explicit choice.** A native `<select>` posted its
+  first option when the operator touched nothing; the registry component submits
+  only what is set, so the first App is now selected deliberately rather than by
+  the browser's default.
+- **Dashboard stat tiles hold their icon component rather than its name**, so an
+  icon that does not exist fails the build instead of 500-ing the overview page.
+
+### Removed
+
+- **The Lucide set ships the icons the pages render.** It carried all 1,702
+  definitions for the 29 that are used: `icon_data.go` goes from 6,773 lines to
+  94, and the `linux/amd64` binary from 20.3 MB to 16.9 MB. The per-icon SVG
+  cache — a map and a mutex memoising one `Sprintf` — went with it.
+- **`aspectratio` and `dropdownmenu`**, which no page imported: roughly 25 KB of
+  JavaScript off every page load and 2.3 KB of CSS. `dialog`'s markup goes too,
+  for the same reason, but `dialog.js` stays: `sheet` and `alertdialog` emit its
+  `data-tui-dialog-*` contract and the mobile sidebar calls `window.tui.dialog`.
+- **Duplicated declarations across the API and web packages.** `pickerRepo`,
+  `bindingRow` and `dashRepo` were declared identically in both, so the accessor
+  bridging them fell through to a JSON round trip to move a Go value between two
+  names for the same struct; they have one home now and the accessor is a type
+  assertion. `web.Renderer` was an empty struct stored on the server and never
+  read, the Coolify client wrote the same thirty lines for `get` and `post`,
+  three copies of a getenv-with-default helper are `cmp.Or`, and the ✓/✗/–
+  alphabet lived in two files each commented to say it must match the other and
+  now lives on `executor.Result`, where both callers already look.
+
+### Upgrade
+
+No action required. No migration, no configuration change, and no endpoint or
+JSON field is added, renamed or removed.
+
+One thing to know rather than to do: a native `<select>` posted its first option
+when the operator touched nothing, and the registry component submits only what
+is set. On a repository binding created from now on, the App is whatever was
+actually chosen. Existing bindings are untouched.
+
 ## [2.1.0] - 2026-09-05
 
 Correctness, a dry run, and a worker that says what is wrong with it. Image
@@ -108,52 +170,6 @@ Correctness, a dry run, and a worker that says what is wrong with it. Image
   `settings.default_runtime` used to be credited to the pipeline file. It is the
   one resolved value with security consequences, so it now says where it came
   from like every other value.
-
-### Changed
-
-- **The operator UI finishes its move onto the component registry.** Six raw
-  `<select>` elements, the jobs pager, three inline `<dl>` grids and two
-  hand-written copies of the "where every value came from" table are now the
-  registry `select` and `pagination` components, `detailList`, and one shared
-  `originsTable` with the empty state neither copy had. The pager shows the page
-  number it never showed, and Previous and Next go disabled at the ends instead
-  of vanishing and shifting the row beside them.
-- **Cancelling a run asks first.** It was a single click, and in a dense table
-  the neighbouring row is a different build, so the dialog names the repository
-  and the commit. `ConfirmDelete` becomes `Confirm` taking a props struct — its
-  six positional strings hardcoded the button as "Remove", which is why a cancel
-  had no dialog to reuse.
-- **The log stream says when it dies.** It closed silently, leaving a log that
-  had stopped growing — on the busiest screen in the app, indistinguishable from
-  a slow build. There is now a live region reporting the connection state, an
-  alert when `EventSource` gives up, and skeleton bars while the runner holds a
-  job it has not yet written to.
-- **A new binding's App is an explicit choice.** A native `<select>` posted its
-  first option when the operator touched nothing; the registry component submits
-  only what is set, so the first App is now selected deliberately rather than by
-  the browser's default.
-- **Dashboard stat tiles hold their icon component rather than its name**, so an
-  icon that does not exist fails the build instead of 500-ing the overview page.
-
-### Removed
-
-- **The Lucide set ships the icons the pages render.** It carried all 1,702
-  definitions for the 29 that are used: `icon_data.go` goes from 6,773 lines to
-  94, and the `linux/amd64` binary from 20.3 MB to 16.9 MB. The per-icon SVG
-  cache — a map and a mutex memoising one `Sprintf` — went with it.
-- **`aspectratio` and `dropdownmenu`**, which no page imported: roughly 25 KB of
-  JavaScript off every page load and 2.3 KB of CSS. `dialog`'s markup goes too,
-  for the same reason, but `dialog.js` stays: `sheet` and `alertdialog` emit its
-  `data-tui-dialog-*` contract and the mobile sidebar calls `window.tui.dialog`.
-- **Duplicated declarations across the API and web packages.** `pickerRepo`,
-  `bindingRow` and `dashRepo` were declared identically in both, so the accessor
-  bridging them fell through to a JSON round trip to move a Go value between two
-  names for the same struct; they have one home now and the accessor is a type
-  assertion. `web.Renderer` was an empty struct stored on the server and never
-  read, the Coolify client wrote the same thirty lines for `get` and `post`,
-  three copies of a getenv-with-default helper are `cmp.Or`, and the ✓/✗/–
-  alphabet lived in two files each commented to say it must match the other and
-  now lives on `executor.Result`, where both callers already look.
 
 ### Upgrade
 
@@ -313,7 +329,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.1...HEAD
+[2.1.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.1
 [2.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.0
 [2.0.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.2
 [2.0.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.0.0
