@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.1.3] - 2026-09-09
+
+The operator mark is the status-quad logo. No schema change and no
+contract change. Image `ghcr.io/openpreflight/openpreflight:2.1.3`.
+
+### Changed
+
+- **Brand mark is the status quad** (running, pending, passed, skipped)
+  instead of the old runway-check. Embedded in the operator UI assets
+  and the README banner.
+
+### Upgrade
+
+No action required. No migration, no configuration change, and no endpoint
+or JSON field is added, renamed or removed.
+
 ## [2.1.2] - 2026-09-07
 
 Flash becomes a toast, and the run log looks like the Check Run it is.
