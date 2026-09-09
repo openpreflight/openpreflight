@@ -1,18 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#2f6f4f"/>
-  <!-- Runway-check: legible at 16px -->
+  <rect width="32" height="32" rx="6" fill="#2f6f4f"/>
+  <!-- Check Run states: passed, running, pending, skipped. -->
+  <circle cx="10" cy="10" r="3" fill="#ffffff"/>
+  <circle cx="23" cy="10" r="2" stroke="#ffffff" stroke-width="2"/>
   <path
-    d="M8 16.5 L13.5 22 L21.5 12.5 H25.5"
+    d="M7 22 L10 25 L15 19"
     stroke="#ffffff"
-    stroke-width="2.75"
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    stroke-width="2"
+    stroke-linecap="square"
+    stroke-linejoin="miter"
   />
   <path
-    d="M20.25 9.25 L21.5 11.75 L22.75 9.25"
+    d="M19 23 H26"
     stroke="#ffffff"
-    stroke-width="2.25"
-    stroke-linecap="round"
-    stroke-linejoin="round"
+    stroke-width="2"
+    stroke-linecap="square"
   />
 </svg>

@@ -65,7 +65,7 @@ func CSSHandler() http.Handler {
 	})
 }
 
-// LogoHandler serves the website runway-check mark. Login and setup need it
+// LogoHandler serves the OpenPreflight status-quad mark. Login and setup need it
 // before a session exists.
 func LogoHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
