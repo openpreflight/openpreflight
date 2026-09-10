@@ -10,6 +10,10 @@ One Go binary · one SQLite file · one Check Run per commit
 
 [Website](https://openpreflight.xyz) · [Docs](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/) · [License](LICENSE)
 
+<br />
+
+<a href="https://www.producthunt.com/products/openpreflight?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-openpreflight" target="_blank" rel="noopener noreferrer"><img alt="openpreflight - Self-hosted CI without the CI platform. | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1244953&theme=light&t=1789004638189"></a>
+
 </div>
 
 **This repository is checked by openpreflight.** `go vet ./...` and `go test ./...`
