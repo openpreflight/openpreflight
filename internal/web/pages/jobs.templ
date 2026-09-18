@@ -39,7 +39,7 @@ templ jobsFilter(repo, status string) {
 				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[11rem] shrink-0"}) {
 					@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})
 				}
-				@selectcomp.Content() {
+				@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
 					@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
 						{ allStatuses }
 					}

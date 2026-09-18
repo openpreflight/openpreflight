@@ -270,7 +270,7 @@ func jobsFilter(repo, status string) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = selectcomp.Content().Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

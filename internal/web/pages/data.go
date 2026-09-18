@@ -249,7 +249,7 @@ func appFormLede(editing bool) string {
 	if editing {
 		return "Leave the webhook secret and PEM blank to keep the stored values."
 	}
-	return "Create with GitHub, or paste credentials under Advanced. GitHub Enterprise uses paste."
+	return "Let GitHub create the App and hand back its credentials, or paste the credentials of one you registered yourself."
 }
 
 func appIDValue(editing bool, id int64) string {
@@ -265,6 +265,17 @@ func apiURLValue(editing bool, u string) string {
 	}
 	return u
 }
+
+// Browser autofill has nothing useful to offer an App slug or a Coolify
+// instance id, and a password manager offering to fill "Webhook secret" with
+// the operator's login is worse than unhelpful. Shared so every editor field
+// opts out the same way.
+var (
+	noAutofill = templ.Attributes{"autocomplete": "off", "spellcheck": "false"}
+	slugAttrs  = templ.Attributes{"autocomplete": "off", "spellcheck": "false", "autocapitalize": "none", "pattern": "[a-z0-9-]+"}
+	// new-password rather than off: Chrome ignores off on password inputs.
+	secretAttrs = templ.Attributes{"autocomplete": "new-password", "spellcheck": "false"}
+)
 
 func pemAttrs(editing bool) templ.Attributes {
 	if editing {

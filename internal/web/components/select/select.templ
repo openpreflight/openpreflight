@@ -384,7 +384,13 @@ templ Item(props ...ItemProps) {
 		<span data-tui-select-item-text class="flex flex-1 gap-2 shrink-0 whitespace-nowrap">
 			{ children... }
 		</span>
-		<span class="pointer-events-none absolute right-2 flex size-4 items-center justify-center opacity-0 group-data-selected/select-item:opacity-100">
+		// group-data-[selected] with the brackets, not the bare group-data-selected
+		// shorthand: for a NAMED group Tailwind v4 compiles the bare form to
+		// [data-selected=true] only, with no attribute-presence fallback (the
+		// unnamed data-disabled: variant a few lines up does get one). This
+		// component's markup and its select.js both write data-selected="", so
+		// the bare form never matched and the tick never appeared on any select.
+		<span class="pointer-events-none absolute right-2 flex size-4 items-center justify-center opacity-0 group-data-[selected]/select-item:opacity-100">
 			@icon.Check(icon.Props{Class: "pointer-events-none"})
 		</span>
 	</div>

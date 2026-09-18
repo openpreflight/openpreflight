@@ -131,3 +131,51 @@ func TestReadFromOffset(t *testing.T) {
 		t.Fatalf("at EOF: %q next=%d err=%v", end, next, err)
 	}
 }
+
+func TestWriterStripsANSI(t *testing.T) {
+	dir := t.TempDir()
+	w, err := Create(dir, "job-ansi", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The reported line, plus an OSC title and a bare two-character escape.
+	if _, err := w.Write([]byte("\x1b[42m\x1b[30m generating static routes \x1b[39m\x1b[49m\n")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("\x1b]0;build\x07done\x1b7\n")); err != nil {
+		t.Fatal(err)
+	}
+	// A sequence split across two writes is the normal case on a pipe: the
+	// filter must not leak the tail of it into the file.
+	if _, err := w.Write([]byte("half\x1b[3")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("1mred\n")); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	body, err := Read(dir, "job-ansi")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := " generating static routes \ndone\nhalfred\n"
+	if body != want {
+		t.Fatalf("escapes survived:\ngot  %q\nwant %q", body, want)
+	}
+}
+
+func TestWriteReportsEveryByteAccepted(t *testing.T) {
+	dir := t.TempDir()
+	w, err := Create(dir, "job-n", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	// io.Writer contract: a short count is an error to os/exec, which would
+	// fail the step over colour we chose to drop.
+	in := []byte("\x1b[32mok\x1b[0m")
+	n, err := w.Write(in)
+	if err != nil || n != len(in) {
+		t.Fatalf("write: n=%d want %d err=%v", n, len(in), err)
+	}
+}

@@ -20,6 +20,7 @@ type Writer struct {
 	max      int64
 	written  int64
 	overflow bool
+	ansi     ansiFilter
 }
 
 // Path returns the log file for a job id.
@@ -42,13 +43,19 @@ func Create(dir, jobID string, max int64) (*Writer, error) {
 func (w *Writer) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	// Every caller is told the whole write landed, escapes included; only the
+	// bytes that reach the file are the stripped ones.
+	accepted := len(p)
 	if w.f == nil {
-		return len(p), nil
+		return accepted, nil
 	}
 	if w.max > 0 && w.written >= w.max {
-		return len(p), nil
+		return accepted, nil
 	}
-	chunk := p
+	chunk := w.ansi.filter(p)
+	if len(chunk) == 0 {
+		return accepted, nil
+	}
 	if w.max > 0 && w.written+int64(len(chunk)) > w.max {
 		chunk = chunk[:w.max-w.written]
 		w.overflow = true
@@ -62,9 +69,9 @@ func (w *Writer) Write(p []byte) (int, error) {
 		w.f = nil
 	}
 	if err != nil {
-		return len(p), fmt.Errorf("logs: write: %w", err)
+		return accepted, fmt.Errorf("logs: write: %w", err)
 	}
-	return len(p), nil
+	return accepted, nil
 }
 
 // Printf writes a framing line (step headers, timings).

@@ -1020,7 +1020,7 @@ func Item(props ...ItemProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</span> <span class=\"pointer-events-none absolute right-2 flex size-4 items-center justify-center opacity-0 group-data-selected/select-item:opacity-100\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</span><span class=\"pointer-events-none absolute right-2 flex size-4 items-center justify-center opacity-0 group-data-[selected]/select-item:opacity-100\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1078,7 +1078,7 @@ func Separator(props ...SeparatorProps) templ.Component {
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/select/select.templ`, Line: 400, Col: 12}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/components/select/select.templ`, Line: 406, Col: 12}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 			if templ_7745c5c3_Err != nil {
