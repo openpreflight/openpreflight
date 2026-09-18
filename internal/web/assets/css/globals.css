@@ -94,7 +94,10 @@
   --foreground: #e8ebe6;
   --card: #1a1d1a;
   --card-foreground: #e8ebe6;
-  --popover: #1a1d1a;
+  /* A step lighter than --card, not equal to it: every popover (select menu,
+     dialog, tooltip) opens over a card, and in dark mode a shadow alone does
+     not separate two surfaces of the same colour. */
+  --popover: #242923;
   --popover-foreground: #e8ebe6;
   --primary: #7cc79c;
   --primary-foreground: #102018;

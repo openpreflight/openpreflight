@@ -14,8 +14,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// sessionTTL is how long a configurator login lasts.
-const sessionTTL = 14 * 24 * time.Hour
+// A login is idle-expiring rather than fixed-length. A flat 14-day TTL meant a
+// cookie copied off a laptop stayed good for a fortnight whether or not anyone
+// used it, and nothing but an explicit logout ever shortened that. This console
+// can run arbitrary repo code on the host, so a credential nobody is using
+// should stop working.
+//
+// SessionIdleTTL is how long a session survives without a request;
+// SessionMaxTTL is the ceiling no amount of activity raises, so even a session
+// in daily use is re-authenticated weekly.
+const (
+	SessionIdleTTL = 24 * time.Hour
+	SessionMaxTTL  = 7 * 24 * time.Hour
+)
 
 // HasUsers reports whether the setup wizard still needs to run.
 func (s *Store) HasUsers() (bool, error) {
@@ -62,6 +73,13 @@ func (s *Store) SetPassword(userID int64, password string) error {
 		string(hash), formatTime(now()), userID)
 	if err != nil {
 		return fmt.Errorf("store: set password: %w", err)
+	}
+	// A password change is how you lock someone out, so it has to invalidate
+	// the credentials they already hold. Leaving them live meant a stolen
+	// cookie or bearer token outlived the password it was obtained with. The
+	// caller re-issues a session for whoever is standing at the keyboard.
+	if _, err := s.db.Exec(`DELETE FROM sessions WHERE user_id = ?`, userID); err != nil {
+		return fmt.Errorf("store: revoke sessions: %w", err)
 	}
 	return nil
 }
@@ -117,7 +135,7 @@ func (s *Store) CreateSession(userID int64) (string, time.Time, error) {
 	}
 	token := base64.RawURLEncoding.EncodeToString(raw)
 	created := now()
-	expires := created.Add(sessionTTL)
+	expires := created.Add(SessionIdleTTL)
 	if _, err := s.db.Exec(`INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
 		token, userID, formatTime(created), formatTime(expires)); err != nil {
 		return "", time.Time{}, fmt.Errorf("store: create session: %w", err)
@@ -125,28 +143,53 @@ func (s *Store) CreateSession(userID int64) (string, time.Time, error) {
 	return token, expires, nil
 }
 
-// UserBySession resolves a session cookie, dropping it if expired.
+// UserBySession resolves a session cookie or bearer token, dropping it if it
+// has gone idle or hit the absolute ceiling, and sliding the idle window
+// forward otherwise.
 func (s *Store) UserBySession(token string) (User, error) {
 	if token == "" {
 		return User{}, ErrNotFound
 	}
 	var (
-		u       User
-		expires string
-		ca      string
+		u              User
+		expires        string
+		sessionCreated string
+		ca             string
 	)
-	err := s.db.QueryRow(`SELECT u.id, u.username, u.created_at, s.expires_at
+	err := s.db.QueryRow(`SELECT u.id, u.username, u.created_at, s.created_at, s.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`, token).
-		Scan(&u.ID, &u.Username, &ca, &expires)
+		Scan(&u.ID, &u.Username, &ca, &sessionCreated, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
 	if err != nil {
 		return User{}, fmt.Errorf("store: session lookup: %w", err)
 	}
-	if parseTime(expires).Before(now()) {
+	var (
+		t        = now()
+		idleEnds = parseTime(expires)
+		hardEnds = parseTime(sessionCreated).Add(SessionMaxTTL)
+	)
+	if idleEnds.Before(t) || hardEnds.Before(t) {
 		s.DeleteSession(token)
 		return User{}, ErrNotFound
+	}
+	want := t.Add(SessionIdleTTL)
+	if want.After(hardEnds) {
+		want = hardEnds
+	}
+	// Write only when the stored deadline is off by more than half a window.
+	// This runs on every authenticated request and a write per request buys
+	// nothing: half a day of imprecision on when an idle session dies is not
+	// worth the churn. Correcting in both directions also pulls sessions issued
+	// under the old flat 14-day TTL back onto the idle window without a
+	// migration.
+	slack := SessionIdleTTL / 2
+	if idleEnds.Before(want.Add(-slack)) || idleEnds.After(want.Add(slack)) {
+		if _, err := s.db.Exec(`UPDATE sessions SET expires_at = ? WHERE token = ?`,
+			formatTime(want), token); err != nil {
+			return User{}, fmt.Errorf("store: session refresh: %w", err)
+		}
 	}
 	u.CreatedAt = parseTime(ca)
 	return u, nil

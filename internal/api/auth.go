@@ -137,7 +137,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 // handleLogout drops every session credential the caller presented: the cookie
 // and/or the Bearer token. JSON login issues a Bearer token and no cookie, so
-// looking at the cookie alone left that token valid for its full 14 days.
+// looking at the cookie alone left that token valid for the rest of its life.
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 		s.store.DeleteSession(c.Value)
@@ -163,6 +163,14 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request, user sto
 		s.badRequest(w, r, err)
 		return
 	}
-	s.reply(w, r, http.StatusOK, map[string]string{"status": "password updated"},
-		"/settings/admin", "Password updated.", "ok")
+	// SetPassword revoked every session, including the one this request came
+	// in on. Hand the browser a fresh cookie so changing your own password does
+	// not bounce you to the login form; a Bearer caller ignores the Set-Cookie
+	// and signs in again for a new token, which is the point.
+	if err := s.setSession(w, r, user.ID); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.reply(w, r, http.StatusOK, map[string]string{"status": "password updated; other sessions signed out"},
+		"/settings/admin", "Password updated. Every other signed-in session was signed out.", "ok")
 }

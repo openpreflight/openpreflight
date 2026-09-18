@@ -3,6 +3,7 @@
 package store
 
 import (
+	"encoding/hex"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -638,5 +639,182 @@ func TestDeletingCoolifyKeepsBinding(t *testing.T) {
 	}
 	if reloaded.CoolifyInstanceID != 0 {
 		t.Fatalf("dangling coolify reference: %d", reloaded.CoolifyInstanceID)
+	}
+}
+
+// setSessionTimes rewrites a session row so the tests can stand where a clock
+// would otherwise have to be injected.
+func setSessionTimes(t *testing.T, st *Store, token string, created, expires time.Time) {
+	t.Helper()
+	if _, err := st.db.Exec(`UPDATE sessions SET created_at = ?, expires_at = ? WHERE token = ?`,
+		formatTime(created), formatTime(expires), token); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func sessionExpiry(t *testing.T, st *Store, token string) time.Time {
+	t.Helper()
+	var s string
+	if err := st.db.QueryRow(`SELECT expires_at FROM sessions WHERE token = ?`, token).Scan(&s); err != nil {
+		t.Fatal(err)
+	}
+	return parseTime(s)
+}
+
+func TestSessionExpiresWhenIdle(t *testing.T) {
+	st := newTestStore(t)
+	user, err := st.CreateUser("admin", "a-long-enough-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, expires, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Until(expires); d > SessionIdleTTL+time.Minute {
+		t.Fatalf("a new session lasts %s, longer than the idle window %s", d, SessionIdleTTL)
+	}
+	now := time.Now().UTC()
+	setSessionTimes(t, st, token, now.Add(-2*SessionIdleTTL), now.Add(-time.Minute))
+	if _, err := st.UserBySession(token); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("an idle session still authenticates: %v", err)
+	}
+	var n int
+	st.db.QueryRow(`SELECT count(*) FROM sessions WHERE token = ?`, token).Scan(&n)
+	if n != 0 {
+		t.Fatal("the expired session row was left behind")
+	}
+}
+
+func TestSessionSlidesForwardButNotPastTheCeiling(t *testing.T) {
+	st := newTestStore(t)
+	user, err := st.CreateUser("admin", "a-long-enough-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+
+	// Nearly idle, but the session is young: the window moves a full step out.
+	active, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setSessionTimes(t, st, active, now.Add(-time.Hour), now.Add(time.Hour))
+	if _, err := st.UserBySession(active); err != nil {
+		t.Fatalf("an in-use session was rejected: %v", err)
+	}
+	if got := sessionExpiry(t, st, active); got.Before(now.Add(SessionIdleTTL - time.Minute)) {
+		t.Fatalf("the idle window did not slide forward: expires %s", got)
+	}
+
+	// Same, but the ceiling is two hours away: the slide must stop there.
+	old, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := now.Add(-SessionMaxTTL).Add(2 * time.Hour)
+	setSessionTimes(t, st, old, created, now.Add(time.Hour))
+	if _, err := st.UserBySession(old); err != nil {
+		t.Fatalf("a session inside the ceiling was rejected: %v", err)
+	}
+	if got := sessionExpiry(t, st, old); got.After(created.Add(SessionMaxTTL).Add(time.Minute)) {
+		t.Fatalf("the slide went past the absolute ceiling: expires %s", got)
+	}
+}
+
+func TestSessionDiesAtTheCeilingHoweverActive(t *testing.T) {
+	st := newTestStore(t)
+	user, err := st.CreateUser("admin", "a-long-enough-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	// Kept alive right up to the ceiling, and a day past it. The stored idle
+	// deadline is still in the future; only created_at says it is over.
+	setSessionTimes(t, st, token, now.Add(-SessionMaxTTL-24*time.Hour), now.Add(SessionIdleTTL))
+	if _, err := st.UserBySession(token); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("a session past the absolute ceiling still authenticates: %v", err)
+	}
+}
+
+func TestLegacyLongSessionIsPulledBackOntoTheIdleWindow(t *testing.T) {
+	st := newTestStore(t)
+	user, err := st.CreateUser("admin", "a-long-enough-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	// What the old flat 14-day TTL wrote. It is still valid, and using it must
+	// shorten it rather than leave a fortnight-long credential in place.
+	setSessionTimes(t, st, token, now.Add(-time.Hour), now.Add(14*24*time.Hour))
+	if _, err := st.UserBySession(token); err != nil {
+		t.Fatalf("a legacy session was rejected: %v", err)
+	}
+	if got := sessionExpiry(t, st, token); got.After(now.Add(SessionIdleTTL + time.Minute)) {
+		t.Fatalf("a legacy 14-day session kept its deadline: expires %s", got)
+	}
+}
+
+func TestSetPasswordRevokesEverySession(t *testing.T) {
+	st := newTestStore(t)
+	user, err := st.CreateUser("admin", "a-long-enough-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetPassword(user.ID, "another-long-password"); err != nil {
+		t.Fatal(err)
+	}
+	for _, token := range []string{a, b} {
+		if _, err := st.UserBySession(token); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("a session outlived the password it was issued under: %v", err)
+		}
+	}
+}
+
+func TestNewJobIDIsAVersion4UUID(t *testing.T) {
+	// The id is the unguessable half of a shareable /runs/{id} link, and it is
+	// generated by hand rather than by a library (see NewJobID). The shape and
+	// the version and variant bits are therefore ours to check.
+	seen := map[string]bool{}
+	for range 1000 {
+		id := NewJobID()
+		if len(id) != 36 {
+			t.Fatalf("not a uuid: %q", id)
+		}
+		parts := strings.Split(id, "-")
+		if len(parts) != 5 ||
+			len(parts[0]) != 8 || len(parts[1]) != 4 || len(parts[2]) != 4 ||
+			len(parts[3]) != 4 || len(parts[4]) != 12 {
+			t.Fatalf("wrong group layout: %q", id)
+		}
+		if _, err := hex.DecodeString(strings.ReplaceAll(id, "-", "")); err != nil {
+			t.Fatalf("not hex: %q", id)
+		}
+		if parts[2][0] != '4' {
+			t.Fatalf("version nibble is %q, want 4: %s", parts[2][0], id)
+		}
+		if !strings.ContainsRune("89ab", rune(parts[3][0])) {
+			t.Fatalf("variant nibble is %q, want one of 8/9/a/b: %s", parts[3][0], id)
+		}
+		if seen[id] {
+			t.Fatalf("duplicate id in 1000 draws: %s", id)
+		}
+		seen[id] = true
 	}
 }

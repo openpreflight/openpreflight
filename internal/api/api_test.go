@@ -428,8 +428,8 @@ func TestGitHubAppsPageOffersManifest(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("new status %d", rec.Code)
 	}
-	if !strings.Contains(body, "Create with GitHub") || !strings.Contains(body, "Advanced") {
-		t.Fatal("add page is missing the manifest button")
+	if !strings.Contains(body, "Create with GitHub") || !strings.Contains(body, "Paste credentials") {
+		t.Fatal("add page is missing the manifest button or the paste-credentials path")
 	}
 	if strings.Contains(body, "never creates Apps") {
 		t.Fatal("add page still says we never create Apps")
@@ -1020,7 +1020,7 @@ func TestHTMLPostRenamesGitHubAppWithoutPEM(t *testing.T) {
 	if !strings.Contains(body, "Leave blank to keep the stored key") {
 		t.Fatal("edit form is missing the keep-PEM hint")
 	}
-	if !strings.Contains(body, "Changing the slug changes the webhook URL") {
+	if !strings.Contains(body, "The webhook URL ends in this") {
 		t.Fatal("edit form is missing the slug-change hint")
 	}
 	if strings.Contains(body, webhookSecret) || strings.Contains(body, "-----END RSA PRIVATE KEY-----") {

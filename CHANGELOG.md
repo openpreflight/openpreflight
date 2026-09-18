@@ -4,6 +4,53 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [2.2.0] - 2026-09-18
+
+Sessions expire on idleness rather than on a calendar, job logs arrive as plain
+text, and the two editor forms are grouped into labelled sections. No schema
+change. Image `ghcr.io/openpreflight/openpreflight:2.2.0`.
+
+### Security
+
+- **Sessions are idle-expiring.** A session now dies 24 hours after the request
+  that last used it, and 7 days after it was issued however much it is used,
+  replacing a flat 14-day TTL that nothing but an explicit logout ever
+  shortened. The store is the authority; the cookie carries the 7-day ceiling.
+- **Changing the password revokes every session** for that user, cookie and
+  bearer token alike. The browser that made the change is handed a fresh
+  cookie. Rotating the password is now a working revocation.
+
+### Fixed
+
+- **ANSI escape sequences are stripped from job logs** as they are written.
+  Build tools colour their output whether or not a terminal is attached, and
+  none of the four readers interpret escape codes, so a coloured line arrived
+  as `[42m[30m generating static routes [39m[49m`.
+- **Select menus show the tick on the selected row.** The item markup and the
+  component's own script both write a bare `data-selected`, but the class was
+  compiled to match `[data-selected="true"]` only, so no select in the app had
+  ever drawn its checkmark.
+- **Popovers are a distinct surface in dark mode.** `--popover` was the same
+  colour as `--card`, and a black drop shadow does not separate two dark
+  surfaces, so an open menu had no visible edge against the card beneath it.
+
+### Changed
+
+- **`/github-apps/new` and `/repos/new` are grouped into labelled sections**,
+  each field carries a description, and the App page presents the manifest flow
+  as the recommended path with the paste-credentials form as a disclosure.
+- **Select menus open below their trigger** instead of positioning the selected
+  item over it. On a one-item list the old behaviour was indistinguishable from
+  the menu staying shut.
+
+### Upgrade
+
+No migration. Existing sessions are pulled onto the idle window the next time
+they are used, so anyone signed in for more than a week is asked to sign in
+again. No endpoint or JSON field is added, renamed or removed.
+
 ## [2.1.3] - 2026-09-09
 
 The operator mark is the status-quad logo. No schema change and no
@@ -372,7 +419,9 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.1.2...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.2.0
+[2.1.3]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.3
 [2.1.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.2
 [2.1.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.1
 [2.1.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.0

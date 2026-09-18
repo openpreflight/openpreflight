@@ -40,6 +40,34 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 
 // NewJobID returns a random UUIDv4 string. Job ids are never sequential: they
 // are the unguessable part of a shareable /runs/{id} link.
+//
+// This formats the twelve lines by hand rather than calling github.com/google/uuid,
+// which is already in the module graph as an indirect dependency. That is
+// deliberate, not an oversight:
+//
+//   - The whole of what we want from a UUID library is here. There is no
+//     parsing, no validating, no v1/v5/v7, no comparison, no text
+//     unmarshalling — one generator whose output is stored and compared as an
+//     opaque string.
+//   - Indirect and direct are different commitments. google/uuid is in the
+//     graph because modernc.org/sqlite's libc needs it, not because we asked
+//     for it; it can leave whenever that chain changes. A direct dependency is
+//     ours to audit, upgrade and keep for the lifetime of the project. The
+//     binary and its supply chain are the product here, so the bar for adding a
+//     name to the direct require block is higher than "it would save twelve
+//     lines".
+//   - Correctness is checkable by reading it. RFC 4122 §4.4 is 16 random bytes
+//     with the version nibble set to 4 and the variant bits to 10; both are
+//     below, and TestNewJobIDIsAVersion4UUID covers them. There is no subtlety
+//     here for a library to get right on our behalf.
+//
+// What would change the decision: needing to parse or validate ids, wanting
+// UUIDv7 so job ids sort by time, or callers beyond the two here (a job id and
+// a throwaway resolve workspace name). At that point take the dependency rather
+// than growing this function. See ADR 006.
+//
+// Note the panic: crypto/rand is the only source, and a predictable id is a
+// disclosed log, so failing loudly beats degrading to math/rand.
 func NewJobID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {

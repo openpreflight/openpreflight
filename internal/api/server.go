@@ -332,7 +332,7 @@ func (s *Server) csrfToken(w http.ResponseWriter, r *http.Request) string {
 		HttpOnly: false, // read back only as a form field; not a credential on its own
 		Secure:   isHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   14 * 24 * 3600,
+		MaxAge:   int(store.SessionMaxTTL.Seconds()),
 	})
 	return token
 }
@@ -347,7 +347,7 @@ func isHTTPS(r *http.Request) bool {
 }
 
 func (s *Server) setSession(w http.ResponseWriter, r *http.Request, userID int64) error {
-	token, expires, err := s.store.CreateSession(userID)
+	token, _, err := s.store.CreateSession(userID)
 	if err != nil {
 		return err
 	}
@@ -358,7 +358,12 @@ func (s *Server) setSession(w http.ResponseWriter, r *http.Request, userID int64
 		HttpOnly: true,
 		Secure:   isHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
-		Expires:  expires,
+		// The cookie is given the absolute ceiling, not the idle deadline: the
+		// server slides the idle window on every request and the browser cannot
+		// be told about that without re-setting the cookie each time. The store
+		// stays the authority on when this token dies; a cookie that outlives
+		// its row just fails the lookup.
+		Expires: time.Now().Add(store.SessionMaxTTL),
 	})
 	return nil
 }
