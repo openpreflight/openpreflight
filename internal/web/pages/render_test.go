@@ -147,3 +147,12 @@ func TestJobPageNumber(t *testing.T) {
 		}
 	}
 }
+
+// Every signed-in route renders through the Shell, so one page proves the
+// header's refresh control is on all of them.
+func TestShellHasRefresh(t *testing.T) {
+	out := renderPage(t, "Error", Error, page(map[string]any{"Heading": "h", "Message": "m"}))
+	if !strings.Contains(out, `aria-label="Refresh"`) || !strings.Contains(out, "location.replace(location.pathname + location.search)") {
+		t.Error("Shell header: refresh button missing")
+	}
+}

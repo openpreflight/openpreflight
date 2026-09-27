@@ -8,9 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.3.1] - 2026-09-27
 
-Go jobs clean up after themselves, and logs written before 2.2.0 read as plain
-text. No schema change and no contract change.
-Image `ghcr.io/openpreflight/openpreflight:2.3.1`.
+Go jobs clean up after themselves, logs written before 2.2.0 read as plain
+text, and every page has a refresh button. No schema change and no contract
+change. Image `ghcr.io/openpreflight/openpreflight:2.3.1`.
+
+### Added
+
+- **A refresh button at the top right of every signed-in page.** It reloads
+  the page's own URL with a GET, so job, queue and status state is current
+  without the browser asking to resubmit the form that led there.
 
 ### Fixed
 
