@@ -1,6 +1,7 @@
 package layouts
 
 import (
+	"github.com/openpreflight/openpreflight/internal/build"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/breadcrumb"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
@@ -215,6 +216,7 @@ templ AppSidebar(p web.Page) {
 				if p.User != nil {
 					<div class="truncate">{ p.User.Username }</div>
 				}
+				<div class="font-mono truncate">openpreflight { build.Version }</div>
 			</div>
 		}
 	}

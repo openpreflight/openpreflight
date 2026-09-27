@@ -4,8 +4,10 @@ package store
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -127,6 +129,16 @@ func (s *Store) FirstUser() (User, error) {
 	return u, nil
 }
 
+// hashToken is what the sessions table holds in place of the token. The raw
+// value only ever lives in the cookie or the Authorization header, so a copy of
+// ci.db carries no credential that signs anyone in, key or no key. Rows written
+// before this stored the raw token; no lookup can match them now, and the
+// hourly prune drops them as they expire.
+func hashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
 // CreateSession issues an opaque session token.
 func (s *Store) CreateSession(userID int64) (string, time.Time, error) {
 	raw := make([]byte, 32)
@@ -137,7 +149,7 @@ func (s *Store) CreateSession(userID int64) (string, time.Time, error) {
 	created := now()
 	expires := created.Add(SessionIdleTTL)
 	if _, err := s.db.Exec(`INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
-		token, userID, formatTime(created), formatTime(expires)); err != nil {
+		hashToken(token), userID, formatTime(created), formatTime(expires)); err != nil {
 		return "", time.Time{}, fmt.Errorf("store: create session: %w", err)
 	}
 	return token, expires, nil
@@ -157,7 +169,7 @@ func (s *Store) UserBySession(token string) (User, error) {
 		ca             string
 	)
 	err := s.db.QueryRow(`SELECT u.id, u.username, u.created_at, s.created_at, s.expires_at
-		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`, token).
+		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`, hashToken(token)).
 		Scan(&u.ID, &u.Username, &ca, &sessionCreated, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
@@ -187,7 +199,7 @@ func (s *Store) UserBySession(token string) (User, error) {
 	slack := SessionIdleTTL / 2
 	if idleEnds.Before(want.Add(-slack)) || idleEnds.After(want.Add(slack)) {
 		if _, err := s.db.Exec(`UPDATE sessions SET expires_at = ? WHERE token = ?`,
-			formatTime(want), token); err != nil {
+			formatTime(want), hashToken(token)); err != nil {
 			return User{}, fmt.Errorf("store: session refresh: %w", err)
 		}
 	}
@@ -197,7 +209,7 @@ func (s *Store) UserBySession(token string) (User, error) {
 
 // DeleteSession logs a session out.
 func (s *Store) DeleteSession(token string) error {
-	_, err := s.db.Exec(`DELETE FROM sessions WHERE token = ?`, token)
+	_, err := s.db.Exec(`DELETE FROM sessions WHERE token = ?`, hashToken(token))
 	return err
 }
 

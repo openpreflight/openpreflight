@@ -3,12 +3,63 @@
 package api
 
 import (
+	"crypto/subtle"
 	"errors"
+	"net"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/openpreflight/openpreflight/internal/store"
 )
+
+// loginAttemptsPerMinute is the sign-in budget per client address. Someone who
+// mistypes needs two or three; a guesser needs millions.
+const loginAttemptsPerMinute = 5
+
+// loginLimiter counts sign-in attempts per client address in a fixed one-minute
+// window. An attempt is counted before the bcrypt compare, so a burst of
+// concurrent guesses cannot all get in ahead of the first failure, and an
+// attempt over budget costs no bcrypt at all.
+//
+// ponytail: keyed on RemoteAddr, so behind a reverse proxy every client shares
+// one budget. For a single admin that global limit is the point; key on a
+// trusted X-Forwarded-For if a shared budget ever locks a real operator out.
+type loginLimiter struct {
+	mu    sync.Mutex
+	start time.Time
+	count map[string]int
+}
+
+// allow records an attempt from addr and reports whether it is within budget,
+// and how long until the window resets.
+func (l *loginLimiter) allow(addr string) (bool, time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now()
+	if l.count == nil || now.Sub(l.start) >= time.Minute {
+		l.start, l.count = now, map[string]int{}
+	}
+	l.count[addr]++
+	return l.count[addr] <= loginAttemptsPerMinute, l.start.Add(time.Minute).Sub(now)
+}
+
+// clear forgets addr's attempts once it has signed in.
+func (l *loginLimiter) clear(addr string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.count, addr)
+}
+
+// clientAddr is the peer's IP, without the port.
+func clientAddr(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}
 
 // pageSetup shows the first-run wizard, or sends you on if setup already ran.
 func (s *Server) pageSetup(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +96,14 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	in, err := readInput(r)
 	if err != nil {
 		s.badRequest(w, r, err)
+		return
+	}
+	// An empty setupToken means this process booted with an admin in place; it
+	// must refuse rather than match an empty field.
+	if s.setupToken == "" || subtle.ConstantTimeCompare([]byte(in.Str("setup_token")), []byte(s.setupToken)) != 1 {
+		s.reply(w, r, http.StatusForbidden,
+			map[string]string{"error": "setup_token is missing or wrong; the server prints it to its log at startup"},
+			"/setup", "That setup token is wrong. Copy it from the server log, where it is printed at startup.", "err")
 		return
 	}
 	username := in.Str("username")
@@ -99,6 +158,13 @@ func (s *Server) pageLogin(w http.ResponseWriter, r *http.Request) {
 // handleLogin exchanges credentials for a session. The JSON surface gets the
 // token back so a CLI can use it as a Bearer credential.
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	addr := clientAddr(r)
+	if ok, wait := s.logins.allow(addr); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		s.reply(w, r, http.StatusTooManyRequests, map[string]string{"error": "too many sign-in attempts; retry later"},
+			"/login", "Too many sign-in attempts. Wait a minute and try again.", "err")
+		return
+	}
 	in, err := readInput(r)
 	if err != nil {
 		s.badRequest(w, r, err)
@@ -114,6 +180,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"/login", "Invalid username or password.", "err")
 		return
 	}
+	s.logins.clear(addr)
 	if wantsJSON(r) {
 		token, expires, err := s.store.CreateSession(user.ID)
 		if err != nil {

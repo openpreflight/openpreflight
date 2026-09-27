@@ -647,7 +647,7 @@ func TestDeletingCoolifyKeepsBinding(t *testing.T) {
 func setSessionTimes(t *testing.T, st *Store, token string, created, expires time.Time) {
 	t.Helper()
 	if _, err := st.db.Exec(`UPDATE sessions SET created_at = ?, expires_at = ? WHERE token = ?`,
-		formatTime(created), formatTime(expires), token); err != nil {
+		formatTime(created), formatTime(expires), hashToken(token)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -655,10 +655,43 @@ func setSessionTimes(t *testing.T, st *Store, token string, created, expires tim
 func sessionExpiry(t *testing.T, st *Store, token string) time.Time {
 	t.Helper()
 	var s string
-	if err := st.db.QueryRow(`SELECT expires_at FROM sessions WHERE token = ?`, token).Scan(&s); err != nil {
+	if err := st.db.QueryRow(`SELECT expires_at FROM sessions WHERE token = ?`, hashToken(token)).Scan(&s); err != nil {
 		t.Fatal(err)
 	}
 	return parseTime(s)
+}
+
+// TestSessionTokenIsNotStoredInTheClear: what a copy of ci.db yields must not
+// sign anyone in.
+func TestSessionTokenIsNotStoredInTheClear(t *testing.T) {
+	st := newTestStore(t)
+	user, err := st.CreateUser("admin", "a-long-enough-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _, err := st.CreateSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored string
+	if err := st.db.QueryRow(`SELECT token FROM sessions`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored == token {
+		t.Fatal("the sessions table holds the raw token")
+	}
+	if _, err := st.UserBySession(stored); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("the stored value authenticates: %v", err)
+	}
+	if _, err := st.UserBySession(token); err != nil {
+		t.Fatalf("the issued token no longer authenticates: %v", err)
+	}
+	if err := st.DeleteSession(token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UserBySession(token); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("a deleted session still authenticates: %v", err)
+	}
 }
 
 func TestSessionExpiresWhenIdle(t *testing.T) {
@@ -680,7 +713,7 @@ func TestSessionExpiresWhenIdle(t *testing.T) {
 		t.Fatalf("an idle session still authenticates: %v", err)
 	}
 	var n int
-	st.db.QueryRow(`SELECT count(*) FROM sessions WHERE token = ?`, token).Scan(&n)
+	st.db.QueryRow(`SELECT count(*) FROM sessions WHERE token = ?`, hashToken(token)).Scan(&n)
 	if n != 0 {
 		t.Fatal("the expired session row was left behind")
 	}

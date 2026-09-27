@@ -6,6 +6,42 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-09-27
+
+A fresh instance can no longer be claimed by whoever finds its URL first,
+sign-in is rate limited, and the database holds no usable session token. The
+running version is shown in the sidebar and on the sign-in page. No schema
+change.
+Image `ghcr.io/openpreflight/openpreflight:2.3.0`.
+
+### Security
+
+- **Setup needs a token from the server log.** Until an admin exists, the
+  process prints `setup_token=…` at startup, and `POST /api/v1/setup` refuses
+  without it. Before, whoever reached a fresh instance's URL first could create
+  the admin. `CI_BOOTSTRAP_ADMIN_PASSWORD` still skips setup entirely.
+- **Sign-in is rate limited.** Five attempts per minute per client address,
+  counted before the bcrypt compare; a successful sign-in resets the count.
+  Over budget, `POST /api/v1/login` answers `429` with `Retry-After`. Behind a
+  reverse proxy every client shares one budget.
+- **Session tokens are stored as SHA-256 hashes.** A copy of `ci.db` no longer
+  holds a credential that signs anyone in. Upgrading signs every existing
+  session out once.
+
+### Added
+
+- **The version is on screen.** The sidebar's Docker box and the sign-in page
+  both end with `openpreflight <version>` (`dev` for an unversioned build).
+
+### Upgrade
+
+No migration. Every session is signed out once, because the stored value is now
+a hash that no pre-2.3.0 token matches. An instance that already has an admin
+never prints a setup token and is otherwise unaffected. A script that drives
+first-run setup over the API must now send `setup_token`, or use
+`CI_BOOTSTRAP_ADMIN_PASSWORD` as before. No endpoint or JSON field is renamed or
+removed.
+
 ## [2.2.0] - 2026-09-18
 
 Sessions expire on idleness rather than on a calendar, job logs arrive as plain
@@ -419,7 +455,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.2.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.0
 [2.2.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.2.0
 [2.1.3]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.3
 [2.1.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.2

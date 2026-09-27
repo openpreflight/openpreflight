@@ -26,7 +26,8 @@ before any public write-up.
   unreadable. To rotate, boot once with both keys set, then unset the old one.
 - GitHub App PEM and webhook secret (encrypted at rest, redacted on GET).
 - Coolify API tokens (same).
-- Session cookies and Bearer session tokens.
+- Session cookies and Bearer session tokens (stored as SHA-256 hashes, so the
+  database holds none of them).
 - Shareable job-log URLs, when a binding opts into them.
 
 A stolen `ci.db` without `CI_SECRET_KEY` is not a full compromise of those

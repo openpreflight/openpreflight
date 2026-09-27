@@ -20,6 +20,8 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 )
 
+const setupTokenHint = "Printed in the server log when it started, as setup_token=… on the line that begins \"no admin yet\"."
+
 const setupPasswordHint = "At least 12 characters. There is no password reset in v1, so keep it somewhere you can find."
 
 const setupURLHint = "GitHub must reach this host over HTTPS. Webhooks go to /webhook/{slug}; Check Run links go to /runs/{id}."
