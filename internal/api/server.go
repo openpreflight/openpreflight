@@ -49,6 +49,12 @@ type Server struct {
 	// manifestAPI is the GitHub API base used to convert a manifest code.
 	// Empty means https://api.github.com. Tests point it at a fake server.
 	manifestAPI string
+
+	// setupToken gates POST /api/v1/setup. It is minted at boot only when no
+	// admin exists, so it is empty on every instance that has finished setup.
+	setupToken string
+
+	logins loginLimiter
 }
 
 // New builds the server.
@@ -56,7 +62,21 @@ func New(st *store.Store, cfg config.Config, runner *queue.Runner, log *slog.Log
 	if err := web.CheckCSS(); err != nil {
 		return nil, err
 	}
-	return &Server{store: st, cfg: cfg, runner: runner, log: log}, nil
+	s := &Server{store: st, cfg: cfg, runner: runner, log: log}
+	hasUsers, err := st.HasUsers()
+	if err != nil {
+		return nil, err
+	}
+	if !hasUsers {
+		// Until an admin exists, /setup is the only door into the console, and
+		// on a public URL whoever reaches it first would own the instance. The
+		// token goes to the server log, which only the operator can read.
+		raw := make([]byte, 24)
+		rand.Read(raw)
+		s.setupToken = base64.RawURLEncoding.EncodeToString(raw)
+		log.Info("no admin yet: enter this setup token on /setup to create one", "setup_token", s.setupToken)
+	}
+	return s, nil
 }
 
 // Handler returns the routed handler.

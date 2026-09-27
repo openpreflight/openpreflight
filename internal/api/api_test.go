@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openpreflight/openpreflight/internal/build"
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/logs"
 	"github.com/openpreflight/openpreflight/internal/store"
@@ -49,7 +50,7 @@ func (ts *testServer) login(t *testing.T) string {
 	t.Helper()
 	if has, _ := ts.store.HasUsers(); !has {
 		rec := ts.do(jsonReq(http.MethodPost, "/api/v1/setup",
-			`{"username":"admin","password":"a-long-enough-password","public_base_url":"https://ci.example.com"}`))
+			`{"username":"admin","password":"a-long-enough-password","public_base_url":"https://ci.example.com","setup_token":"`+ts.setupToken+`"}`))
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("setup: %d %s", rec.Code, rec.Body.String())
 		}
@@ -93,6 +94,56 @@ func TestSetupIsOnlyAvailableOnce(t *testing.T) {
 	}
 	if _, err := ts.store.Authenticate("intruder", "another-long-password"); err == nil {
 		t.Fatal("a second admin was created")
+	}
+}
+
+// TestSetupRequiresTheLoggedToken: before an admin exists, reaching the URL
+// first must not be enough to own the instance.
+func TestSetupRequiresTheLoggedToken(t *testing.T) {
+	ts := newTestServer(t)
+	for _, body := range []string{
+		`{"username":"admin","password":"a-long-enough-password"}`,
+		`{"username":"admin","password":"a-long-enough-password","setup_token":"a-guess"}`,
+	} {
+		if rec := ts.do(jsonReq(http.MethodPost, "/api/v1/setup", body)); rec.Code != http.StatusForbidden {
+			t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+		}
+	}
+	// A process that booted with an admin present holds no token; an empty
+	// field must not match that empty value.
+	token := ts.setupToken
+	ts.setupToken = ""
+	rec := ts.do(jsonReq(http.MethodPost, "/api/v1/setup",
+		`{"username":"admin","password":"a-long-enough-password","setup_token":""}`))
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("empty token: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if has, _ := ts.store.HasUsers(); has {
+		t.Fatal("setup created an admin without the token")
+	}
+	ts.setupToken = token
+	ts.login(t)
+}
+
+// TestLoginIsRateLimited: guesses are capped per client address, a success
+// resets the count, and one client's lockout does not reach another.
+func TestLoginIsRateLimited(t *testing.T) {
+	ts := newTestServer(t)
+	ts.login(t) // a success first: it must not count against the budget below
+	for i := 1; i <= loginAttemptsPerMinute; i++ {
+		rec := ts.do(jsonReq(http.MethodPost, "/api/v1/login", `{"username":"admin","password":"not-the-password"}`))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: status %d", i, rec.Code)
+		}
+	}
+	rec := ts.do(jsonReq(http.MethodPost, "/api/v1/login", `{"username":"admin","password":"a-long-enough-password"}`))
+	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") == "" {
+		t.Fatalf("over budget: status %d, Retry-After %q", rec.Code, rec.Header().Get("Retry-After"))
+	}
+	other := jsonReq(http.MethodPost, "/api/v1/login", `{"username":"admin","password":"a-long-enough-password"}`)
+	other.RemoteAddr = "198.51.100.7:4321"
+	if rec := ts.do(other); rec.Code != http.StatusOK {
+		t.Fatalf("another client was locked out too: status %d", rec.Code)
 	}
 }
 
@@ -973,6 +1024,9 @@ func TestLoginAndSetupHaveBrandChrome(t *testing.T) {
 	body = rec.Body.String()
 	if !strings.Contains(body, `class="brand`) || !strings.Contains(body, "max-w-[440px]") {
 		t.Fatalf("login is missing brand chrome")
+	}
+	if !strings.Contains(body, "openpreflight "+build.Version) {
+		t.Fatal("login does not show the version")
 	}
 	if strings.Contains(body, "Sign out") || strings.Contains(body, ">Overview<") {
 		t.Fatal("login must not show the signed-in nav")

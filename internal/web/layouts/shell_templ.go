@@ -9,6 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"github.com/openpreflight/openpreflight/internal/build"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/breadcrumb"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
@@ -401,7 +402,7 @@ func Crumbs(p web.Page) templ.Component {
 							var templ_7745c5c3_Var16 string
 							templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(p.Title)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 80, Col: 15}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 81, Col: 15}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 							if templ_7745c5c3_Err != nil {
@@ -449,7 +450,7 @@ func Crumbs(p web.Page) templ.Component {
 									var templ_7745c5c3_Var19 string
 									templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 88, Col: 17}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 89, Col: 17}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 									if templ_7745c5c3_Err != nil {
@@ -477,7 +478,7 @@ func Crumbs(p web.Page) templ.Component {
 									var templ_7745c5c3_Var21 string
 									templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 92, Col: 17}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 93, Col: 17}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 									if templ_7745c5c3_Err != nil {
@@ -771,7 +772,7 @@ func AppSidebar(p web.Page) templ.Component {
 										var templ_7745c5c3_Var35 string
 										templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(p.InFlightCount))
 										if templ_7745c5c3_Err != nil {
-											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 136, Col: 32}
+											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 137, Col: 32}
 										}
 										_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 										if templ_7745c5c3_Err != nil {
@@ -1300,7 +1301,7 @@ func AppSidebar(p web.Page) templ.Component {
 				var templ_7745c5c3_Var56 string
 				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(dockerLabel(p.DockerAvailable))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 210, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 211, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
@@ -1318,7 +1319,7 @@ func AppSidebar(p web.Page) templ.Component {
 					var templ_7745c5c3_Var57 string
 					templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.DockerHost)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 213, Col: 57}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 214, Col: 57}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
 					if templ_7745c5c3_Err != nil {
@@ -1331,7 +1332,7 @@ func AppSidebar(p web.Page) templ.Component {
 					var templ_7745c5c3_Var58 string
 					templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(p.DockerHost)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 213, Col: 74}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 214, Col: 74}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 					if templ_7745c5c3_Err != nil {
@@ -1350,7 +1351,7 @@ func AppSidebar(p web.Page) templ.Component {
 					var templ_7745c5c3_Var59 string
 					templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(p.User.Username)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 216, Col: 44}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 217, Col: 44}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 					if templ_7745c5c3_Err != nil {
@@ -1361,7 +1362,20 @@ func AppSidebar(p web.Page) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div class=\"font-mono truncate\">openpreflight ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var60 string
+				templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(build.Version)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/shell.templ`, Line: 219, Col: 65}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
