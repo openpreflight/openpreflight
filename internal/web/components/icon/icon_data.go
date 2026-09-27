@@ -68,6 +68,10 @@ var internalSvgData = map[string]string{
   <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />`,
 	"search": `<path d="m21 21-4.34-4.34" />
   <circle cx="11" cy="11" r="8" />`,
+	"refresh-cw": `<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+  <path d="M21 3v5h-5" />
+  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+  <path d="M8 16H3v5" />`,
 	"server": `<rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
   <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
   <line x1="6" x2="6.01" y1="6" y2="6" />

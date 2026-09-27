@@ -3,6 +3,7 @@
 package logs
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -154,13 +155,29 @@ func TestWriterStripsANSI(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.Close()
-	body, err := Read(dir, "job-ansi")
+	// The file itself, not Read, which filters again on the way out.
+	raw, err := os.ReadFile(Path(dir, "job-ansi"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := " generating static routes \ndone\nhalfred\n"
-	if body != want {
-		t.Fatalf("escapes survived:\ngot  %q\nwant %q", body, want)
+	if string(raw) != want {
+		t.Fatalf("escapes survived:\ngot  %q\nwant %q", raw, want)
+	}
+}
+
+func TestReadStripsANSIFromOldLogs(t *testing.T) {
+	dir := t.TempDir()
+	// A log from before the Writer filtered, as 2.1.x wrote it.
+	if err := os.WriteFile(Path(dir, "job-old"), []byte("\x1b[2m06:08:10\x1b[22m \x1b[34m[content]\x1b[39m Syncing content\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	body, err := Read(dir, "job-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "06:08:10 [content] Syncing content\n"; body != want {
+		t.Fatalf("got %q, want %q", body, want)
 	}
 }
 
