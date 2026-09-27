@@ -105,7 +105,9 @@ func (w *Writer) Close() error {
 	return err
 }
 
-// Read returns a job's log, or "" if there is none yet.
+// Read returns a job's log, or "" if there is none yet. Logs written before
+// the Writer stripped escapes still hold them, so the whole file is filtered
+// here too; on a clean log that is one scan for ESC.
 func Read(dir, jobID string) (string, error) {
 	b, err := os.ReadFile(Path(dir, jobID))
 	if os.IsNotExist(err) {
@@ -114,7 +116,8 @@ func Read(dir, jobID string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("logs: read: %w", err)
 	}
-	return string(b), nil
+	var a ansiFilter
+	return string(a.filter(b)), nil
 }
 
 // readFromChunk caps one ReadFrom so a single SSE event cannot be the whole

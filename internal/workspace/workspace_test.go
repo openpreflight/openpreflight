@@ -134,6 +134,33 @@ func TestPrepareIsClean(t *testing.T) {
 	}
 }
 
+func TestCleanupRemovesReadOnlyTrees(t *testing.T) {
+	ws, err := Prepare(t.TempDir(), "job-5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The shape `go mod download` leaves: read-only directories all the way
+	// down to the files.
+	mod := filepath.Join(ws.Repo, "go", "pkg", "mod", "example.com", "m@v1.0.0")
+	if err := os.MkdirAll(mod, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module m\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	for d := mod; d != ws.Repo; d = filepath.Dir(d) {
+		if err := os.Chmod(d, 0o555); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := ws.Cleanup(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(ws.Root); !os.IsNotExist(err) {
+		t.Fatal("Cleanup left a read-only tree behind")
+	}
+}
+
 func TestRedactWriter(t *testing.T) {
 	var buf bytes.Buffer
 	w := &redactWriter{w: &buf, secret: "s3cret"}

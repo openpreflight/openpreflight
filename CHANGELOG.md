@@ -6,6 +6,39 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-09-27
+
+Go jobs clean up after themselves, and logs written before 2.2.0 read as plain
+text. No schema change and no contract change.
+Image `ghcr.io/openpreflight/openpreflight:2.3.1`.
+
+### Fixed
+
+- **A Go job's workspace is removed when it finishes.** Go writes its module
+  cache read-only, and the job's `HOME` (so `GOPATH`) is inside the workspace,
+  so cleanup failed with `permission denied` and every Go job left about 270 MB
+  under `/workspace`. Cleanup now grants write permission on each directory
+  before removing the tree, which is what `go clean -modcache` does.
+- **Old logs are shown without escape codes.** 2.2.0 strips ANSI sequences as a
+  log is written; a log written before that still held them, so its run page
+  and `GET /api/v1/jobs/{id}/logs` showed `[2m06:08:10[22m`. Reading a log now
+  strips them too.
+- **git's stdout and stderr share one writer during clone**, so they are copied
+  on one goroutine, and the token is redacted from both streams rather than
+  only stderr.
+
+### Changed
+
+- `golang.org/x/crypto` 0.57.0, `modernc.org/sqlite` 1.59.0,
+  `tailwind-merge-go` 0.2.3, and the release workflow's Docker and
+  `setup-node` actions on their current majors.
+
+### Upgrade
+
+No migration and no configuration change. Workspaces that earlier Go jobs left
+behind are not removed by the upgrade; delete them from `/workspace` once no
+job is running.
+
 ## [2.3.0] - 2026-09-27
 
 A fresh instance can no longer be claimed by whoever finds its URL first,
@@ -455,7 +488,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.3.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.3.1...HEAD
+[2.3.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.1
 [2.3.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.0
 [2.2.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.2.0
 [2.1.3]: https://github.com/openpreflight/openpreflight/releases/tag/v2.1.3

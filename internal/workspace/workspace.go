@@ -34,7 +34,7 @@ var repoPattern = regexp.MustCompile(`^[A-Za-z0-9-_.]+/[A-Za-z0-9-_.]+$`)
 // Prepare creates a clean directory tree for a job.
 func Prepare(base, jobID string) (*Workspace, error) {
 	root := filepath.Join(base, jobID)
-	if err := os.RemoveAll(root); err != nil {
+	if err := removeAll(root); err != nil {
 		return nil, fmt.Errorf("workspace: clear %s: %w", root, err)
 	}
 	for _, d := range []string{root, filepath.Join(root, ".tmp"), filepath.Join(root, ".npm")} {
@@ -128,10 +128,28 @@ func (w *Workspace) Cleanup() error {
 	if w == nil || w.Root == "" {
 		return nil
 	}
-	if err := os.RemoveAll(w.Root); err != nil {
+	if err := removeAll(w.Root); err != nil {
 		return fmt.Errorf("workspace: cleanup: %w", err)
 	}
 	return nil
+}
+
+// removeAll is os.RemoveAll for trees a build made read-only. Go writes its
+// module cache without write permission, and the job's HOME (so GOPATH) is in
+// the workspace; RemoveAll cannot unlink from a directory it may not write, so
+// every Go job left its tree behind. Granting u+w on each directory first is
+// what `go clean -modcache` does.
+func removeAll(path string) error {
+	if err := os.RemoveAll(path); err == nil {
+		return nil
+	}
+	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			os.Chmod(p, 0o700)
+		}
+		return nil
+	})
+	return os.RemoveAll(path)
 }
 
 // CloneOptions describes one checkout.
@@ -228,9 +246,11 @@ func (w *Workspace) git(ctx context.Context, token, base string, args []string, 
 		)
 	}
 	cmd.Env = env
-	// git writes progress to stderr; both streams belong in the job log.
-	cmd.Stdout = out
-	cmd.Stderr = &redactWriter{w: out, secret: token}
+	// git writes progress to stderr; both streams belong in the job log. One
+	// writer for both makes os/exec copy them on a single goroutine, so an out
+	// without its own lock is safe, and stdout is redacted as well.
+	rw := &redactWriter{w: out, secret: token}
+	cmd.Stdout, cmd.Stderr = rw, rw
 	start := time.Now()
 	if out != nil {
 		fmt.Fprintf(out, "$ git %s\n", strings.Join(args, " "))
