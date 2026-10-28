@@ -82,6 +82,10 @@ templ GitHubApps(p web.Page) {
 									Test
 								}
 							</form>
+							// ponytail: github.com only; GHES installs live at <host>/github-apps/<slug>/installations/new.
+							@button.Button(button.Props{Href: "https://github.com/apps/" + app.Slug + "/installations/new", Target: "_blank", Variant: button.VariantOutline, Size: button.SizeSm}) {
+								Install on GitHub
+							}
 							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantOutline, Size: button.SizeSm}) {
 								Edit
 							}

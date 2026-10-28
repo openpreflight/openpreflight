@@ -167,7 +167,7 @@ func (s *Server) runAppTest(ctx context.Context, id int64) (string, string) {
 		return err.Error(), "err"
 	}
 	if len(installs) == 0 {
-		return fmt.Sprintf("App %q authenticated, but it is not installed anywhere yet — install it on the org or account that owns the repos you want checked.", app.Name), "err"
+		return fmt.Sprintf("App %q authenticated, but it is not installed anywhere yet — install it at https://github.com/apps/%s/installations/new on the account that owns the repos you want checked.", app.Name, app.Slug), "err"
 	}
 	accounts := make([]string, 0, len(installs))
 	for _, i := range installs {
