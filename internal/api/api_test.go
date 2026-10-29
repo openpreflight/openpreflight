@@ -3,6 +3,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -144,6 +145,27 @@ func TestLoginIsRateLimited(t *testing.T) {
 	other.RemoteAddr = "198.51.100.7:4321"
 	if rec := ts.do(other); rec.Code != http.StatusOK {
 		t.Fatalf("another client was locked out too: status %d", rec.Code)
+	}
+}
+
+func TestClientAddr(t *testing.T) {
+	for _, tc := range []struct {
+		name, header, value, want string
+	}{
+		{"unset ignores the header", "", "203.0.113.9", "192.0.2.1"},
+		{"cloudflare", "CF-Connecting-IP", "203.0.113.9", "203.0.113.9"},
+		{"forwarded-for takes the proxy's entry", "X-Forwarded-For", "6.6.6.6, 203.0.113.9", "203.0.113.9"},
+		{"not an ip falls back", "X-Forwarded-For", "unknown", "192.0.2.1"},
+		{"missing falls back", "X-Real-IP", "", "192.0.2.1"},
+	} {
+		r := httptest.NewRequest(http.MethodPost, "/api/v1/login", nil)
+		r.RemoteAddr = "192.0.2.1:5555"
+		if tc.value != "" {
+			r.Header.Set(cmp.Or(tc.header, "X-Forwarded-For"), tc.value)
+		}
+		if got := clientAddr(r, tc.header); got != tc.want {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
 
