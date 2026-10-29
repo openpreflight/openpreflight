@@ -27,6 +27,9 @@ Image `ghcr.io/openpreflight/openpreflight:2.3.2`.
 
 - The pipeline that checks this repository reads the Go version from `go.mod`
   and runs `govulncheck`, so a reachable known vulnerability fails the check.
+- The Actions `image` job builds the Docker image again on a pull request or
+  push that changes the Dockerfile, `go.mod`, the Tailwind lockfile or a
+  workflow. Before, a broken image showed up only when a tag was pushed.
 - templ is a `go tool` dependency. Run `go tool templ generate`; the generator
   and the library can no longer be on different versions.
 - Dependabot also watches the Dockerfile's base images and the Tailwind
