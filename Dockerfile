@@ -13,14 +13,13 @@ RUN npm run css
 
 # Build: pure Go, so the binary is static and the runtime image needs no libc
 # shim. modernc.org/sqlite is what makes CGO_ENABLED=0 possible.
-FROM golang:1.26-alpine AS build
+FROM golang:1.26.10-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=css /web/assets/css/output.css internal/web/assets/css/output.css
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
-RUN templ generate ./internal/web/...
+RUN go tool templ generate ./internal/web/...
 ENV CGO_ENABLED=0 GOOS=linux
 ARG VERSION=dev
 RUN go build -trimpath \
@@ -29,7 +28,7 @@ RUN go build -trimpath \
 
 # Runtime: git is required to check out commits, and Node is the default
 # pipeline runtime (README Pipelines). Everything runs as a non-root user.
-FROM alpine:3.21
+FROM alpine:3.22
 RUN apk add --no-cache git nodejs npm ca-certificates tini docker-cli \
  && addgroup -g 10001 ci \
  && adduser -D -u 10001 -G ci -h /home/ci ci \

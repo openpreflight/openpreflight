@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **Built with Go 1.26.10.** 2.3.1 was built with Go 1.26.5, and
+  `govulncheck -mode binary` reports 22 standard-library vulnerabilities in
+  it. `go.mod` now names the patch release, and the image's build stage uses
+  the same one as the release binaries.
+- **The runtime image is Alpine 3.22.** Alpine 3.21 reaches end of life on
+  2026-11-01. The default job runtime stays on Node 22.
+
+### Changed
+
+- The pipeline that checks this repository reads the Go version from `go.mod`
+  and runs `govulncheck`, so a reachable known vulnerability fails the check.
+- templ is a `go tool` dependency. Run `go tool templ generate`; the generator
+  and the library can no longer be on different versions.
+- Dependabot also watches the Dockerfile's base images and the Tailwind
+  `package.json`.
+
 ## [2.3.1] - 2026-09-27
 
 Go jobs clean up after themselves, logs written before 2.2.0 read as plain
