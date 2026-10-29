@@ -82,6 +82,9 @@ func TestHealth(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"ok"`) {
 		t.Fatalf("health: %d %s", rec.Code, rec.Body.String())
 	}
+	if rec.Header().Get("X-Frame-Options") != "DENY" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("security headers missing: %v", rec.Header())
+	}
 }
 
 func TestSetupIsOnlyAvailableOnce(t *testing.T) {
