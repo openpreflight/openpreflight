@@ -57,6 +57,15 @@ func Open(path string, box *secret.Box) (*Store, error) {
 // Close releases the database handle.
 func (s *Store) Close() error { return s.db.Close() }
 
+// Backup writes a consistent copy of the database to dest while the server
+// keeps running (VACUUM INTO). dest must not exist yet.
+func (s *Store) Backup(dest string) error {
+	if _, err := s.db.Exec(`VACUUM INTO ?`, dest); err != nil {
+		return fmt.Errorf("store: backup to %s: %w", dest, err)
+	}
+	return nil
+}
+
 // DB exposes the handle for tests.
 func (s *Store) DB() *sql.DB { return s.db }
 
