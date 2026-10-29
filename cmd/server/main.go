@@ -58,6 +58,19 @@ func run(log *slog.Logger) error {
 	}
 	defer st.Close()
 
+	// `openpreflight backup <file>` copies the database while the server runs,
+	// from `docker exec` in the same container, then exits.
+	if len(os.Args) > 1 && os.Args[1] == "backup" {
+		if len(os.Args) != 3 {
+			return errors.New("usage: openpreflight backup <file>")
+		}
+		if err := st.Backup(os.Args[2]); err != nil {
+			return err
+		}
+		log.Info("database backed up; copy DATA_DIR/logs separately", "file", os.Args[2])
+		return nil
+	}
+
 	if cfg.OldSecretKey != "" {
 		old, err := secret.New(cfg.OldSecretKey)
 		if err != nil {

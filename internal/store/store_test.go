@@ -851,3 +851,28 @@ func TestNewJobIDIsAVersion4UUID(t *testing.T) {
 		seen[id] = true
 	}
 }
+
+func TestBackupCopiesAnOpenDatabase(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	job, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/api", SHA: "abc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(t.TempDir(), "backup.db")
+	if err := st.Backup(dest); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Backup(dest); err == nil {
+		t.Fatal("a second backup over an existing file should fail, not overwrite it")
+	}
+	box, _ := secret.New(testKey)
+	restored, err := Open(dest, box)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	if got, err := restored.Job(job.ID); err != nil || got.SHA != "abc" {
+		t.Fatalf("job in backup: %+v %v", got, err)
+	}
+}
