@@ -4,9 +4,9 @@
 
 # openpreflight
 
-**A small CI provider for private repos.**
+**A small CI provider for private repositories.**
 
-One Go binary · one SQLite file · one Check Run per commit
+One Go binary · one SQLite file · one Check Run for each commit
 
 [Website](https://openpreflight.xyz) · [Docs](https://docs.openpreflight.xyz) · [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/) · [License](LICENSE)
 
@@ -44,12 +44,12 @@ Published at **[docs.openpreflight.xyz](https://docs.openpreflight.xyz)** ([open
 
 | | |
 | --- | --- |
-| Getting started | [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/) · [FAQ](https://docs.openpreflight.xyz/getting-started/faq/) · [Comparison](https://docs.openpreflight.xyz/getting-started/comparison/) |
-| Deploy | [Deployment](https://docs.openpreflight.xyz/deploy/deployment/) · [Coolify](https://docs.openpreflight.xyz/deploy/coolify/) · [Networking](https://docs.openpreflight.xyz/deploy/networking/) |
-| Configure | [Configuration](https://docs.openpreflight.xyz/configure/configuration/) · [GitHub App](https://docs.openpreflight.xyz/configure/github-app/) · [Bindings](https://docs.openpreflight.xyz/configure/bindings/) · [Resolution](https://docs.openpreflight.xyz/configure/resolution/) · [Path filters](https://docs.openpreflight.xyz/configure/path-filters/) |
-| Use | [Pipelines](https://docs.openpreflight.xyz/use/pipelines/) · [Runs](https://docs.openpreflight.xyz/use/runs/) · [Logs](https://docs.openpreflight.xyz/use/logs/) |
-| Operate | [Operations](https://docs.openpreflight.xyz/operate/operations/) · [Troubleshooting](https://docs.openpreflight.xyz/operate/troubleshooting/) |
-| Reference | [API](https://docs.openpreflight.xyz/reference/api/) · [Architecture](https://docs.openpreflight.xyz/reference/architecture/) · [Security model](https://docs.openpreflight.xyz/reference/security-model/) · [ADRs](https://docs.openpreflight.xyz/reference/decisions/001-database/) |
+| Getting started | [Overview](https://docs.openpreflight.xyz/getting-started/overview/) · [Quickstart](https://docs.openpreflight.xyz/getting-started/quickstart/) · [Comparison](https://docs.openpreflight.xyz/getting-started/comparison/) |
+| Deploy | [Deployment](https://docs.openpreflight.xyz/deploy/deployment/) · [Networking](https://docs.openpreflight.xyz/deploy/networking/) · [Coolify](https://docs.openpreflight.xyz/deploy/coolify/) |
+| Configure | [GitHub App](https://docs.openpreflight.xyz/configure/github-app/) · [Bindings](https://docs.openpreflight.xyz/configure/bindings/) · [Pipelines](https://docs.openpreflight.xyz/configure/pipelines/) · [Path filters](https://docs.openpreflight.xyz/configure/path-filters/) · [Dry run](https://docs.openpreflight.xyz/configure/dry-run/) · [Fork pull requests](https://docs.openpreflight.xyz/configure/fork-pull-requests/) |
+| Use | [Runs](https://docs.openpreflight.xyz/use/runs/) · [Logs](https://docs.openpreflight.xyz/use/logs/) |
+| Operate | [Health](https://docs.openpreflight.xyz/operate/health/) · [Backup and restore](https://docs.openpreflight.xyz/operate/backup-restore/) · [Upgrade](https://docs.openpreflight.xyz/operate/upgrade/) · [Rotate the secret key](https://docs.openpreflight.xyz/operate/rotate-secret-key/) · [Troubleshooting](https://docs.openpreflight.xyz/operate/troubleshooting/) |
+| Reference | [Configuration](https://docs.openpreflight.xyz/reference/configuration/) · [Resolution](https://docs.openpreflight.xyz/reference/resolution/) · [API](https://docs.openpreflight.xyz/reference/api/) · [Architecture](https://docs.openpreflight.xyz/reference/architecture/) · [Security model](https://docs.openpreflight.xyz/reference/security-model/) · [Glossary](https://docs.openpreflight.xyz/reference/glossary/) · [ADRs](https://docs.openpreflight.xyz/reference/decisions/001-database/) |
 | Project | [Development](https://docs.openpreflight.xyz/contributing/development/) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md) |
 
 ## Run it
