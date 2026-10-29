@@ -78,3 +78,26 @@ func (c *Client) CommitFiles(ctx context.Context, installationID int64, repo, re
 		Truncated: raw.Truncated || len(raw.Files) >= maxCommitFiles,
 	}, nil
 }
+
+// CompareFiles lists paths changed between base and head, from their merge base
+// (GET /repos/{}/compare/{base}...{head}). That is the whole pull request or the
+// whole push, not only its last commit. The endpoint has no truncated flag, so
+// the 300-file cap is the only signal.
+func (c *Client) CompareFiles(ctx context.Context, installationID int64, repo, base, head string) (CommitFiles, error) {
+	repo, base, head = strings.TrimSpace(repo), strings.TrimSpace(base), strings.TrimSpace(head)
+	if repo == "" || base == "" || head == "" {
+		return CommitFiles{}, errors.New("githubapp: repo, base and head are required")
+	}
+	token, err := c.InstallationToken(ctx, installationID)
+	if err != nil {
+		return CommitFiles{}, err
+	}
+	var raw struct {
+		Files []CommitFile `json:"files"`
+	}
+	path := fmt.Sprintf("/repos/%s/compare/%s...%s", repo, base, head)
+	if err := c.do(ctx, http.MethodGet, path, "Bearer "+token, nil, &raw); err != nil {
+		return CommitFiles{}, err
+	}
+	return CommitFiles{SHA: head, Files: raw.Files, Truncated: len(raw.Files) >= maxCommitFiles}, nil
+}

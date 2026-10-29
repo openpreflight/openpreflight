@@ -183,6 +183,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		GitHubAppID:    app.ID,
 		Repo:           ev.Repo,
 		SHA:            ev.SHA,
+		BaseSHA:        ev.BaseSHA,
 		Ref:            ev.Branch,
 		Event:          ev.Name + "." + ev.Action,
 		DeliveryID:     deliveryID,

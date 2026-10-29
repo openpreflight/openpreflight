@@ -13,7 +13,7 @@ import (
 const jobCols = `id, COALESCE(binding_id, 0), github_app_id, repo, sha, ref, event, delivery_id,
 	installation_id, check_suite_id, check_run_id, check_name, status, conclusion, steps_json, error,
 	log_bytes, shareable_logs, is_fork, pull_number, skip_reason, runtime, plan_source,
-	plan_origins, created_at, started_at, finished_at`
+	plan_origins, base_sha, created_at, started_at, finished_at`
 
 func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	var (
@@ -26,7 +26,7 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	if err := sc.Scan(&j.ID, &j.BindingID, &j.GitHubAppID, &j.Repo, &j.SHA, &j.Ref, &j.Event,
 		&j.DeliveryID, &j.InstallationID, &j.CheckSuiteID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
 		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &j.SkipReason,
-		&j.Runtime, &j.PlanSource, &j.PlanOrigins, &created, &started, &finished); err != nil {
+		&j.Runtime, &j.PlanSource, &j.PlanOrigins, &j.BaseSHA, &created, &started, &finished); err != nil {
 		return Job{}, err
 	}
 	j.ShareableLogs = shared != 0
@@ -82,10 +82,12 @@ func NewJobID() string {
 
 // JobInput is what the webhook handler knows at enqueue time.
 type JobInput struct {
-	BindingID      int64
-	GitHubAppID    int64
-	Repo           string
-	SHA            string
+	BindingID   int64
+	GitHubAppID int64
+	Repo        string
+	SHA         string
+	// BaseSHA starts the range the path filter reads; "" means the head commit only.
+	BaseSHA        string
 	Ref            string
 	Event          string
 	DeliveryID     string
@@ -109,11 +111,11 @@ func (s *Store) EnqueueJob(in JobInput) (Job, error) {
 	id := NewJobID()
 	_, err := s.db.Exec(`INSERT INTO jobs (id, binding_id, github_app_id, repo, sha, ref, event,
 		delivery_id, installation_id, check_suite_id, check_name, status, shareable_logs, is_fork,
-		pull_number, skip_reason, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		pull_number, skip_reason, base_sha, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullInt64(in.BindingID), in.GitHubAppID, in.Repo, in.SHA, in.Ref, in.Event,
 		in.DeliveryID, in.InstallationID, in.CheckSuiteID, in.CheckName, JobQueued,
-		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, in.SkipReason, formatTime(now()))
+		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, in.SkipReason, in.BaseSHA, formatTime(now()))
 	if err != nil {
 		return Job{}, fmt.Errorf("store: enqueue job: %w", err)
 	}
