@@ -24,6 +24,8 @@ type GitHub struct {
 	tokens      int
 	failNext    map[string]int
 	commitFiles map[string]commitFilesStub
+	// compareFiles is keyed "base...head".
+	compareFiles map[string][]map[string]any
 	// refs maps a branch or tag to the SHA it points at, so a dry run can ask
 	// for "main" and get an immutable commit back the way real GitHub does.
 	refs          map[string]string
@@ -49,6 +51,7 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 	f := &GitHub{
 		failNext:      map[string]int{},
 		commitFiles:   map[string]commitFilesStub{},
+		compareFiles:  map[string][]map[string]any{},
 		refs:          map[string]string{},
 		defaultBranch: "main",
 	}
@@ -130,6 +133,17 @@ func NewGitHub(t *testing.T, root string) *GitHub {
 			"default_branch": branch,
 			"private":        true,
 		})
+	})
+	mux.HandleFunc("GET /repos/{owner}/{repo}/compare/{basehead}", func(w http.ResponseWriter, r *http.Request) {
+		f.mu.Lock()
+		files, ok := f.compareFiles[r.PathValue("basehead")]
+		f.mu.Unlock()
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"files": files})
 	})
 	mux.HandleFunc("GET /repos/{owner}/{repo}/commits/{sha}", func(w http.ResponseWriter, r *http.Request) {
 		if f.shouldFail("commit-files") {
@@ -226,4 +240,11 @@ func (f *GitHub) SetCommitFiles(sha string, files []map[string]any, truncated bo
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.commitFiles[sha] = commitFilesStub{files: files, truncated: truncated}
+}
+
+// SetCompareFiles is the fake GET /repos/{}/compare/{base}...{head} file list.
+func (f *GitHub) SetCompareFiles(base, head string, files []map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.compareFiles[base+"..."+head] = files
 }

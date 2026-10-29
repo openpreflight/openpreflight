@@ -30,6 +30,7 @@ type pullRequestRef struct {
 	} `json:"head"`
 	Base struct {
 		Ref  string  `json:"ref"`
+		SHA  string  `json:"sha"`
 		Repo repoRef `json:"repo"`
 	} `json:"base"`
 }
@@ -38,6 +39,7 @@ type checkSuitePayload struct {
 	ID           int64            `json:"id"`
 	HeadSHA      string           `json:"head_sha"`
 	HeadBranch   *string          `json:"head_branch"`
+	Before       *string          `json:"before"`
 	PullRequests []pullRequestRef `json:"pull_requests"`
 	App          struct {
 		ID int64 `json:"id"`
@@ -68,10 +70,14 @@ type rawPayload struct {
 
 // Event is the normalised form of an actionable delivery.
 type Event struct {
-	Name           string // check_suite | check_run
-	Action         string
-	Repo           string // owner/name
-	SHA            string
+	Name   string // check_suite | check_run
+	Action string
+	Repo   string // owner/name
+	SHA    string
+	// BaseSHA is where the changes being checked start: the pull request's base,
+	// else the branch tip before the push. "" when neither is known (a new
+	// branch), and the path filter then looks at the head commit alone.
+	BaseSHA        string
 	Branch         string // "" when GitHub gave us none (fork PR)
 	InstallationID int64
 	// CheckRunAppID is the App that owns the re-requested Check Run. We only act
@@ -154,8 +160,14 @@ func Parse(eventName string, body []byte) (Event, SkipReason, error) {
 		return ev, "", fmt.Errorf("webhook: %s payload has no head sha", eventName)
 	}
 	ev.IsFork = isFork(raw.Repository, suite, prs)
+	if suite != nil && suite.Before != nil && strings.Trim(*suite.Before, "0") != "" {
+		ev.BaseSHA = *suite.Before
+	}
 	if len(prs) > 0 {
 		ev.PullNumber = prs[0].Number
+		if prs[0].Base.SHA != "" {
+			ev.BaseSHA = prs[0].Base.SHA
+		}
 		if ev.Branch == "" && prs[0].Head.Ref != "" {
 			ev.Branch = strings.TrimPrefix(prs[0].Head.Ref, "refs/heads/")
 		}
