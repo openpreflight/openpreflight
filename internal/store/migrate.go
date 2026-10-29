@@ -189,6 +189,13 @@ ALTER TABLE jobs ADD COLUMN plan_source TEXT NOT NULL DEFAULT '';
 	{"0008_job_plan_origins", `
 ALTER TABLE jobs ADD COLUMN plan_origins TEXT NOT NULL DEFAULT '';
 `},
+
+	// 0009: the path filter reads the whole pull request or push, so a job
+	// keeps where that range starts. '' (every job before this) means the head
+	// commit alone, which is what those jobs were filtered on.
+	{"0009_job_base_sha", `
+ALTER TABLE jobs ADD COLUMN base_sha TEXT NOT NULL DEFAULT '';
+`},
 }
 
 func (s *Store) migrate() error {

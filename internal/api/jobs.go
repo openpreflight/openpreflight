@@ -161,6 +161,7 @@ func (s *Server) rerunJob(w http.ResponseWriter, r *http.Request, _ store.User) 
 		GitHubAppID: old.GitHubAppID,
 		Repo:        old.Repo,
 		SHA:         old.SHA,
+		BaseSHA:     old.BaseSHA,
 		Ref:         old.Ref,
 		Event:       "manual.rerun",
 		// No delivery id: this run is ours, not GitHub's, so it must not

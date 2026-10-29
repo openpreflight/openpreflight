@@ -6,6 +6,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`openpreflight backup <file>` copies the database while the server runs.**
+  It uses SQLite's `VACUUM INTO`, so the copy is consistent without stopping
+  the container: `docker compose exec openpreflight openpreflight backup
+  /data/backup.db`. Logs are plain files; copy `DATA_DIR/logs` as before.
+- **`CI_CLIENT_IP_HEADER`** names the header a reverse proxy sets to the
+  client's IP, such as `CF-Connecting-IP` or `X-Forwarded-For`. The sign-in
+  limit then counts each client on its own. Before, every client behind a
+  proxy shared one budget of five attempts a minute. Set it only when the
+  proxy overwrites or appends that header.
+
+### Changed
+
+- **A path filter reads the whole pull request, or the whole push.** It read
+  only the head commit, so a pull request whose last commit changed only
+  `README.md` was skipped even when earlier commits changed filtered paths,
+  and a required check let it merge. The range starts at the pull request's
+  base, else at the branch tip before the push. A new branch, and a re-run of
+  a job from before this release, still read the head commit. The dry run
+  still reads the one commit it is given.
+
+### Security
+
+- Every response sends `X-Frame-Options: DENY` and
+  `X-Content-Type-Options: nosniff`.
+
+### Upgrade
+
+Migration `0009_job_base_sha` adds one column to `jobs` on first boot. No
+configuration change is needed; `CI_CLIENT_IP_HEADER` is off until set.
+
 ## [2.3.2] - 2026-10-29
 
 A security patch: a current Go toolchain, a supported Alpine, and Node 22.23.4

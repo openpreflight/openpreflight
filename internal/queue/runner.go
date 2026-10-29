@@ -344,7 +344,17 @@ func (r *Runner) runJob(ctx context.Context, job store.Job, settings store.Setti
 			complete("failure", nil, msg)
 			return err
 		}
-		files, ferr := client.CommitFiles(ctx, job.InstallationID, job.Repo, job.SHA)
+		// The whole pull request or push: a last commit that touches only
+		// README.md must not skip a check the earlier commits need. With no
+		// base (a new branch, a job from before 2.4.0) it is the head commit.
+		var files githubapp.CommitFiles
+		var ferr error
+		if job.BaseSHA != "" {
+			w.Printf("path filter: files changed in %s...%s\n", shortSHA(job.BaseSHA), shortSHA(job.SHA))
+			files, ferr = client.CompareFiles(ctx, job.InstallationID, job.Repo, job.BaseSHA, job.SHA)
+		} else {
+			files, ferr = client.CommitFiles(ctx, job.InstallationID, job.Repo, job.SHA)
+		}
 		switch {
 		case ferr != nil || files.Truncated:
 			// Fail open: skipping a commit because we could not see the file

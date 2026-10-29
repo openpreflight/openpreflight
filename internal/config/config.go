@@ -30,6 +30,10 @@ type Config struct {
 	DockerHost string
 	// OldSecretKey, when set, re-seals secret columns under SecretKey on boot.
 	OldSecretKey string
+	// ClientIPHeader names the header a reverse proxy sets to the client's IP
+	// (CF-Connecting-IP, X-Forwarded-For). Empty uses the TCP peer, so nothing
+	// a client sends can change its sign-in budget unless this is set.
+	ClientIPHeader string
 }
 
 // ErrNoSecretKey is returned when CI_SECRET_KEY is absent or too weak.
@@ -48,6 +52,7 @@ func Load() (Config, error) {
 		BootstrapAdminPassword: os.Getenv("CI_BOOTSTRAP_ADMIN_PASSWORD"),
 		PublicBaseURL:          strings.TrimRight(os.Getenv("CI_PUBLIC_BASE_URL"), "/"),
 		OldSecretKey:           os.Getenv("CI_SECRET_KEY_OLD"),
+		ClientIPHeader:         strings.TrimSpace(os.Getenv("CI_CLIENT_IP_HEADER")),
 	}
 	if host := os.Getenv("CI_DOCKER_HOST"); host != "" {
 		c.DockerHost = host

@@ -223,6 +223,11 @@ func verbose(r *http.Request) bool {
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+		// No page is meant to be framed, and no response is meant to be sniffed
+		// into another type. A CSP is not set: the shadcn-templ bundle uses
+		// inline scripts.
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
 		s.log.Info("http", "method", r.Method, "path", r.URL.Path,

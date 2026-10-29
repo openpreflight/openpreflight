@@ -71,6 +71,31 @@ func TestParseCheckSuite(t *testing.T) {
 	}
 }
 
+// The path filter reads base...head: the PR base when there is one, else the
+// tip before the push. An all-zero before (a new branch) means no base.
+func TestParseBaseSHA(t *testing.T) {
+	suite := func(before, prs string) []byte {
+		return []byte(`{"action":"requested","check_suite":{"id":1,"head_sha":"h","head_branch":"feat",
+			"before":` + before + `,"pull_requests":` + prs + `},
+			"repository":{"id":10,"full_name":"acme/api"},"installation":{"id":7}}`)
+	}
+	pr := `[{"number":3,"head":{"ref":"feat","sha":"h","repo":{"id":10,"full_name":"acme/api"}},
+		"base":{"ref":"main","sha":"b","repo":{"id":10,"full_name":"acme/api"}}}]`
+	for _, tc := range []struct {
+		name, body, want string
+	}{
+		{"push", string(suite(`"p"`, `[]`)), "p"},
+		{"pull request wins over before", string(suite(`"p"`, pr)), "b"},
+		{"new branch", string(suite(`"0000000000000000000000000000000000000000"`, `[]`)), ""},
+		{"no before", string(suite(`null`, `[]`)), ""},
+	} {
+		ev, _, err := Parse(EventCheckSuite, []byte(tc.body))
+		if err != nil || ev.BaseSHA != tc.want {
+			t.Errorf("%s: base %q, want %q (err %v)", tc.name, ev.BaseSHA, tc.want, err)
+		}
+	}
+}
+
 func TestParseIgnoresNonActionableActions(t *testing.T) {
 	body := []byte(`{"action":"completed","check_suite":{"head_sha":"abc","head_branch":"main"},
 		"repository":{"full_name":"o/r"},"installation":{"id":1}}`)
