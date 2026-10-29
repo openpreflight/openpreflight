@@ -1,9 +1,23 @@
 name: CI
 
+# Only changes that can break the image. Everything else is checked by
+# openpreflight itself (below).
 on:
   push:
     branches: [main]
+    paths:
+      - Dockerfile
+      - go.mod
+      - go.sum
+      - 'internal/web/package*.json'
+      - '.github/workflows/**'
   pull_request:
+    paths:
+      - Dockerfile
+      - go.mod
+      - go.sum
+      - 'internal/web/package*.json'
+      - '.github/workflows/**'
 
 permissions:
   contents: read

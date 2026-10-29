@@ -6,6 +6,41 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-10-29
+
+A security patch: a current Go toolchain, a supported Alpine, and Node 22.23.4
+in the image. No behaviour change, no schema change and no contract change.
+Image `ghcr.io/openpreflight/openpreflight:2.3.2`.
+
+### Security
+
+- **Built with Go 1.26.10.** 2.3.1 was built with Go 1.26.5, and
+  `govulncheck -mode binary` reports 22 standard-library vulnerabilities in
+  it. `go.mod` now names the patch release, and the image's build stage uses
+  the same one as the release binaries.
+- **The runtime image is Alpine 3.22.** Alpine 3.21 reaches end of life on
+  2026-11-01. The default job runtime stays on Node 22, at 22.23.4 or later
+  (the October 2026 Node security release); the Tailwind lockfile takes the
+  same release's npm fixes.
+
+### Changed
+
+- The pipeline that checks this repository reads the Go version from `go.mod`
+  and runs `govulncheck`, so a reachable known vulnerability fails the check.
+- The Actions `image` job builds the Docker image again on a pull request or
+  push that changes the Dockerfile, `go.mod`, the Tailwind lockfile or a
+  workflow. Before, a broken image showed up only when a tag was pushed.
+- templ is a `go tool` dependency. Run `go tool templ generate`; the generator
+  and the library can no longer be on different versions.
+- Dependabot also watches the Dockerfile's base images and the Tailwind
+  `package.json`.
+- `golang.org/x/crypto` 0.58.0, `modernc.org/sqlite` 1.61.0, templ 0.3.1070,
+  and `docker/login-action` v4 in the release workflows.
+
+### Upgrade
+
+No migration and no configuration change. Pull the image.
+
 ## [2.3.1] - 2026-09-27
 
 Go jobs clean up after themselves, logs written before 2.2.0 read as plain
