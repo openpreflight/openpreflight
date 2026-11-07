@@ -70,7 +70,7 @@ templ Shell(p web.Page) {
 						Variant:    button.VariantGhost,
 						Size:       button.SizeIcon,
 						Class:      "text-muted-foreground ml-auto",
-						Attributes: templ.Attributes{"type": "button", "aria-label": "Refresh", "title": "Refresh", "onclick": "location.replace(location.pathname + location.search)"},
+						Attributes: templ.Attributes{"type": "button", "aria-label": "Refresh", "title": "Refresh", "onclick": templ.JSUnsafeFuncCall("location.replace(location.pathname + location.search)")},
 					}) {
 						@icon.RefreshCw(icon.Props{Class: "size-4"})
 					}

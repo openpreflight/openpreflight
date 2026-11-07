@@ -27,6 +27,10 @@ func renderPage(t *testing.T, name string, f func(web.Page) templ.Component, p w
 	if len(out) < 500 {
 		t.Fatalf("%s: rendered %d bytes, expected a page", name, len(out))
 	}
+	// templ drops a plain-string on* handler and leaves this marker instead.
+	if strings.Contains(out, "templ: failed sanitization") {
+		t.Errorf("%s: an inline handler was sanitized away; wrap it in templ.JSUnsafeFuncCall", name)
+	}
 	return out
 }
 
@@ -154,5 +158,13 @@ func TestShellHasRefresh(t *testing.T) {
 	out := renderPage(t, "Error", Error, page(map[string]any{"Heading": "h", "Message": "m"}))
 	if !strings.Contains(out, `aria-label="Refresh"`) || !strings.Contains(out, "location.replace(location.pathname + location.search)") {
 		t.Error("Shell header: refresh button missing")
+	}
+}
+
+// The webhook URL field selects itself on focus; templ strips a plain-string handler.
+func TestGitHubAppsWebhookFieldSelects(t *testing.T) {
+	out := renderPage(t, "GitHubApps", GitHubApps, page(map[string]any{"Apps": []store.GitHubApp{{Name: "ci"}}}))
+	if !strings.Contains(out, `onfocus="this.select()"`) {
+		t.Error("GitHubApps: webhook URL field lost its onfocus handler")
 	}
 }

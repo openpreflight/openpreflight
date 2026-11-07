@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/Oudwins/tailwind-merge-go v0.2.3
-	github.com/a-h/templ v0.3.1070
+	github.com/a-h/templ v0.3.1100
 	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.61.0
@@ -12,7 +12,7 @@ require (
 
 require (
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect
-	github.com/andybalholm/brotli v1.2.6 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cli/browser v1.3.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
