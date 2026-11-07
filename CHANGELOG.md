@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-07
+
 ### Added
 
 - **`openpreflight backup <file>` copies the database while the server runs.**
@@ -27,6 +29,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   base, else at the branch tip before the push. A new branch, and a re-run of
   a job from before this release, still read the head commit. The dry run
   still reads the one commit it is given.
+- Built with templ 0.3.1100.
 
 ### Security
 
@@ -561,7 +564,9 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.3.1...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.4.0
+[2.3.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.2
 [2.3.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.1
 [2.3.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.0
 [2.2.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.2.0
