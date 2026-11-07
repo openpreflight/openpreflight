@@ -65,7 +65,7 @@ templ GitHubApps(p web.Page) {
 									Class:      "font-mono text-xs",
 									ReadOnly:   true,
 									Value:      web.WebhookURL(settings.PublicBaseURL, app.Slug),
-									Attributes: templ.Attributes{"aria-label": "Webhook URL for " + app.Name, "onfocus": "this.select()"},
+									Attributes: templ.Attributes{"aria-label": "Webhook URL for " + app.Name, "onfocus": templ.JSUnsafeFuncCall("this.select()")},
 								})
 							}
 							if p.Flash == "" && app.LastError != "" {

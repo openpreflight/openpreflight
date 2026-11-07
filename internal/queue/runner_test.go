@@ -311,6 +311,36 @@ func TestRunnerRunsWhenAPathMatches(t *testing.T) {
 	}
 }
 
+// Commit 1 changes src/, commit 2 only README.md. Filtering on the head commit
+// alone skipped the pull request; the range sees src/ and runs it.
+func TestRunnerFiltersOnTheWholeRange(t *testing.T) {
+	h := newHarness(t)
+	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{
+		".ci.yml": "install: echo installing\ntest: echo testing\nbuild: echo building\n",
+	})
+	h.github.SetCommitFiles(sha, []map[string]any{{"filename": "README.md"}}, false)
+	h.github.SetCompareFiles("base123", sha, []map[string]any{
+		{"filename": "src/main.go"}, {"filename": "README.md"},
+	})
+	b := h.binding(t, store.BindingInput{Repo: "acme/api", Enabled: true, Paths: "src/**"})
+
+	job := h.runOne(t, store.JobInput{
+		BindingID: b.ID, GitHubAppID: h.app.ID, Repo: "acme/api", SHA: sha, BaseSHA: "base123", InstallationID: 101,
+	})
+	if job.Status != store.JobSuccess {
+		t.Fatalf("a range that touches src/ should run, got %q %q", job.Status, job.Error)
+	}
+	if job.BaseSHA != "base123" {
+		t.Fatalf("base_sha not stored: %q", job.BaseSHA)
+	}
+	body, _ := logs.Read(h.cfg.LogDir(), job.ID)
+	for _, want := range []string{"files changed in base123...", "Changed files: 2", "Matched files: 1"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("log should contain %q:\n%s", want, body)
+		}
+	}
+}
+
 func TestRunnerFailOpenWhenCommitFilesFail(t *testing.T) {
 	h := newHarness(t)
 	sha := testsupport.NewRepo(t, h.repos, "acme/api", map[string]string{

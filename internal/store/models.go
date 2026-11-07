@@ -146,6 +146,7 @@ type Job struct {
 	GitHubAppID    int64      `json:"github_app_id"`
 	Repo           string     `json:"repo"`
 	SHA            string     `json:"sha"`
+	BaseSHA        string     `json:"base_sha"`
 	Ref            string     `json:"ref"`
 	Event          string     `json:"event"`
 	DeliveryID     string     `json:"delivery_id"`

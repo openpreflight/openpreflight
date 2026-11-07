@@ -24,9 +24,8 @@ const loginAttemptsPerMinute = 5
 // concurrent guesses cannot all get in ahead of the first failure, and an
 // attempt over budget costs no bcrypt at all.
 //
-// ponytail: keyed on RemoteAddr, so behind a reverse proxy every client shares
-// one budget. For a single admin that global limit is the point; key on a
-// trusted X-Forwarded-For if a shared budget ever locks a real operator out.
+// It is keyed on the TCP peer, so behind a reverse proxy every client shares one
+// budget unless CI_CLIENT_IP_HEADER names the header the proxy sets.
 type loginLimiter struct {
 	mu    sync.Mutex
 	start time.Time
@@ -53,8 +52,19 @@ func (l *loginLimiter) clear(addr string) {
 	delete(l.count, addr)
 }
 
-// clientAddr is the peer's IP, without the port.
-func clientAddr(r *http.Request) string {
+// clientAddr is the client's IP, without the port: from header when it is set
+// and holds an IP, else the TCP peer. X-Forwarded-For takes its last entry, the
+// one the nearest proxy appended; earlier entries are whatever the client sent.
+func clientAddr(r *http.Request, header string) string {
+	if header != "" {
+		v := r.Header.Values(header)
+		if len(v) > 0 {
+			parts := strings.Split(v[len(v)-1], ",")
+			if ip := net.ParseIP(strings.TrimSpace(parts[len(parts)-1])); ip != nil {
+				return ip.String()
+			}
+		}
+	}
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host
 	}
@@ -158,7 +168,7 @@ func (s *Server) pageLogin(w http.ResponseWriter, r *http.Request) {
 // handleLogin exchanges credentials for a session. The JSON surface gets the
 // token back so a CLI can use it as a Bearer credential.
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	addr := clientAddr(r)
+	addr := clientAddr(r, s.cfg.ClientIPHeader)
 	if ok, wait := s.logins.allow(addr); !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
 		s.reply(w, r, http.StatusTooManyRequests, map[string]string{"error": "too many sign-in attempts; retry later"},
