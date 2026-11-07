@@ -6,7 +6,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [2.3.2] - 2026-10-29
+## [2.3.2] - 2026-11-07
 
 A security patch: a current Go toolchain, a supported Alpine, and Node 22.23.4
 in the image. No behaviour change, no schema change and no contract change.
