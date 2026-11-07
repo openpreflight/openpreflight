@@ -1,7 +1,7 @@
 # CSS is compiled from Tailwind at image-build time so a forgotten
 # `npm run css` cannot ship stale styles. The runtime image stays a
 # static Go binary.
-FROM node:22-alpine AS css
+FROM node:22.23.4-alpine AS css
 WORKDIR /web
 COPY internal/web/package.json internal/web/package-lock.json ./
 RUN npm ci
@@ -13,14 +13,13 @@ RUN npm run css
 
 # Build: pure Go, so the binary is static and the runtime image needs no libc
 # shim. modernc.org/sqlite is what makes CGO_ENABLED=0 possible.
-FROM golang:1.26-alpine AS build
+FROM golang:1.26.10-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=css /web/assets/css/output.css internal/web/assets/css/output.css
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
-RUN templ generate ./internal/web/...
+RUN go tool templ generate ./internal/web/...
 ENV CGO_ENABLED=0 GOOS=linux
 ARG VERSION=dev
 RUN go build -trimpath \
@@ -29,8 +28,8 @@ RUN go build -trimpath \
 
 # Runtime: git is required to check out commits, and Node is the default
 # pipeline runtime (README Pipelines). Everything runs as a non-root user.
-FROM alpine:3.21
-RUN apk add --no-cache git nodejs npm ca-certificates tini docker-cli \
+FROM alpine:3.22
+RUN apk add --no-cache git "nodejs>=22.23.4-r0" npm ca-certificates tini docker-cli \
  && addgroup -g 10001 ci \
  && adduser -D -u 10001 -G ci -h /home/ci ci \
  && mkdir -p /data /workspace \
