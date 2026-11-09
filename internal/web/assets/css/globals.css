@@ -35,6 +35,9 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-pass: var(--chart-pass);
+  --color-chart-fail: var(--chart-fail);
+  --color-chart-other: var(--chart-other);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -79,6 +82,11 @@
   --border: #dfe3dc;
   --input: #dfe3dc;
   --ring: #2f6f4f;
+  /* Outcome colours for charts: CVD-checked as a pair (dataviz validator,
+     deutan/protan ΔE ≥ 9 on both surfaces). Text never wears them. */
+  --chart-pass: #2f6f4f;
+  --chart-fail: #e0705a;
+  --chart-other: #c5cac1;
   --chart-1: #2f6f4f;
   --chart-2: #5f8f74;
   --chart-3: #7cc79c;
@@ -120,6 +128,9 @@
   --border: #2a2f2a;
   --input: #2a2f2a;
   --ring: #7cc79c;
+  --chart-pass: #7cc79c;
+  --chart-fail: #c2493c;
+  --chart-other: #3a403a;
   --chart-1: #7cc79c;
   --chart-2: #5f8f74;
   --chart-3: #2f6f4f;
@@ -207,6 +218,21 @@
   /* The live dot inside a running status pill. */
   .dot-live {
     animation: dot-live 1.4s ease-in-out infinite;
+  }
+
+  /* ListCard: every child after the head is an inset panel on the frame. */
+  [data-slot="list-card"] > :not([data-slot="list-head"]) {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  [data-slot="list-card"] > :not([data-slot="list-head"]) + :not([data-slot="list-head"]) {
+    margin-top: 0.25rem;
+  }
+  /* A card with no head still keeps its frame even all round. */
+  [data-slot="list-card"] > [data-slot="list-head"] + * {
+    margin-top: 0;
   }
 
   /* A row whose primary link covers the whole row; controls sit above it. */

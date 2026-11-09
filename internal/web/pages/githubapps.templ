@@ -153,16 +153,18 @@ templ appList(p web.Page, settings store.Settings, title, hint string, apps []st
 	@layouts.ListCard() {
 		@layouts.ListHead(title, len(apps), hint)
 		// Same column template as appRow; Tailwind scans .templ files, not pages/*.go.
-		<div class="bg-muted/40 text-muted-foreground hidden border-b px-4 py-2 text-xs font-medium sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:gap-4">
-			<span>App</span>
-			<span>Check name</span>
-			<span>Status</span>
-		</div>
-		@layouts.List() {
-			for _, app := range apps {
-				@appRow(p, settings, app)
+		<div>
+			<div class="bg-muted/40 text-muted-foreground hidden border-b px-4 py-2 text-xs font-medium sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:gap-4">
+				<span class="pl-12">App</span>
+				<span>Check name</span>
+				<span>Status</span>
+			</div>
+			@layouts.List() {
+				for _, app := range apps {
+					@appRow(p, settings, app)
+				}
 			}
-		}
+		</div>
 	}
 }
 
@@ -172,8 +174,8 @@ templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
 	<li class="hover:bg-muted/40 px-4 py-3 transition-colors">
 		<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:items-center sm:gap-4">
 			<div class="flex min-w-0 items-center gap-3">
-				<span class="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
-					@icon.Github(icon.Props{Class: "size-4"})
+				<span class={ "flex size-9 shrink-0 items-center justify-center rounded-lg border", appTileClass(app) }>
+					@layouts.GitHubMark("size-[18px]")
 				</span>
 				<div class="min-w-0">
 					<a
@@ -508,4 +510,19 @@ templ formActions() {
 	<div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-5">
 		{ children... }
 	</div>
+}
+
+// appTileClass tints an App's tile by its state, so the icon column reads as a
+// status column at a glance: the mark is the same on every row, the colour is not.
+func appTileClass(a store.GitHubApp) string {
+	_, tone := appStatus(a)
+	switch tone {
+	case layouts.ToneDanger:
+		return "border-destructive/25 bg-destructive/10 text-destructive"
+	case layouts.ToneWarning:
+		return "border-warning/30 bg-warning/10 text-warning"
+	case layouts.ToneSuccess:
+		return "border-success/25 bg-success/10 text-success"
+	}
+	return "bg-muted text-muted-foreground"
 }

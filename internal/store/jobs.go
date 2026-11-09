@@ -422,3 +422,53 @@ func (s *Store) PruneJobs(olderThan time.Duration) ([]string, error) {
 	}
 	return ids, nil
 }
+
+// DayCount is one UTC day's finished runs, by outcome.
+type DayCount struct {
+	Day    time.Time // midnight UTC
+	Passed int
+	Failed int // failure or error
+	Other  int // skipped or cancelled
+}
+
+// DailyJobCounts returns the last `days` UTC days, oldest first, including
+// days with no runs. Queued and running jobs are not outcomes yet.
+func (s *Store) DailyJobCounts(days int, until time.Time) ([]DayCount, error) {
+	end := until.UTC().Truncate(24 * time.Hour)
+	start := end.AddDate(0, 0, -(days - 1))
+	rows, err := s.db.Query(`SELECT substr(created_at, 1, 10), status, count(*) FROM jobs
+		WHERE created_at >= ? AND status NOT IN (?, ?)
+		GROUP BY 1, 2`, start.Format(timeFmt), JobQueued, JobInProgress)
+	if err != nil {
+		return nil, fmt.Errorf("store: daily counts: %w", err)
+	}
+	defer rows.Close()
+	out := make([]DayCount, days)
+	for i := range out {
+		out[i].Day = start.AddDate(0, 0, i)
+	}
+	for rows.Next() {
+		var day, status string
+		var n int
+		if err := rows.Scan(&day, &status, &n); err != nil {
+			return nil, fmt.Errorf("store: scan daily counts: %w", err)
+		}
+		d, err := time.Parse("2006-01-02", day)
+		if err != nil {
+			continue
+		}
+		i := int(d.Sub(start).Hours() / 24)
+		if i < 0 || i >= days {
+			continue
+		}
+		switch status {
+		case JobSuccess:
+			out[i].Passed += n
+		case JobFailure, JobError:
+			out[i].Failed += n
+		default:
+			out[i].Other += n
+		}
+	}
+	return out, rows.Err()
+}

@@ -19,50 +19,65 @@ func job(status string, secs int) store.Job {
 	return j
 }
 
-func TestDashStats(t *testing.T) {
+func TestDashTiles(t *testing.T) {
 	tests := []struct {
-		name      string
-		recent    []store.Job
-		rate, mid string
-		rateCap   string
+		name            string
+		recent          []store.Job
+		rate, unit, mid string
 	}{
 		{
-			name:    "nothing has finished yet",
-			recent:  []store.Job{job(store.JobQueued, 0), job(store.JobInProgress, 0)},
-			rate:    "-",
-			rateCap: "no finished runs yet",
-			mid:     "-",
+			name:   "nothing has finished yet",
+			recent: []store.Job{job(store.JobQueued, 0), job(store.JobInProgress, 0)},
+			rate:   "—",
+			mid:    "—",
 		},
 		{
 			// A skipped job is not a failure - counting it as one would show a
 			// red pass rate for a repo that is behaving exactly as configured.
-			name:    "skipped runs count towards nothing",
-			recent:  []store.Job{job(store.JobSuccess, 10), job(store.JobSkipped, 0)},
-			rate:    "100%",
-			rateCap: "1 of 1 finished",
-			mid:     "10s",
+			name:   "skipped runs count towards nothing",
+			recent: []store.Job{job(store.JobSuccess, 10), job(store.JobSkipped, 0)},
+			rate:   "100", unit: "%",
+			mid: "10s",
 		},
 		{
-			name:    "failures and errors are results",
-			recent:  []store.Job{job(store.JobSuccess, 4), job(store.JobFailure, 60), job(store.JobError, 2), job(store.JobSuccess, 8)},
-			rate:    "50%",
-			rateCap: "2 of 4 finished",
-			mid:     "8s", // 2,4,8,60 -> upper median, not dragged by the 60s outlier
+			name:   "failures and errors are results",
+			recent: []store.Job{job(store.JobSuccess, 4), job(store.JobFailure, 60), job(store.JobError, 2), job(store.JobSuccess, 8)},
+			rate:   "50", unit: "%",
+			mid: "8s", // 2,4,8,60 -> upper median, not dragged by the 60s outlier
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := dashStats(tt.recent, 3, 2, 5)
-			if got[0].Value != tt.rate || got[0].Caption != tt.rateCap {
-				t.Errorf("pass rate = %q %q, want %q %q", got[0].Value, got[0].Caption, tt.rate, tt.rateCap)
+			got := dashTiles(tt.recent, nil, nil, 2, 5, 3)
+			if got[0].Value != tt.rate || got[0].Unit != tt.unit {
+				t.Errorf("pass rate = %q%q, want %q%q", got[0].Value, got[0].Unit, tt.rate, tt.unit)
 			}
-			if got[3].Value != tt.mid {
-				t.Errorf("run time = %q, want %q", got[3].Value, tt.mid)
+			if got[1].Value != tt.mid {
+				t.Errorf("run time = %q, want %q", got[1].Value, tt.mid)
 			}
-			if got[1].Value != "3" || got[2].Value != "2" || got[2].Caption != "of 5 bound" {
-				t.Errorf("counts = %+v %+v", got[1], got[2])
+			if got[2].Value != "2" || got[2].Lines[0][1] != "3" || got[2].Lines[1][1] != "3" {
+				t.Errorf("repos tile = %+v", got[2])
 			}
 		})
+	}
+}
+
+func TestWeekTrendAndChartScale(t *testing.T) {
+	daily := make([]store.DayCount, 14)
+	daily[0] = store.DayCount{Passed: 1, Failed: 1}            // prior week 50%
+	daily[13] = store.DayCount{Passed: 3, Failed: 1, Other: 2} // this week 75%
+	last, prev, ok := weekRates(daily)
+	if !ok || last != 75 || prev != 50 {
+		t.Fatalf("weekRates = %d %d %v, want 75 50 true", last, prev, ok)
+	}
+	bars, top, total, failed := activityChart(daily)
+	if top != 10 || total != 8 || failed != 2 || bars[13].Height != "60.0%" {
+		t.Fatalf("chart: top %d total %d failed %d height %s", top, total, failed, bars[13].Height)
+	}
+	for n, want := range map[int]int{0: 4, 3: 4, 5: 5, 6: 10, 11: 20, 21: 50, 99: 100} {
+		if got := niceCeil(n); got != want {
+			t.Errorf("niceCeil(%d) = %d, want %d", n, got, want)
+		}
 	}
 }
 

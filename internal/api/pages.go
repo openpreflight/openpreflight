@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/openpreflight/openpreflight/internal/coolify"
 	"github.com/openpreflight/openpreflight/internal/executor"
@@ -55,6 +56,11 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		s.fail(w, r, err)
 		return
 	}
+	daily, err := s.store.DailyJobCounts(14, time.Now())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	latest := latestJobByRepo(recent)
 	enabled := 0
 	var cards []web.DashRepo
@@ -89,6 +95,7 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		"Recent":          recent,
 		"InFlight":        inflight,
 		"RepoCards":       cards,
+		"Daily":           daily,
 	}))
 }
 

@@ -539,56 +539,207 @@ func dashNoRepoHint(bound int) string {
 	return "the worker runs nothing without one"
 }
 
-// dashStat is one tile in the Overview strip. The caption names the window the
-// number came from: these are the recent jobs the page already loaded, not an
-// all-time figure, and a bare percentage that implies otherwise is a lie.
-type dashStat struct {
+// dashTile is one number on Overview: a label, the value with its unit set
+// apart, a chip that says which way it is going, and two lines of context.
+// The window is always named: these come from the recent runs the page
+// loaded, not an all-time figure.
+type dashTile struct {
 	// Icon is the component, not its name: a name that no longer exists is a
 	// render error at request time, a missing component is a build failure.
-	Icon    func(...icon.Props) templ.Component
-	Label   string
-	Value   string
-	Caption string
+	Icon     func(...icon.Props) templ.Component
+	Label    string
+	Value    string
+	Unit     string
+	Chip     string
+	ChipTone layouts.Tone
+	ChipHint string
+	Lines    [][2]string // {lead, emphasised}
 }
 
-// dashStats reads the same recent-jobs slice the repo cards are built from, so
-// the numbers and the cards under them always describe the same runs. Skipped
-// and in-flight jobs are not results, so they count towards nothing.
-func dashStats(recent []store.Job, inflight, enabled, bound int) []dashStat {
+func finished(j store.Job) bool { return !j.InFlight() && j.Status != store.JobSkipped }
+
+func failedJob(j store.Job) bool { return j.Status == store.JobFailure || j.Status == store.JobError }
+
+// weekRates is the pass rate of the last 7 days and the 7 before, from the
+// daily counts; ok is false when either week has no finished run.
+func weekRates(daily []store.DayCount) (last, prev int, ok bool) {
+	if len(daily) < 14 {
+		return 0, 0, false
+	}
+	rate := func(days []store.DayCount) (int, bool) {
+		p, f := 0, 0
+		for _, d := range days {
+			p, f = p+d.Passed, f+d.Failed
+		}
+		if p+f == 0 {
+			return 0, false
+		}
+		return p * 100 / (p + f), true
+	}
+	n := len(daily)
+	a, okA := rate(daily[n-7:])
+	b, okB := rate(daily[n-14 : n-7])
+	return a, b, okA && okB
+}
+
+// dashTiles reads the same recent-jobs slice the repo list is built from, so
+// the numbers and the rows under them describe the same runs. Skipped and
+// in-flight jobs are not results, so they count towards nothing.
+func dashTiles(recent []store.Job, daily []store.DayCount, cards []dashRepo, enabled, bound, inflight int) []dashTile {
 	done, passed := 0, 0
 	var durs []time.Duration
+	var lastFail, slowest store.Job
 	for _, j := range recent {
-		if j.InFlight() || j.Status == store.JobSkipped {
+		if !finished(j) {
 			continue
 		}
 		done++
 		if j.Status == store.JobSuccess {
 			passed++
 		}
+		if failedJob(j) && lastFail.ID == "" {
+			lastFail = j
+		}
 		if d := j.Duration(); d > 0 {
 			durs = append(durs, d)
+			if d > slowest.Duration() {
+				slowest = j
+			}
 		}
 	}
-	rate, rateCaption := "-", "no finished runs yet"
+
+	rate := dashTile{Icon: icon.CircleCheck, Label: "Pass rate", Value: "—"}
 	if done > 0 {
-		rate = itoa(passed*100/done) + "%"
-		rateCaption = itoa(passed) + " of " + itoa(done) + " finished"
+		rate.Value, rate.Unit = itoa(passed*100/done), "%"
+		rate.Lines = append(rate.Lines, [2]string{"", itoa(passed) + " of " + itoa(done) + " finished runs passed."})
+	} else {
+		rate.Lines = append(rate.Lines, [2]string{"", "No finished runs yet."})
 	}
+	if last, prev, ok := weekRates(daily); ok {
+		d := last - prev
+		rate.Chip, rate.ChipHint = signed(d)+" pts", "this week against the week before"
+		rate.ChipTone = layouts.ToneSuccess
+		if d < 0 {
+			rate.ChipTone = layouts.ToneDanger
+		}
+	}
+	if lastFail.ID != "" {
+		rate.Lines = append(rate.Lines, [2]string{"Last failure: ", lastFail.Repo + " · " + web.Ago(lastFail.CreatedAt)})
+	} else if done > 0 {
+		rate.Lines = append(rate.Lines, [2]string{"", "No failures in these runs."})
+	}
+
 	// Median, not mean: one job that hung for the full timeout would drag an
 	// average somewhere no run has ever been.
-	mid, midCaption := "-", "nothing timed yet"
+	run := dashTile{Icon: icon.Timer, Label: "Run time", Value: "—"}
 	if len(durs) > 0 {
 		sort.Slice(durs, func(a, b int) bool { return durs[a] < durs[b] })
-		mid = web.HumanDuration(durs[len(durs)/2])
-		midCaption = "median of " + itoa(len(durs)) + " runs"
+		run.Value = web.HumanDuration(durs[len(durs)/2])
+		run.Chip, run.ChipTone, run.ChipHint = "p90 "+web.HumanDuration(durs[len(durs)*9/10]), layouts.ToneNeutral, "nine in ten runs finish within this"
+		run.Lines = append(run.Lines, [2]string{"", "Median of " + itoa(len(durs)) + " runs."})
+		run.Lines = append(run.Lines, [2]string{"Slowest: ", slowest.Repo + " · " + web.HumanDuration(slowest.Duration())})
+	} else {
+		run.Lines = append(run.Lines, [2]string{"", "Nothing timed yet."})
 	}
-	return []dashStat{
-		{Icon: icon.CircleCheck, Label: "Pass rate", Value: rate, Caption: rateCaption},
-		{Icon: icon.Loader, Label: "In flight", Value: itoa(inflight), Caption: "queued or running"},
-		{Icon: icon.GitBranch, Label: "Enabled repos", Value: itoa(enabled), Caption: "of " + itoa(bound) + " bound"},
-		{Icon: icon.Timer, Label: "Run time", Value: mid, Caption: midCaption},
+
+	failing, ran := 0, 0
+	for _, c := range cards {
+		if c.LastJob.ID != "" {
+			ran++
+			if failedJob(c.LastJob) {
+				failing++
+			}
+		}
+	}
+	repos := dashTile{Icon: icon.FolderGit, Label: "Repos", Value: itoa(enabled), Unit: " enabled"}
+	switch {
+	case failing > 0:
+		repos.Chip, repos.ChipTone, repos.ChipHint = itoa(failing)+" failing", layouts.ToneDanger, "repos whose last run failed"
+	case ran > 0:
+		repos.Chip, repos.ChipTone, repos.ChipHint = "all passing", layouts.ToneSuccess, "every repo's last run"
+	}
+	repos.Lines = append(repos.Lines, [2]string{"Running now: ", itoa(inflight)})
+	repos.Lines = append(repos.Lines, [2]string{"Bound but off: ", itoa(bound - enabled)})
+
+	return []dashTile{rate, run, repos}
+}
+
+func signed(n int) string {
+	if n >= 0 {
+		return "+" + itoa(n)
+	}
+	return itoa(n)
+}
+
+// chartBar is one day in the activity chart. Heights are a share of the
+// chart's top value, so the tallest day does not always touch the top.
+type chartBar struct {
+	Label     string // "Nov 3", shown on every third bar and the last
+	ShowLabel bool
+	Title     string
+	Pass      int
+	Fail      int
+	Other     int
+	Height    string // CSS percentage of the plot height
+}
+
+// activityChart lays the daily counts out as bars on a nice scale: the top
+// of the axis is 1, 2 or 5 times a power of ten, so the gridlines read as
+// round numbers.
+func activityChart(daily []store.DayCount) (bars []chartBar, top, total, failed int) {
+	most := 0
+	for _, d := range daily {
+		n := d.Passed + d.Failed + d.Other
+		total += n
+		failed += d.Failed
+		most = max(most, n)
+	}
+	top = niceCeil(most)
+	for i, d := range daily {
+		n := d.Passed + d.Failed + d.Other
+		b := chartBar{
+			Label:     d.Day.Format("Jan 2"),
+			ShowLabel: (len(daily)-1-i)%3 == 0,
+			Pass:      d.Passed,
+			Fail:      d.Failed,
+			Other:     d.Other,
+			Height:    strconv.FormatFloat(float64(n)*100/float64(top), 'f', 1, 64) + "%",
+		}
+		b.Title = b.Label + ": " + itoa(d.Passed) + " passed, " + itoa(d.Failed) + " failed, " + itoa(d.Other) + " skipped or cancelled"
+		bars = append(bars, b)
+	}
+	return bars, top, total, failed
+}
+
+func niceCeil(n int) int {
+	if n <= 4 {
+		return 4
+	}
+	for p := 1; ; p *= 10 {
+		for _, m := range []int{1, 2, 5} {
+			if m*p >= n {
+				return m * p
+			}
+		}
 	}
 }
+
+// repoHistory is each repo's last ten finished runs, oldest first, from the
+// recent jobs the page already loaded.
+// ponytail: bounded by those 100 recent jobs; a quiet repo next to a busy one
+// shows fewer squares. A per-repo query fixes that if it matters.
+func repoHistory(recent []store.Job) map[string][]store.Job {
+	out := map[string][]store.Job{}
+	for _, j := range recent {
+		if j.InFlight() || len(out[j.Repo]) >= 10 {
+			continue
+		}
+		out[j.Repo] = append([]store.Job{j}, out[j.Repo]...)
+	}
+	return out
+}
+
+func dailyOf(m map[string]any) []store.DayCount { return get[[]store.DayCount](m, "Daily") }
 
 // appSubtitle names an App without repeating its own title: the slug is only
 // worth a line when it differs from the name it was derived from.

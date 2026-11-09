@@ -1,6 +1,8 @@
 package pages
 
 import (
+	"strconv"
+
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
@@ -21,6 +23,7 @@ templ Dashboard(p web.Page) {
 	{{ recent := recentOf(m) }}
 	{{ ranAny := asBool(m, "RanAny") }}
 	{{ passedAny := asBool(m, "PassedAny") }}
+	{{ daily := dailyOf(m) }}
 	@layouts.Shell(p) {
 		@layouts.PageHead("Overview", dashLede(dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny))) {
 			if dashNeedApp(len(apps)) {
@@ -34,9 +37,9 @@ templ Dashboard(p web.Page) {
 				}
 			}
 		}
-		<div class="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-			for _, s := range dashStats(recent, len(inflight), enabled, len(bindings)) {
-				@statCard(s)
+		<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			for _, t := range dashTiles(recent, daily, cards, enabled, len(bindings), len(inflight)) {
+				@statTile(t)
 			}
 		</div>
 		if !dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny) {
@@ -88,6 +91,15 @@ templ Dashboard(p web.Page) {
 				@jobList(p, inflight, true)
 			}
 		}
+		// Both panels stretch to the taller one, inset and all.
+		<div class="grid gap-x-4 lg:grid-cols-3 [&>div>section]:flex [&>div>section]:h-[calc(100%-1.5rem)] [&>div>section]:flex-col [&>div>section>:last-child]:flex-1">
+			<div class="min-w-0">
+				@reposPanel(cards, recent)
+			</div>
+			<div class="min-w-0 lg:col-span-2">
+				@activityPanel(daily)
+			</div>
+		</div>
 		@layouts.ListCard() {
 			@layouts.ListHead("Recent jobs", -1, "") {
 				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
@@ -100,35 +112,7 @@ templ Dashboard(p web.Page) {
 				@jobsEmpty(false)
 			}
 		}
-		if len(cards) > 0 {
-			@layouts.ListCard() {
-				@layouts.ListHead("Enabled repos", len(cards), "") {
-					@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
-						All repos
-					}
-				}
-				@layouts.List() {
-					for _, c := range cards {
-						@repoRow(c.ID, c.Repo, c.LastJob)
-					}
-				}
-			}
-		}
 	}
-}
-
-// repoRow is a repository and what happened to it last. The row opens the
-// repo's own page, not the run: it is about the repository.
-templ repoRow(id int64, repo string, last store.Job) {
-	<li class={ layouts.RowClass }>
-		<a class="row-link min-w-0 flex-1 truncate text-sm font-medium" href={ templ.SafeURL("/repos/" + itoa64(id)) } title={ repo }>{ repo }</a>
-		if last.ID != "" {
-			<span class="text-muted-foreground hidden truncate text-xs sm:inline">{ jobRefLabel(last) } · { web.Ago(last.CreatedAt) }</span>
-			@StatusBadge(last)
-		} else {
-			<span class="text-muted-foreground text-xs">no runs yet</span>
-		}
-	</li>
 }
 
 // setupRow is one line of the setup checklist. The state badge sits in a fixed
@@ -152,15 +136,166 @@ templ setupRow(tone layouts.Tone, state, label, detail string, mono bool, href, 
 	</li>
 }
 
-// statCard is one number on the Overview strip. A tile rather than a row in a
-// table: the number is the point, and a table buries it in a column.
-templ statCard(s dashStat) {
-	<div class="bg-card rounded-xl border p-4">
-		<div class="text-muted-foreground flex items-center justify-between gap-2 text-xs font-medium">
-			<span class="truncate">{ s.Label }</span>
-			@s.Icon(icon.Props{Class: "size-4 shrink-0"})
+// statTile is one number on Overview, in the two-tone frame every panel uses:
+// label on the frame, the number and its context on the inset.
+templ statTile(t dashTile) {
+	<section data-slot="list-card" class="bg-muted/60 rounded-xl border p-1">
+		<div data-slot="list-head" class="text-muted-foreground flex items-center justify-between gap-2 px-3 pt-1.5 pb-2 text-sm">
+			<span>{ t.Label }</span>
+			@t.Icon(icon.Props{Class: "size-4 shrink-0"})
 		</div>
-		<p class="mt-2 text-2xl leading-none font-semibold tracking-tight tabular-nums">{ s.Value }</p>
-		<p class="text-muted-foreground mt-1.5 truncate text-xs">{ s.Caption }</p>
-	</div>
+		<div class="px-4 pt-3.5 pb-3">
+			<div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+				<p class="text-3xl leading-none font-semibold tracking-tight tabular-nums">{ t.Value }<span class="text-muted-foreground/60 font-normal">{ t.Unit }</span></p>
+				if t.Chip != "" {
+					<span title={ t.ChipHint }>
+						@layouts.Status(t.Chip, t.ChipTone)
+					</span>
+				}
+			</div>
+			<div class="text-muted-foreground mt-3 space-y-0.5 border-t pt-2.5 text-xs">
+				for _, l := range t.Lines {
+					<p class="truncate">
+						{ l[0] }
+						<span class="text-foreground font-medium">{ l[1] }</span>
+					</p>
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// reposPanel is every enabled repo with its last ten runs as a strip of
+// squares, oldest on the left: a repo that has been flaky reads differently
+// from one that just broke.
+templ reposPanel(cards []dashRepo, recent []store.Job) {
+	{{ hist := repoHistory(recent) }}
+	@layouts.ListCard() {
+		@layouts.ListHead("Repos", len(cards), "Last ten runs, newest on the right.") {
+			@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
+				All repos
+			}
+		}
+		if len(cards) > 0 {
+			@layouts.List() {
+				for _, c := range cards {
+					<li class="relative px-3 py-2.5 transition-colors hover:bg-muted/40">
+						<div class="flex min-w-0 items-center gap-2">
+							<span class={ "size-2 shrink-0 rounded-full", repoDotClass(c.LastJob) } aria-hidden="true"></span>
+							<a class="row-link min-w-0 flex-1 truncate text-sm font-medium" href={ templ.SafeURL("/repos/" + itoa64(c.ID)) } title={ c.Repo }>{ c.Repo }</a>
+						</div>
+						<div class="mt-1.5 flex items-center justify-between gap-3 pl-4">
+							<span class="text-muted-foreground truncate text-xs">
+								if c.LastJob.ID != "" {
+									{ web.JobStatusLabel(c.LastJob) } · { jobRefLabel(c.LastJob) } · { web.Ago(c.LastJob.CreatedAt) }
+								} else {
+									no runs yet
+								}
+							</span>
+							<span class="flex shrink-0 gap-0.5" role="img" aria-label={ historyLabel(hist[c.Repo]) }>
+								for _, j := range hist[c.Repo] {
+									<span class={ "h-3.5 w-1.5 rounded-[2px]", historyClass(j) } title={ web.JobStatusLabel(j) + " · " + jobRefLabel(j) + " · " + web.Ago(j.CreatedAt) }></span>
+								}
+							</span>
+						</div>
+					</li>
+				}
+			}
+		} else {
+			<p class="text-muted-foreground px-4 py-8 text-center text-sm">No repo is enabled yet.</p>
+		}
+	}
+}
+
+// activityPanel is finished runs per day for two weeks, stacked by outcome.
+// HTML rather than SVG: the bars are flex boxes, so the chart is as wide as
+// its panel without stretching any text. Each day has a hover and focus
+// tooltip; the list under the chart is the table view.
+templ activityPanel(daily []store.DayCount) {
+	{{ bars, top, total, failed := activityChart(daily) }}
+	@layouts.ListCard() {
+		@layouts.ListHead("Activity", -1, itoa(total)+" finished runs in 14 days, "+itoa(failed)+" failed.") {
+			<ul class="text-muted-foreground flex items-center gap-3 text-xs" aria-label="Legend">
+				<li class="flex items-center gap-1.5"><span class="bg-chart-pass size-2 rounded-full"></span>Passed</li>
+				<li class="flex items-center gap-1.5"><span class="bg-chart-fail size-2 rounded-full"></span>Failed</li>
+				<li class="flex items-center gap-1.5"><span class="bg-chart-other size-2 rounded-full"></span>Skipped</li>
+			</ul>
+		}
+		<div class="px-4 pt-5 pb-3">
+			<div class="relative h-44 pl-7">
+				// Gridlines at 0, half and the top: recessive, dashed, labelled.
+				for _, g := range []int{top, top / 2, 0} {
+					<div class="pointer-events-none absolute right-0 left-7 border-t border-dashed border-border" style={ gridTop(g, top) }>
+						<span class="text-muted-foreground absolute -top-2 -left-7 w-5 text-right text-[10px] tabular-nums">{ itoa(g) }</span>
+					</div>
+				}
+				<div class="relative flex h-full items-end gap-1.5 sm:gap-2" role="list" aria-label="Finished runs per day">
+					for _, b := range bars {
+						<div class="group relative flex h-full flex-1 items-end justify-center outline-none" role="listitem" tabindex="0" aria-label={ b.Title }>
+							<div class="flex w-full max-w-7 flex-col-reverse gap-[2px] [&>*:last-child]:rounded-t-[4px]" style={ "height: " + b.Height }>
+								if b.Pass > 0 {
+									<div class="bg-chart-pass min-h-[2px]" style={ flexOf(b.Pass) }></div>
+								}
+								if b.Fail > 0 {
+									<div class="bg-chart-fail min-h-[2px]" style={ flexOf(b.Fail) }></div>
+								}
+								if b.Other > 0 {
+									<div class="bg-chart-other min-h-[2px]" style={ flexOf(b.Other) }></div>
+								}
+							</div>
+							<div class="bg-popover text-popover-foreground pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-max -translate-x-1/2 rounded-md border px-2.5 py-1.5 text-xs shadow-md group-hover:block group-focus-visible:block">
+								<p class="font-medium">{ b.Label }</p>
+								<p class="text-muted-foreground">{ itoa(b.Pass) } passed · { itoa(b.Fail) } failed · { itoa(b.Other) } skipped</p>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+			<div class="mt-2 flex gap-1.5 pl-7 sm:gap-2" aria-hidden="true">
+				for _, b := range bars {
+					<span class="text-muted-foreground flex-1 text-center text-[10px] whitespace-nowrap">
+						if b.ShowLabel {
+							{ b.Label }
+						}
+					</span>
+				}
+			</div>
+		</div>
+	}
+}
+
+func gridTop(v, top int) string {
+	return "top: " + strconv.FormatFloat(100-float64(v)*100/float64(top), 'f', 1, 64) + "%"
+}
+
+func flexOf(n int) string { return "flex: " + itoa(n) + " 1 0" }
+
+// The class strings stay in this .templ file: Tailwind does not scan pages/*.go.
+func historyClass(j store.Job) string {
+	switch {
+	case j.Status == store.JobSuccess:
+		return "bg-chart-pass"
+	case failedJob(j):
+		return "bg-chart-fail"
+	}
+	return "bg-chart-other"
+}
+
+func repoDotClass(j store.Job) string {
+	if j.ID == "" {
+		return "bg-muted-foreground/40"
+	}
+	return jobDotClass(j)
+}
+
+func historyLabel(jobs []store.Job) string {
+	p, f := 0, 0
+	for _, j := range jobs {
+		if j.Status == store.JobSuccess {
+			p++
+		} else if failedJob(j) {
+			f++
+		}
+	}
+	return "Last " + itoa(len(jobs)) + " runs: " + itoa(p) + " passed, " + itoa(f) + " failed"
 }

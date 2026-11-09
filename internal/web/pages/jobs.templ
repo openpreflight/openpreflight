@@ -20,12 +20,14 @@ templ Jobs(p web.Page) {
 	@layouts.Shell(p) {
 		@layouts.PageHead("Jobs", "Every run this worker has taken, newest first. "+retentionLabel(settings.LogRetentionDays))
 		@layouts.ListCard() {
-			@jobsFilter(repo, status)
-			if len(list) > 0 {
-				@jobList(p, list, true)
-			} else {
-				@jobsEmpty(jobFiltered(m))
-			}
+			<div>
+				@jobsFilter(repo, status)
+				if len(list) > 0 {
+					@jobList(p, list, true)
+				} else {
+					@jobsEmpty(jobFiltered(m))
+				}
+			</div>
 		}
 		@jobsPager(m, len(list))
 	}

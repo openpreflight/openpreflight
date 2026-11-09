@@ -26,8 +26,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Plain words for machine values.** Refs read `main` and `PR #47`, events
   read `push`, `pull request` or `re-run`, log sizes `10 MiB`, retention
   "Kept for 14 days".
-- Overview stops giving setup instructions once setup is done, and shows its
-  numbers two by two on a phone.
+- **A new Overview.** Three tiles (pass rate with its week-on-week change,
+  median run time with p90 and the slowest repo, enabled repos with how many
+  are failing), every enabled repo with a strip of its last ten runs, and a
+  chart of finished runs per day for two weeks, stacked by outcome. It stops
+  giving setup instructions once setup is done.
+- Panels are two-tone: the title on a muted frame, the content inset. Pages
+  sit in a centred column, top bar included.
+- GitHub Apps show the GitHub mark, tinted by the App's state.
 - Coolify instances are a list with their last error on the row; adding one
   is folded under the list.
 - Settings forms save from a button under the fields, not the page header.
