@@ -257,22 +257,35 @@ templ coolifyRow(p web.Page, inst store.CoolifyInstance) {
 			<div class="ml-auto flex items-center gap-1">
 				<form method="post" action={ templ.SafeURL("/api/v1/coolify/" + itoa64(inst.ID) + "/test") } class="m-0">
 					@layouts.CSRF(p.CSRFToken)
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+						@icon.RefreshCw(icon.Props{Class: "size-3.5"})
 						Test
 					}
 				</form>
-				@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID) + "#add", Variant: button.VariantGhost, Size: button.SizeSm}) {
-					Edit
+				@layouts.RowMenu("More actions for " + inst.Name) {
+					<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/coolify?inspect=" + itoa64(inst.ID) + "#inspect") }>
+						@icon.Search()
+						Servers and connectors
+					</a>
+					<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL(inst.BaseURL) } target="_blank" rel="noopener">
+						@icon.ExternalLink()
+						Open Coolify
+					</a>
+					<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/coolify?edit=" + itoa64(inst.ID) + "#add") }>
+						@icon.Settings()
+						Edit
+					</a>
+					@layouts.MenuSeparator()
+					@layouts.Confirm(layouts.ConfirmProps{
+						ID:          "del-coolify-" + itoa64(inst.ID),
+						Token:       p.CSRFToken,
+						Action:      "/api/v1/coolify/" + itoa64(inst.ID) + "/delete",
+						Trigger:     "Remove",
+						MenuItem:    true,
+						Title:       "Remove " + inst.Name + "?",
+						Description: "Bindings that name it keep working; Coolify is only bookkeeping for them.",
+					})
 				}
-				@layouts.Confirm(layouts.ConfirmProps{
-					ID:           "del-coolify-" + itoa64(inst.ID),
-					Token:        p.CSRFToken,
-					Action:       "/api/v1/coolify/" + itoa64(inst.ID) + "/delete",
-					Trigger:      "Remove",
-					TriggerClass: "text-destructive",
-					Title:        "Remove " + inst.Name + "?",
-					Description:  "Bindings that name it keep working; Coolify is only bookkeeping for them.",
-				})
 			</div>
 		</div>
 		if inst.LastError != "" {

@@ -125,7 +125,7 @@ templ bindingRowItem(p web.Page, row bindingRow) {
 				<span class="text-muted-foreground text-xs">no runs yet</span>
 			}
 		</div>
-		<div class="relative z-10 -ml-2 flex items-center gap-1 md:ml-0 md:justify-end">
+		<div class="relative z-10 flex items-center gap-1 md:justify-end">
 			<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
 				@layouts.CSRF(p.CSRFToken)
 				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
@@ -136,15 +136,34 @@ templ bindingRowItem(p web.Page, row bindingRow) {
 					}
 				}
 			</form>
-			@layouts.Confirm(layouts.ConfirmProps{
-				ID:           "del-bind-" + itoa64(row.Binding.ID),
-				Token:        p.CSRFToken,
-				Action:       "/api/v1/bindings/" + itoa64(row.Binding.ID) + "/delete",
-				Trigger:      "Remove",
-				TriggerClass: "text-destructive",
-				Title:        "Remove " + row.Binding.Repo + "?",
-				Description:  "The repo stops being checked. Its past runs stay in Jobs.",
-			})
+			@layouts.RowMenu("More actions for " + row.Binding.Repo) {
+				<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/repos/" + itoa64(row.Binding.ID) + "/edit") }>
+					@icon.Settings()
+					Edit
+				</a>
+				<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/repos/" + itoa64(row.Binding.ID) + "/resolve") }>
+					@icon.Search()
+					Dry run
+				</a>
+				<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/jobs?repo=" + row.Binding.Repo) }>
+					@icon.Workflow()
+					All runs
+				</a>
+				<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("https://github.com/" + row.Binding.Repo) } target="_blank" rel="noopener">
+					@icon.ExternalLink()
+					Open on GitHub
+				</a>
+				@layouts.MenuSeparator()
+				@layouts.Confirm(layouts.ConfirmProps{
+					ID:          "del-bind-" + itoa64(row.Binding.ID),
+					Token:       p.CSRFToken,
+					Action:      "/api/v1/bindings/" + itoa64(row.Binding.ID) + "/delete",
+					Trigger:     "Remove",
+					MenuItem:    true,
+					Title:       "Remove " + row.Binding.Repo + "?",
+					Description: "The repo stops being checked. Its past runs stay in Jobs.",
+				})
+			}
 		</div>
 	</li>
 }

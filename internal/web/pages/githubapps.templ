@@ -28,7 +28,7 @@ templ GitHubApps(p web.Page) {
 		if len(apps) > 0 {
 			{{ attention, connected := splitApps(apps) }}
 			if len(attention) > 0 {
-				@appList(p, settings, "Needs attention", "Not installed anywhere, or the last check failed. Removing one here leaves it on GitHub; delete it there from Open on GitHub.", attention)
+				@appList(p, settings, "Needs attention", "Not installed anywhere, or the last check failed. Removing one here leaves it on GitHub; to delete it there, use ⋯ → Open on GitHub.", attention)
 			}
 			if len(connected) > 0 {
 				@appList(p, settings, "Connected", "", connected)
@@ -216,33 +216,64 @@ templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
 						title="Webhook URL (click to select)"
 					>{ web.WebhookURL(settings.PublicBaseURL, app.Slug) }</code>
 				</p>
-				<div class="ml-auto flex flex-wrap items-center gap-1">
-					<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
-						@layouts.CSRF(p.CSRFToken)
-						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
-							Test
+				// One button for the thing this App most likely needs, the rest
+				// in the menu: a row of five equal links made every App look like
+				// it needed all five.
+				<div class="ml-auto flex items-center gap-1">
+					if notInstalled {
+						// ponytail: github.com only; GHES installs live at <host>/github-apps/<slug>/installations/new.
+						@button.Button(button.Props{Href: "https://github.com/apps/" + app.Slug + "/installations/new", Target: "_blank", Size: button.SizeSm}) {
+							Install on GitHub
+							@icon.ExternalLink(icon.Props{Class: "size-3.5"})
 						}
-					</form>
-					// ponytail: github.com only; GHES installs live at <host>/github-apps/<slug>/installations/new.
-					@button.Button(button.Props{Href: "https://github.com/apps/" + app.Slug + "/installations/new", Target: "_blank", Variant: installVariant(notInstalled), Size: button.SizeSm}) {
-						Install
+					} else {
+						<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
+							@layouts.CSRF(p.CSRFToken)
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+								@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+								Test
+							}
+						</form>
 					}
-					@button.Button(button.Props{Href: appSettingsURL(app), Target: "_blank", Variant: button.VariantGhost, Size: button.SizeSm}) {
-						Open on GitHub
+					@layouts.RowMenu("More actions for " + app.Name) {
+						if notInstalled {
+							<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
+								@layouts.CSRF(p.CSRFToken)
+								<button type="submit" role="menuitem" class={ layouts.MenuItemClass }>
+									@icon.RefreshCw()
+									Test again
+								</button>
+							</form>
+						} else {
+							<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("https://github.com/apps/" + app.Slug + "/installations/new") } target="_blank" rel="noopener">
+								@icon.FolderGit()
+								Install on another account
+							</a>
+						}
+						<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL(appSettingsURL(app)) } target="_blank" rel="noopener">
+							@icon.ExternalLink()
+							Open on GitHub
+						</a>
+						<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/github-apps?inspect=" + itoa64(app.ID) + "#inspect") }>
+							@icon.Search()
+							Installations and repos
+						</a>
+						<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/github-apps/" + itoa64(app.ID) + "/edit") }>
+							@icon.Settings()
+							Edit
+						</a>
+						@layouts.MenuSeparator()
+						@layouts.Confirm(layouts.ConfirmProps{
+							ID:          "del-app-" + itoa64(app.ID),
+							Token:       p.CSRFToken,
+							Action:      "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
+							Trigger:     "Remove from this worker",
+							Confirm:     "Remove",
+							MenuItem:    true,
+							Title:       "Remove " + app.Name + "?",
+							Description: "Its repo bindings are removed too. The App itself stays on GitHub until you delete it there.",
+						})
 					}
-					@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantGhost, Size: button.SizeSm}) {
-						Edit
-					}
-					@layouts.Confirm(layouts.ConfirmProps{
-						ID:             "del-app-" + itoa64(app.ID),
-						Token:          p.CSRFToken,
-						Action:         "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
-						Trigger:        "Remove",
-						TriggerVariant: button.VariantGhost,
-						TriggerClass:   "text-destructive",
-						Title:          "Remove " + app.Name + "?",
-						Description:    "Its repo bindings are removed too. The App itself stays on GitHub until you delete it there.",
-					})
 				</div>
 			</div>
 		</div>

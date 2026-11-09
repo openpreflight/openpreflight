@@ -16,7 +16,6 @@ import (
 	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -766,13 +765,6 @@ func appStatus(a store.GitHubApp) (string, layouts.Tone) {
 		return "connected", layouts.ToneSuccess
 	}
 	return "not tested", layouts.ToneNeutral
-}
-
-func installVariant(notInstalled bool) button.Variant {
-	if notInstalled {
-		return button.VariantDefault
-	}
-	return button.VariantGhost
 }
 
 // appSettingsURL is the App's settings page on GitHub, where it is edited or

@@ -33,6 +33,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   giving setup instructions once setup is done.
 - Panels are two-tone: the title on a muted frame, the content inset.
 - GitHub Apps show the GitHub mark, tinted by the App's state.
+- **One action per row, the rest in a menu.** A GitHub App shows Install on
+  GitHub when it is not installed and Test otherwise; a Coolify instance
+  shows Test; a repo shows Enable or Disable. Everything else (Open on
+  GitHub, Edit, installations, dry run, Remove) is under ⋯, with Remove set
+  apart in red and still behind a confirmation.
 - Coolify instances are a list with their last error on the row; adding one
   is folded under the list.
 - Settings forms save from a button under the fields, not the page header.

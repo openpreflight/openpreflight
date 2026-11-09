@@ -73,6 +73,49 @@ templ Base(p web.Page) {
 					} catch (e) {}
 				})();
 			</script>
+			<script>
+				// Row menus: one open at a time, placed fixed under (or above) their
+				// button so a clipped list panel cannot cut them off, and closed by
+				// an outside click, an item click, Escape, scroll or resize.
+				(function () {
+					function closeAll(except) {
+						document.querySelectorAll("details[data-row-menu][open]").forEach(function (d) {
+							if (d !== except) d.removeAttribute("open");
+						});
+					}
+					function place(d) {
+						var btn = d.querySelector("summary"), menu = d.querySelector("[role=menu]");
+						var r = btn.getBoundingClientRect();
+						menu.style.position = "fixed";
+						menu.style.visibility = "hidden";
+						var h = menu.offsetHeight, w = menu.offsetWidth;
+						var below = r.bottom + 4 + h <= window.innerHeight;
+						menu.style.top = (below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)) + "px";
+						menu.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + "px";
+						menu.style.visibility = "";
+					}
+					document.addEventListener("toggle", function (e) {
+						var d = e.target;
+						if (!(d instanceof HTMLDetailsElement) || !d.hasAttribute("data-row-menu") || !d.open) return;
+						closeAll(d);
+						place(d);
+						var first = d.querySelector("[role=menuitem]");
+						if (first) first.focus();
+					}, true);
+					document.addEventListener("click", function (e) {
+						document.querySelectorAll("details[data-row-menu][open]").forEach(function (d) {
+							if (!d.contains(e.target) || e.target.closest("[role=menuitem]")) d.removeAttribute("open");
+						});
+					});
+					document.addEventListener("keydown", function (e) {
+						if (e.key !== "Escape") return;
+						var open = document.querySelector("details[data-row-menu][open]");
+						if (open) { open.removeAttribute("open"); open.querySelector("summary").focus(); }
+					});
+					window.addEventListener("scroll", function () { closeAll(null); }, true);
+					window.addEventListener("resize", function () { closeAll(null); });
+				})();
+			</script>
 		</body>
 	</html>
 }
