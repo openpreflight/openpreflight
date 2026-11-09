@@ -906,3 +906,23 @@ func TestDailyJobCounts(t *testing.T) {
 		t.Fatalf("13 days ago should be empty: %+v", days[0])
 	}
 }
+
+func TestCountJobsIgnoresLimitAndOffset(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	for i := 0; i < 3; i++ {
+		if _, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/api", SHA: "a"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/web", SHA: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := st.CountJobs(JobList{Repo: "acme/api", Limit: 1, Offset: 2})
+	if err != nil || n != 3 {
+		t.Fatalf("CountJobs = %d, %v; want 3", n, err)
+	}
+	if n, _ := st.CountJobs(JobList{}); n != 4 {
+		t.Fatalf("CountJobs all = %d, want 4", n)
+	}
+}

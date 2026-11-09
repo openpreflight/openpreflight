@@ -329,9 +329,43 @@ func jobStatusOf(m map[string]any) string { return str(m, "Status") }
 func jobLimitOf(m map[string]any) int {
 	n := asInt(m, "Limit")
 	if n <= 0 || n > 500 {
-		return 100
+		return jobPageSize
 	}
 	return n
+}
+
+// jobPageSize is the Jobs page's default; jobPageSizes are what the rows-per-
+// page control offers.
+const jobPageSize = 25
+
+var jobPageSizes = []int{25, 50, 100}
+
+// jobPages is the page numbers to show for a list of total rows: the first,
+// the last, and the current one with a neighbour either side; 0 marks a gap.
+func jobPages(total, limit, offset int) []int {
+	if limit <= 0 || total <= 0 {
+		return []int{1}
+	}
+	last := (total + limit - 1) / limit
+	cur := jobPageNumber(offset, limit)
+	var out []int
+	for n := 1; n <= last; n++ {
+		if n == 1 || n == last || (n >= cur-1 && n <= cur+1) {
+			if len(out) > 0 && out[len(out)-1] != 0 && n-out[len(out)-1] > 1 {
+				out = append(out, 0)
+			}
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// jobRange is "26–50 of 87": which rows this page holds, out of how many.
+func jobRange(total, limit, offset, shown int) string {
+	if total == 0 || shown == 0 {
+		return "0 of " + itoa(total)
+	}
+	return itoa(offset+1) + "–" + itoa(offset+shown) + " of " + itoa(total)
 }
 func jobOffsetOf(m map[string]any) int { return asInt(m, "Offset") }
 
@@ -357,7 +391,7 @@ func jobsPath(repo, status string, limit, offset int) string {
 	if status != "" {
 		q.Set("status", status)
 	}
-	if limit > 0 && limit != 100 {
+	if limit > 0 && limit != jobPageSize {
 		q.Set("limit", strconv.Itoa(limit))
 	}
 	if offset > 0 {

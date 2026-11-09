@@ -574,12 +574,25 @@ func (s *Server) pageJobs(w http.ResponseWriter, r *http.Request, user store.Use
 		s.fail(w, r, err)
 		return
 	}
+	// The page shows 25 rows unless asked for more; the JSON API keeps its
+	// own default of 100.
+	if r.URL.Query().Get("limit") == "" {
+		q := r.URL.Query()
+		q.Set("limit", "25")
+		r.URL.RawQuery = q.Encode()
+	}
 	jobs, f, ok := s.loadJobs(w, r)
 	if !ok {
 		return
 	}
+	total, err := s.store.CountJobs(f)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	s.render(w, "jobs", s.page(w, r, &user, "Jobs", "jobs", map[string]any{
 		"Settings": settings,
+		"Total":    total,
 		"Jobs":     jobs,
 		"Repo":     f.Repo,
 		"Status":   f.Status,

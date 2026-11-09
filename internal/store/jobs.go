@@ -472,3 +472,20 @@ func (s *Store) DailyJobCounts(days int, until time.Time) ([]DayCount, error) {
 	}
 	return out, rows.Err()
 }
+
+// CountJobs is how many jobs match a filter's repo and status, ignoring its
+// limit and offset: the total a paged list counts against.
+func (s *Store) CountJobs(f JobList) (int, error) {
+	f, err := f.clamp()
+	if err != nil {
+		return 0, err
+	}
+	var n int
+	err = s.db.QueryRow(`SELECT count(*) FROM jobs
+		WHERE (? = '' OR repo = ?) AND (? = '' OR status = ?)`,
+		f.Repo, f.Repo, f.Status, f.Status).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("store: count jobs: %w", err)
+	}
+	return n, nil
+}

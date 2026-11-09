@@ -3,6 +3,7 @@
 package pages
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -112,5 +113,30 @@ func TestHumanUnits(t *testing.T) {
 		if got := retentionLabel(d); got != want {
 			t.Errorf("retentionLabel(%d) = %q, want %q", d, got, want)
 		}
+	}
+}
+
+func TestJobPagesAndRange(t *testing.T) {
+	for _, c := range []struct {
+		total, limit, offset int
+		want                 []int
+	}{
+		{0, 25, 0, []int{1}},
+		{20, 25, 0, []int{1}},
+		{87, 25, 0, []int{1, 2, 0, 4}},
+		{87, 25, 25, []int{1, 2, 3, 4}},
+		{300, 25, 125, []int{1, 0, 5, 6, 7, 0, 12}},
+		{300, 25, 275, []int{1, 0, 11, 12}},
+	} {
+		got := jobPages(c.total, c.limit, c.offset)
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("jobPages(%d, %d, %d) = %v, want %v", c.total, c.limit, c.offset, got, c.want)
+		}
+	}
+	if got := jobRange(87, 25, 75, 12); got != "76–87 of 87" {
+		t.Errorf("jobRange = %q", got)
+	}
+	if got := jobRange(0, 25, 0, 0); got != "0 of 0" {
+		t.Errorf("jobRange empty = %q", got)
 	}
 }

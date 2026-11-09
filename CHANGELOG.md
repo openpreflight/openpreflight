@@ -26,6 +26,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Plain words for machine values.** Refs read `main` and `PR #47`, events
   read `push`, `pull request` or `re-run`, log sizes `10 MiB`, retention
   "Kept for 14 days".
+- **Jobs pages properly.** The list ends in a footer with rows per page
+  (25, 50 or 100), "26–50 of 87" and numbered pages, instead of a bare
+  Previous / Next under a 100-row page. Filters carry across pages.
 - **A new Overview.** Three tiles (pass rate with its week-on-week change,
   median run time with p90 and the slowest repo, enabled repos with how many
   are failing), every enabled repo with a strip of its last ten runs, and a
