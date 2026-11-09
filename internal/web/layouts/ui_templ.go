@@ -573,10 +573,11 @@ func GitHubMark(class string) templ.Component {
 }
 
 // RowMenu is the "more actions" menu at the end of a row: the row shows its
-// one likely action as a button, everything else lives here. A native
-// <details>, positioned fixed by the script in Base so a list's rounded,
-// clipped panel cannot cut it off.
-func RowMenu(label string) templ.Component {
+// one likely action as a button, everything else lives here. The menu is a
+// native popover, so it sits in the browser's top layer: no row, list panel
+// or stacking context can draw over it or clip it, and outside clicks and
+// Escape close it without script. The script in Base only places it.
+func RowMenu(id, label string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -594,20 +595,33 @@ func RowMenu(label string) templ.Component {
 		ctx = templ.InitializeContext(ctx)
 		templ_7745c5c3_Var23 := templ.GetChildren(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<details data-row-menu class=\"relative z-10\"><summary class=\"text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 cursor-pointer list-none items-center justify-center rounded-md [&::-webkit-details-marker]:hidden\" aria-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<button type=\"button\" popovertarget=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(label).Resolve(ctx)
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(id).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/ui.templ`, Line: 150, Col: 207}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/ui.templ`, Line: 150, Col: 41}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" title=\"More actions\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" aria-haspopup=\"menu\" aria-label=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var25 string
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(label).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/ui.templ`, Line: 150, Col: 83}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" title=\"More actions\" class=\"text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -615,7 +629,20 @@ func RowMenu(label string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</summary><div role=\"menu\" class=\"bg-popover text-popover-foreground z-50 min-w-48 rounded-lg border p-1 shadow-lg\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</button><div id=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var26 string
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templruntime.NewAttributeExpression(id).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/ui.templ`, Line: 153, Col: 13}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" popover=\"auto\" role=\"menu\" data-row-menu class=\"bg-popover text-popover-foreground m-0 min-w-48 rounded-lg border p-1 shadow-lg [inset:auto]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -623,7 +650,7 @@ func RowMenu(label string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div></details>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -634,8 +661,8 @@ func RowMenu(label string) templ.Component {
 // Menu item classes. A link, a form's submit button or a dialog trigger all
 // take one of these so every menu reads the same.
 const (
-	MenuItemClass   = "hover:bg-muted flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground"
-	MenuDangerClass = "hover:bg-destructive/10 text-destructive flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+	MenuItemClass   = "hover:bg-muted focus-visible:bg-muted flex w-full cursor-pointer outline-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground"
+	MenuDangerClass = "hover:bg-destructive/10 focus-visible:bg-destructive/10 text-destructive flex w-full cursor-pointer outline-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
 )
 
 func MenuSeparator() templ.Component {
@@ -655,7 +682,7 @@ func MenuSeparator() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div role=\"separator\" class=\"bg-border -mx-1 my-1 h-px\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<div role=\"separator\" class=\"bg-border -mx-1 my-1 h-px\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -967,7 +967,7 @@ func bindingRowItem(p web.Page, row bindingRow) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = layouts.RowMenu("More actions for "+row.Binding.Repo).Render(templ.WithChildren(ctx, templ_7745c5c3_Var31), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layouts.RowMenu("bind-menu-"+itoa64(row.Binding.ID), "More actions for "+row.Binding.Repo).Render(templ.WithChildren(ctx, templ_7745c5c3_Var31), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

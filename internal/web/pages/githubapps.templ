@@ -171,7 +171,11 @@ templ appList(p web.Page, settings store.Settings, title, hint string, apps []st
 templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
 	{{ label, tone := appStatus(app) }}
 	{{ notInstalled := app.LastError == store.AppNotInstalled }}
-	<li class="hover:bg-muted/40 px-4 py-3 transition-colors">
+	// Each App is a small card: what it is and how it is doing on top, then a
+	// dashed rule and a tinted footer holding its webhook and its actions, so
+	// the buttons are visibly this App's and not the next one's.
+	<li>
+		<div class="px-4 py-3">
 		<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:items-center sm:gap-4">
 			<div class="flex min-w-0 items-center gap-3">
 				<span class={ "flex size-9 shrink-0 items-center justify-center rounded-lg border", appTileClass(app) }>
@@ -201,13 +205,14 @@ templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
 				}
 			</div>
 		</div>
-		<div class="mt-2 space-y-2 sm:pl-12">
-			if app.LastError != "" {
-				<p class={ "flex items-start gap-1.5 text-xs", templ.KV("text-destructive", !notInstalled), templ.KV("text-muted-foreground", notInstalled) }>
-					@icon.CircleAlert(icon.Props{Class: "mt-px size-3.5 shrink-0"})
-					<span class="min-w-0 [overflow-wrap:anywhere]">{ app.LastError }</span>
-				</p>
-			}
+		if app.LastError != "" {
+			<p class={ "mt-2 flex items-start gap-1.5 text-xs sm:pl-12", templ.KV("text-destructive", !notInstalled), templ.KV("text-muted-foreground", notInstalled) }>
+				@icon.CircleAlert(icon.Props{Class: "mt-px size-3.5 shrink-0"})
+				<span class="min-w-0 [overflow-wrap:anywhere]">{ app.LastError }</span>
+			</p>
+		}
+		</div>
+		<div class="bg-muted/30 border-t border-dashed px-4 py-2 sm:pl-16">
 			<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
 				<p class="text-muted-foreground m-0 flex min-w-0 max-w-full items-center gap-1.5 text-xs">
 					<span class="shrink-0">Webhook</span>
@@ -235,7 +240,7 @@ templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
 							}
 						</form>
 					}
-					@layouts.RowMenu("More actions for " + app.Name) {
+					@layouts.RowMenu("app-menu-"+itoa64(app.ID), "More actions for "+app.Name) {
 						if notInstalled {
 							<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
 								@layouts.CSRF(p.CSRFToken)

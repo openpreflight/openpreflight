@@ -262,7 +262,7 @@ templ coolifyRow(p web.Page, inst store.CoolifyInstance) {
 						Test
 					}
 				</form>
-				@layouts.RowMenu("More actions for " + inst.Name) {
+				@layouts.RowMenu("coolify-menu-"+itoa64(inst.ID), "More actions for "+inst.Name) {
 					<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/coolify?inspect=" + itoa64(inst.ID) + "#inspect") }>
 						@icon.Search()
 						Servers and connectors

@@ -136,7 +136,7 @@ templ bindingRowItem(p web.Page, row bindingRow) {
 					}
 				}
 			</form>
-			@layouts.RowMenu("More actions for " + row.Binding.Repo) {
+			@layouts.RowMenu("bind-menu-"+itoa64(row.Binding.ID), "More actions for "+row.Binding.Repo) {
 				<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/repos/" + itoa64(row.Binding.ID) + "/edit") }>
 					@icon.Settings()
 					Edit

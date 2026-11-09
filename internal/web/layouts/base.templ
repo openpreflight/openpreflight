@@ -74,46 +74,39 @@ templ Base(p web.Page) {
 				})();
 			</script>
 			<script>
-				// Row menus: one open at a time, placed fixed under (or above) their
-				// button so a clipped list panel cannot cut them off, and closed by
-				// an outside click, an item click, Escape, scroll or resize.
+				// Row menus are popovers: the browser keeps one open at a time and
+				// closes it on an outside click or Escape. This only places the
+				// menu under its button (above it when there is no room below),
+				// and closes it after an item is used or the page moves.
 				(function () {
-					function closeAll(except) {
-						document.querySelectorAll("details[data-row-menu][open]").forEach(function (d) {
-							if (d !== except) d.removeAttribute("open");
-						});
+					function openMenu() {
+						return document.querySelector("[data-row-menu]:popover-open");
 					}
-					function place(d) {
-						var btn = d.querySelector("summary"), menu = d.querySelector("[role=menu]");
+					// Hidden until placed: toggle fires after the popover is shown.
+					document.addEventListener("beforetoggle", function (e) {
+						if (e.target instanceof HTMLElement && e.target.hasAttribute("data-row-menu") && e.newState === "open") e.target.style.visibility = "hidden";
+					}, true);
+					document.addEventListener("toggle", function (e) {
+						var menu = e.target;
+						if (!(menu instanceof HTMLElement) || !menu.hasAttribute("data-row-menu") || e.newState !== "open") return;
+						var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
+						if (!btn) return;
 						var r = btn.getBoundingClientRect();
-						menu.style.position = "fixed";
-						menu.style.visibility = "hidden";
 						var h = menu.offsetHeight, w = menu.offsetWidth;
 						var below = r.bottom + 4 + h <= window.innerHeight;
+						menu.style.position = "fixed";
 						menu.style.top = (below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)) + "px";
 						menu.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + "px";
 						menu.style.visibility = "";
-					}
-					document.addEventListener("toggle", function (e) {
-						var d = e.target;
-						if (!(d instanceof HTMLDetailsElement) || !d.hasAttribute("data-row-menu") || !d.open) return;
-						closeAll(d);
-						place(d);
-						var first = d.querySelector("[role=menuitem]");
-						if (first) first.focus();
 					}, true);
 					document.addEventListener("click", function (e) {
-						document.querySelectorAll("details[data-row-menu][open]").forEach(function (d) {
-							if (!d.contains(e.target) || e.target.closest("[role=menuitem]")) d.removeAttribute("open");
-						});
+						var item = e.target instanceof Element && e.target.closest("[data-row-menu] [role=menuitem]");
+						var m = item && item.closest("[data-row-menu]");
+						if (m && m.matches(":popover-open")) m.hidePopover();
 					});
-					document.addEventListener("keydown", function (e) {
-						if (e.key !== "Escape") return;
-						var open = document.querySelector("details[data-row-menu][open]");
-						if (open) { open.removeAttribute("open"); open.querySelector("summary").focus(); }
-					});
-					window.addEventListener("scroll", function () { closeAll(null); }, true);
-					window.addEventListener("resize", function () { closeAll(null); });
+					function hide() { var m = openMenu(); if (m) m.hidePopover(); }
+					window.addEventListener("scroll", hide, true);
+					window.addEventListener("resize", hide);
 				})();
 			</script>
 		</body>

@@ -142,25 +142,24 @@ templ GitHubMark(class string) {
 }
 
 // RowMenu is the "more actions" menu at the end of a row: the row shows its
-// one likely action as a button, everything else lives here. A native
-// <details>, positioned fixed by the script in Base so a list's rounded,
-// clipped panel cannot cut it off.
-templ RowMenu(label string) {
-	<details data-row-menu class="relative z-10">
-		<summary class="text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 cursor-pointer list-none items-center justify-center rounded-md [&::-webkit-details-marker]:hidden" aria-label={ label } title="More actions">
-			@icon.Ellipsis(icon.Props{Class: "size-4"})
-		</summary>
-		<div role="menu" class="bg-popover text-popover-foreground z-50 min-w-48 rounded-lg border p-1 shadow-lg">
-			{ children... }
-		</div>
-	</details>
+// one likely action as a button, everything else lives here. The menu is a
+// native popover, so it sits in the browser's top layer: no row, list panel
+// or stacking context can draw over it or clip it, and outside clicks and
+// Escape close it without script. The script in Base only places it.
+templ RowMenu(id, label string) {
+	<button type="button" popovertarget={ id } aria-haspopup="menu" aria-label={ label } title="More actions" class="text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md">
+		@icon.Ellipsis(icon.Props{Class: "size-4"})
+	</button>
+	<div id={ id } popover="auto" role="menu" data-row-menu class="bg-popover text-popover-foreground m-0 min-w-48 rounded-lg border p-1 shadow-lg [inset:auto]">
+		{ children... }
+	</div>
 }
 
 // Menu item classes. A link, a form's submit button or a dialog trigger all
 // take one of these so every menu reads the same.
 const (
-	MenuItemClass   = "hover:bg-muted flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground"
-	MenuDangerClass = "hover:bg-destructive/10 text-destructive flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
+	MenuItemClass   = "hover:bg-muted focus-visible:bg-muted flex w-full cursor-pointer outline-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm [&>svg]:size-3.5 [&>svg]:text-muted-foreground"
+	MenuDangerClass = "hover:bg-destructive/10 focus-visible:bg-destructive/10 text-destructive flex w-full cursor-pointer outline-none items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm"
 )
 
 templ MenuSeparator() {

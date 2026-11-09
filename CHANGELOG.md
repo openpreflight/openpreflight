@@ -41,6 +41,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   shows Test; a repo shows Enable or Disable. Everything else (Open on
   GitHub, Edit, installations, dry run, Remove) is under ⋯, with Remove set
   apart in red and still behind a confirmation.
+- Each GitHub App reads as its own card: what it is and its state on top,
+  then a rule and a footer with its webhook URL and its actions.
 - Coolify instances are a list with their last error on the row; adding one
   is folded under the list.
 - Settings forms save from a button under the fields, not the page header.
