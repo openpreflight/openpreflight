@@ -61,7 +61,7 @@ templ Shell(p web.Page) {
 			@AppSidebar(p)
 			@sidebar.Inset() {
 				<header class="bg-background/80 sticky top-0 z-20 h-14 shrink-0 border-b backdrop-blur-md">
-					<div class="mx-auto flex h-full w-full max-w-5xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+					<div class="flex h-full w-full items-center gap-3 px-4 sm:px-6 lg:px-8">
 					@sidebar.Trigger(sidebar.TriggerProps{Class: "-ml-2"})
 					@Crumbs(p)
 					// A GET of the page's own URL: re-reads job and queue state without
@@ -77,7 +77,7 @@ templ Shell(p web.Page) {
 					}
 					</div>
 				</header>
-				<div id="main" class="mx-auto w-full max-w-5xl min-w-0 px-4 pb-16 pt-6 sm:px-6 md:pt-8 lg:px-8">
+				<div id="main" class="w-full min-w-0 px-4 pb-16 pt-6 sm:px-6 md:pt-8 lg:px-8">
 					{ children... }
 				</div>
 			}

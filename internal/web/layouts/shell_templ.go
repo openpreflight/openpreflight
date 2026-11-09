@@ -260,7 +260,7 @@ func Shell(p web.Page) templ.Component {
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<header class=\"bg-background/80 sticky top-0 z-20 h-14 shrink-0 border-b backdrop-blur-md\"><div class=\"mx-auto flex h-full w-full max-w-5xl items-center gap-3 px-4 sm:px-6 lg:px-8\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<header class=\"bg-background/80 sticky top-0 z-20 h-14 shrink-0 border-b backdrop-blur-md\"><div class=\"flex h-full w-full items-center gap-3 px-4 sm:px-6 lg:px-8\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -299,7 +299,7 @@ func Shell(p web.Page) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></header><div id=\"main\" class=\"mx-auto w-full max-w-5xl min-w-0 px-4 pb-16 pt-6 sm:px-6 md:pt-8 lg:px-8\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></header><div id=\"main\" class=\"w-full min-w-0 px-4 pb-16 pt-6 sm:px-6 md:pt-8 lg:px-8\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
