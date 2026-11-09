@@ -188,7 +188,7 @@ func RepoResolve(p web.Page) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if failure != "" {
-				templ_7745c5c3_Err = layouts.Toast("The dry run could not be attempted: "+failure, "err").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = layouts.Notice(layouts.ToneDanger, "The dry run could not be attempted", failure).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -458,19 +458,23 @@ func RepoResolve(p web.Page) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"space-y-3\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				for _, msg := range res.Errors {
-					templ_7745c5c3_Err = layouts.Toast(msg, "err").Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = layouts.Notice(layouts.ToneDanger, "", msg).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 				for _, msg := range res.Warnings {
-					templ_7745c5c3_Err = layouts.Toast(msg, "warn").Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = layouts.Notice(layouts.ToneWarning, "", msg).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " <div class=\"mt-6 grid gap-4\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><div class=\"mt-6 grid gap-4\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -510,7 +514,7 @@ func RepoResolve(p web.Page) templ.Component {
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "Steps")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "Steps")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -532,7 +536,7 @@ func RepoResolve(p web.Page) templ.Component {
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "Each command with the configuration layer that supplied it.")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "Each command with the configuration layer that supplied it.")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -609,7 +613,7 @@ func RepoResolve(p web.Page) templ.Component {
 												}()
 											}
 											ctx = templ.InitializeContext(ctx)
-											templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "Step")
+											templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "Step")
 											if templ_7745c5c3_Err != nil {
 												return templ_7745c5c3_Err
 											}
@@ -631,7 +635,7 @@ func RepoResolve(p web.Page) templ.Component {
 												}()
 											}
 											ctx = templ.InitializeContext(ctx)
-											templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "Command")
+											templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "Command")
 											if templ_7745c5c3_Err != nil {
 												return templ_7745c5c3_Err
 											}
@@ -653,7 +657,7 @@ func RepoResolve(p web.Page) templ.Component {
 												}()
 											}
 											ctx = templ.InitializeContext(ctx)
-											templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "From")
+											templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "From")
 											if templ_7745c5c3_Err != nil {
 												return templ_7745c5c3_Err
 											}
@@ -715,7 +719,7 @@ func RepoResolve(p web.Page) templ.Component {
 												var templ_7745c5c3_Var40 string
 												templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(step.Name)
 												if templ_7745c5c3_Err != nil {
-													return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 110, Col: 23}
+													return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 112, Col: 23}
 												}
 												_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 												if templ_7745c5c3_Err != nil {
@@ -742,7 +746,7 @@ func RepoResolve(p web.Page) templ.Component {
 												var templ_7745c5c3_Var42 string
 												templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(step.Command)
 												if templ_7745c5c3_Err != nil {
-													return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 113, Col: 26}
+													return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 115, Col: 26}
 												}
 												_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 												if templ_7745c5c3_Err != nil {
@@ -769,7 +773,7 @@ func RepoResolve(p web.Page) templ.Component {
 												var templ_7745c5c3_Var44 string
 												templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(step.Source)
 												if templ_7745c5c3_Err != nil {
-													return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 116, Col: 25}
+													return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 118, Col: 25}
 												}
 												_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 												if templ_7745c5c3_Err != nil {
@@ -859,7 +863,7 @@ func RepoResolve(p web.Page) templ.Component {
 											}()
 										}
 										ctx = templ.InitializeContext(ctx)
-										templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "No steps")
+										templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "No steps")
 										if templ_7745c5c3_Err != nil {
 											return templ_7745c5c3_Err
 										}
@@ -881,7 +885,7 @@ func RepoResolve(p web.Page) templ.Component {
 											}()
 										}
 										ctx = templ.InitializeContext(ctx)
-										templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "Nothing resolved to a command, so this commit would run nothing. The binding's \"Empty pipeline\" setting decides whether that is a skip or a failure.")
+										templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "Nothing resolved to a command, so this commit would run nothing. The binding's \"Empty pipeline\" setting decides whether that is a skip or a failure.")
 										if templ_7745c5c3_Err != nil {
 											return templ_7745c5c3_Err
 										}
@@ -952,7 +956,7 @@ func RepoResolve(p web.Page) templ.Component {
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "Where every value came from")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "Where every value came from")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -974,7 +978,7 @@ func RepoResolve(p web.Page) templ.Component {
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "The four layers, in the order they are checked: the pipeline file in the commit, then the binding, then settings, then a built-in default.")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "The four layers, in the order they are checked: the pipeline file in the commit, then the binding, then settings, then a built-in default.")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -1055,7 +1059,7 @@ func RepoResolve(p web.Page) templ.Component {
 									}()
 								}
 								ctx = templ.InitializeContext(ctx)
-								templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "Path filter")
+								templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "Path filter")
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
 								}
@@ -1077,7 +1081,7 @@ func RepoResolve(p web.Page) templ.Component {
 									}()
 								}
 								ctx = templ.InitializeContext(ctx)
-								templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "Evaluated against the same commit a webhook would deliver.")
+								templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "Evaluated against the same commit a webhook would deliver.")
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
 								}
@@ -1105,20 +1109,20 @@ func RepoResolve(p web.Page) templ.Component {
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<pre class=\"bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs\">")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<pre class=\"bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs\">")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
 							var templ_7745c5c3_Var60 string
 							templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(res.PathFilter)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 163, Col: 94}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/pages/repo_resolve.templ`, Line: 165, Col: 94}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</pre>")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</pre>")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -1135,7 +1139,7 @@ func RepoResolve(p web.Page) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

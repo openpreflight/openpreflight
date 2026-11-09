@@ -65,3 +65,37 @@ func TestDashStats(t *testing.T) {
 		})
 	}
 }
+
+func TestJobLabels(t *testing.T) {
+	for _, c := range []struct {
+		j          store.Job
+		ref, event string
+	}{
+		{store.Job{Ref: "main", Event: "check_suite.requested"}, "main", "push"},
+		{store.Job{Ref: "refs/heads/feat/x", Event: "check_suite.requested"}, "feat/x", "push"},
+		{store.Job{Ref: "refs/pull/47/head", PullNumber: 47, Event: "check_suite.requested"}, "PR #47", "pull request"},
+		{store.Job{PullNumber: 9, Event: "check_run.rerequested"}, "PR #9", "re-run from GitHub"},
+		{store.Job{Ref: "v1.2", Event: "manual.rerun"}, "v1.2", "re-run"},
+		{store.Job{}, "—", "—"},
+	} {
+		if got := jobRefLabel(c.j); got != c.ref {
+			t.Errorf("jobRefLabel(%q) = %q, want %q", c.j.Ref, got, c.ref)
+		}
+		if got := eventLabel(c.j); got != c.event {
+			t.Errorf("eventLabel(%q) = %q, want %q", c.j.Event, got, c.event)
+		}
+	}
+}
+
+func TestHumanUnits(t *testing.T) {
+	for n, want := range map[int64]string{0: "0 bytes", 1023: "1023 bytes", 4096: "4 KiB", 10485760: "10 MiB", 1536: "1.5 KiB"} {
+		if got := humanBytes(n); got != want {
+			t.Errorf("humanBytes(%d) = %q, want %q", n, got, want)
+		}
+	}
+	for d, want := range map[int]string{1: "Kept for a day.", 14: "Kept for 14 days.", 365: "Kept for a year.", 3650: "Kept for 10 years."} {
+		if got := retentionLabel(d); got != want {
+			t.Errorf("retentionLabel(%d) = %q, want %q", d, got, want)
+		}
+	}
+}

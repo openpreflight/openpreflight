@@ -1,10 +1,10 @@
 package pages
 
 import (
+	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
@@ -17,85 +17,30 @@ templ Coolify(p web.Page) {
 	{{ editing := has(m, "Edit") }}
 	{{ edit := instOf(m, "Edit") }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Coolify instances", "One row is one (base URL, API token) pair. A Coolify API token is scoped to a single team, so a row covers that team - not the whole host. A second team on the same host is a second row.") {
-			if len(instances) > 0 {
-				@button.Button(button.Props{Href: "/coolify#add", Size: button.SizeSm, Variant: button.VariantOutline}) {
-					Add an instance
-				}
-			}
-		}
+		@layouts.PageHead("Coolify", "Optional. A Coolify team gives this worker a server inventory and its GitHub connectors as a repo source. Coolify never runs or reports the checks.")
 		if len(instances) > 0 {
-			<div class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-				for _, inst := range instances {
-					@card.Card(card.Props{Size: card.SizeSm}) {
-						@card.Header() {
-							@card.Title(card.TitleProps{Class: "truncate"}) {
-								{ inst.Name }
-							}
-							@card.Description(card.DescriptionProps{Class: "font-mono"}) {
-								{ inst.BaseURL }
-							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-2"}) {
-							<div class="flex flex-wrap items-center gap-2">
-								@badge.Badge(badge.Props{
-									Variant:    healthVariant(inst.LastError, inst.LastSeenAt != nil),
-									Attributes: healthTitle(inst.LastError),
-								}) {
-									{ healthLabel(inst.LastError, inst.LastSeenAt != nil) }
-								}
-								if inst.TeamName != "" {
-									<span class="text-xs">{ inst.TeamName } <span class="text-muted-foreground">#{ inst.TeamID }</span></span>
-								} else {
-									<span class="text-muted-foreground text-xs">untested</span>
-								}
-							</div>
-							<div class="font-mono text-xs">{ inst.APITokenRedacted }</div>
-							if p.Flash == "" && inst.LastError != "" {
-								@layouts.Toast(inst.LastError, "err")
-							}
-							if inst.LastError == "" && inst.LastSeenAt != nil {
-								<p class="text-muted-foreground text-xs">{ agoPtr(inst.LastSeenAt) }</p>
-							}
-						}
-						@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
-							<form method="post" action={ templ.SafeURL("/api/v1/coolify/" + itoa64(inst.ID) + "/test") } class="m-0">
-								@layouts.CSRF(p.CSRFToken)
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
-									Test
-								}
-							</form>
-							@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID) + "#add", Variant: button.VariantOutline, Size: button.SizeSm}) {
-								Edit
-							}
-							@button.Button(button.Props{Href: "/coolify?inspect=" + itoa64(inst.ID) + "#inspect", Variant: button.VariantGhost, Size: button.SizeSm}) {
-								Inspect
-							}
-							@layouts.Confirm(layouts.ConfirmProps{
-								ID:          "del-coolify-" + itoa64(inst.ID),
-								Token:       p.CSRFToken,
-								Action:      "/api/v1/coolify/" + itoa64(inst.ID) + "/delete",
-								Trigger:     "Remove",
-								Title:       "Remove this Coolify instance?",
-								Description: "Bindings that name it keep working.",
-							})
-						}
+			@layouts.ListCard() {
+				@layouts.ListHead("Instances", len(instances), "One per API token. A token covers one team, so a second team on the same host is a second instance.")
+				@layouts.List() {
+					for _, inst := range instances {
+						@coolifyRow(p, inst)
 					}
 				}
-			</div>
+			}
 		}
 		if has(m, "Inspect") {
 			{{ inspect := instOf(m, "Inspect") }}
 			{{ servers := serversOf(m) }}
 			{{ connectors := connectorsOf(m) }}
-			@card.Card(card.Props{ID: "inspect", Class: "mb-6 scroll-mt-6"}) {
-				@card.Header() {
-					@card.Title() {
-						{ inspect.Name }
+			<div id="inspect" class="scroll-mt-20">
+				@layouts.ListCard() {
+				@layouts.ListHead(inspect.Name+" · inspect", -1, "What this token can see, and installing this worker through Coolify.") {
+					@button.Button(button.Props{Href: "/coolify", Variant: button.VariantGhost, Size: button.SizeSm}) {
+						Close
 					}
 				}
-				@card.Content(card.ContentProps{Class: "space-y-4"}) {
-					@layouts.Toast(str(m, "InspectError"), "err")
+				<div class="space-y-4 p-4">
+					@layouts.Notice(layouts.ToneDanger, "Could not read this instance", str(m, "InspectError"))
 					if len(servers) > 0 {
 						<h2 class="text-base font-semibold">Servers in this team</h2>
 						@table.Table() {
@@ -207,24 +152,32 @@ templ Coolify(p web.Page) {
 								@input.Input(input.Props{ID: "install_env", Name: "environment_name", Type: "text", Value: "production"})
 							}
 						</div>
-						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
+						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary, Class: "self-start"}) {
 							Create application
 						}
 					</form>
+				</div>
 				}
-			}
+			</div>
 		}
-		@card.Card(card.Props{ID: "add", Class: "scroll-mt-6"}) {
-			@card.Header() {
-				@card.Title() {
-					if editing {
-						Edit { edit.Name }
-					} else {
-						Add an instance
-					}
-				}
+		@coolifyForm(p, editing, edit, len(instances) == 0)
+	}
+}
+
+// coolifyForm adds or edits an instance. It is folded away under the list
+// once there is something in the list, and open when editing or when it is the
+// only thing on the page.
+templ coolifyForm(p web.Page, editing bool, edit store.CoolifyInstance, alone bool) {
+	<details id="add" class="group bg-card mb-8 scroll-mt-20 overflow-hidden rounded-xl border" open?={ editing || alone }>
+		<summary class="hover:bg-muted/40 flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+			@icon.ChevronRight(icon.Props{Class: "text-muted-foreground size-4 transition-transform group-open:rotate-90"})
+			if editing {
+				Edit { edit.Name }
+			} else {
+				Add an instance
 			}
-			@card.Content() {
+		</summary>
+		<div class="border-t p-4">
 				<form method="post" action={ templ.SafeURL(coolifyFormAction(editing, edit.ID)) } class="flex flex-col gap-4">
 					@layouts.CSRF(p.CSRFToken)
 					<div class="grid gap-4 sm:grid-cols-2">
@@ -232,20 +185,20 @@ templ Coolify(p web.Page) {
 							@field.Label(field.LabelProps{For: "name"}) {
 								Name
 							}
-							@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "prod-platform", Value: edit.Name})
+							@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "prod-platform", Value: edit.Name, Attributes: noAutofill})
 						}
 						@field.Field() {
 							@field.Label(field.LabelProps{For: "base_url"}) {
 								Base URL
 							}
-							@input.Input(input.Props{ID: "base_url", Name: "base_url", Type: "url", Placeholder: "https://coolify.example.com", Required: true, Value: edit.BaseURL})
+							@input.Input(input.Props{ID: "base_url", Name: "base_url", Type: "url", Placeholder: "https://coolify.example.com", Required: true, Value: edit.BaseURL, Attributes: noAutofill})
 						}
 					</div>
 					@field.Field() {
 						@field.Label(field.LabelProps{For: "api_token"}) {
 							API token
 						}
-						@input.Input(input.Props{ID: "api_token", Name: "api_token", Type: "password", Placeholder: "3|Waobq…", Required: !editing})
+						@input.Input(input.Props{ID: "api_token", Name: "api_token", Type: "password", Placeholder: "3|Waobq…", Required: !editing, Attributes: secretAttrs})
 						@field.Description() {
 							if editing {
 								Leave blank to keep the stored token. Current: <span class="font-mono">{ edit.APITokenRedacted }</span>
@@ -271,7 +224,62 @@ templ Coolify(p web.Page) {
 						}
 					</div>
 				</form>
-			}
+		</div>
+	</details>
+}
+
+// coolifyRow is one instance: what it is, whether its last check worked, and
+// the error if not. The name opens the inspect panel.
+templ coolifyRow(p web.Page, inst store.CoolifyInstance) {
+	{{ label, tone := healthStatus(inst.LastError, inst.LastSeenAt != nil) }}
+	<li class="hover:bg-muted/40 px-4 py-3 transition-colors">
+		<div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+			<div class="flex min-w-0 flex-1 basis-64 items-center gap-3">
+				<span class="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
+					@icon.Server(icon.Props{Class: "size-4"})
+				</span>
+				<div class="min-w-0">
+					<a href={ templ.SafeURL("/coolify?inspect=" + itoa64(inst.ID) + "#inspect") } class="block truncate text-sm font-medium underline-offset-4 hover:underline" title="Servers, connectors and install">{ inst.Name }</a>
+					<p class="text-muted-foreground truncate text-xs">
+						<span class="font-mono">{ inst.BaseURL }</span>
+						if inst.TeamName != "" {
+							· { inst.TeamName }
+						}
+					</p>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				@layouts.Status(label, tone)
+				if inst.LastSeenAt != nil {
+					<span class="text-muted-foreground text-xs" title="Last successful check">{ agoPtr(inst.LastSeenAt) }</span>
+				}
+			</div>
+			<div class="ml-auto flex items-center gap-1">
+				<form method="post" action={ templ.SafeURL("/api/v1/coolify/" + itoa64(inst.ID) + "/test") } class="m-0">
+					@layouts.CSRF(p.CSRFToken)
+					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
+						Test
+					}
+				</form>
+				@button.Button(button.Props{Href: "/coolify?edit=" + itoa64(inst.ID) + "#add", Variant: button.VariantGhost, Size: button.SizeSm}) {
+					Edit
+				}
+				@layouts.Confirm(layouts.ConfirmProps{
+					ID:           "del-coolify-" + itoa64(inst.ID),
+					Token:        p.CSRFToken,
+					Action:       "/api/v1/coolify/" + itoa64(inst.ID) + "/delete",
+					Trigger:      "Remove",
+					TriggerClass: "text-destructive",
+					Title:        "Remove " + inst.Name + "?",
+					Description:  "Bindings that name it keep working; Coolify is only bookkeeping for them.",
+				})
+			</div>
+		</div>
+		if inst.LastError != "" {
+			<p class="text-destructive mt-2 flex items-start gap-1.5 text-xs sm:pl-12">
+				@icon.CircleAlert(icon.Props{Class: "mt-px size-3.5 shrink-0"})
+				<span class="min-w-0 [overflow-wrap:anywhere]">{ inst.LastError }</span>
+			</p>
 		}
-	}
+	</li>
 }

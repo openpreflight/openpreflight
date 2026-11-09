@@ -2,7 +2,6 @@ package pages
 
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/checkbox"
@@ -51,7 +50,7 @@ templ reposList(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ apps := appsOf(m) }}
 	{{ rows := rowsOf(m) }}
-	@layouts.PageHead("Repos", "The worker's allow-list is this page. A repo with no enabled binding is ignored, even if its webhook signature is valid.") {
+	@layouts.PageHead("Repos", "The repositories this worker checks. Each is bound to the GitHub App that receives its webhooks.") {
 		if len(apps) > 0 {
 			@button.Button(button.Props{Href: "/repos/pick", Size: button.SizeSm}) {
 				Pick repositories
@@ -62,68 +61,14 @@ templ reposList(p web.Page) {
 		}
 	}
 	if len(rows) > 0 {
-		<div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-			for _, row := range rows {
-				@card.Card(card.Props{Size: card.SizeSm}) {
-					@card.Header() {
-						@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
-							<a class="hover:underline" href={ templ.SafeURL("/repos/" + itoa64(row.Binding.ID)) } title={ row.Binding.Repo }>{ row.Binding.Repo }</a>
-						}
-						// Whether the repo is checked at all is the one thing worth
-						// reading without moving your eyes off the name.
-						@card.Action() {
-							if row.Binding.Enabled {
-								@badge.Badge() {
-									on
-								}
-							} else {
-								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-									off
-								}
-							}
-						}
-					}
-					@card.Content(card.ContentProps{Class: "space-y-2"}) {
-						{{ filter := bindingFilterLine(row) }}
-						<div class="flex flex-wrap items-center gap-2">
-							if row.Binding.ShareableLogs {
-								@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-									shareable
-								}
-							} else {
-								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-									private
-								}
-							}
-							<span class="text-muted-foreground min-w-0 truncate text-xs" title={ filter }>{ filter }</span>
-						</div>
-						@LastRun(row.LastJob)
-					}
-					// Edit and Dry run live on the repo's own page, one click through
-					// the title. The footer keeps the two actions that change state.
-					@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
-						<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
-							@layouts.CSRF(p.CSRFToken)
-							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
-								if row.Binding.Enabled {
-									Disable
-								} else {
-									Enable
-								}
-							}
-						</form>
-						@layouts.Confirm(layouts.ConfirmProps{
-							ID:          "del-bind-" + itoa64(row.Binding.ID),
-							Token:       p.CSRFToken,
-							Action:      "/api/v1/bindings/" + itoa64(row.Binding.ID) + "/delete",
-							Trigger:     "Remove",
-							Title:       "Remove this binding?",
-							Description: "The repo stops being checked.",
-						})
-					}
+		@layouts.ListCard() {
+			@layouts.ListHead("Bindings", len(rows), "A repo with no enabled binding is ignored, even if its webhook signature is valid.")
+			@layouts.List() {
+				for _, row := range rows {
+					@bindingRowItem(p, row)
 				}
 			}
-		</div>
+		}
 	} else if len(apps) == 0 {
 		@reposNeedApp()
 	} else {
@@ -151,6 +96,64 @@ templ reposList(p web.Page) {
 	}
 	if len(rows) > 0 && len(apps) == 0 {
 		@reposNeedApp()
+	}
+}
+
+// bindingRowItem is one binding: the repo, whether it runs, what it is filtered
+// to, and what happened last. The row opens the repo's page; the two controls
+// that change state stay on the row.
+templ bindingRowItem(p web.Page, row bindingRow) {
+	{{ filter := bindingFilterLine(row) }}
+	<li class="relative grid grid-cols-1 items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[minmax(0,1fr)_minmax(0,16rem)_auto]">
+		<div class="min-w-0">
+			<div class="flex min-w-0 items-center gap-2">
+				<a class="row-link truncate text-sm font-medium" href={ templ.SafeURL("/repos/" + itoa64(row.Binding.ID)) } title={ row.Binding.Repo }>{ row.Binding.Repo }</a>
+				@bindingStatus(row.Binding.Enabled)
+				if row.Binding.ShareableLogs {
+					@layouts.Status("public logs", layouts.ToneWarning)
+				}
+			</div>
+			<p class="text-muted-foreground mt-0.5 truncate text-xs" title={ filter }>{ filter }</p>
+		</div>
+		<div class="min-w-0">
+			if row.LastJob.ID != "" {
+				<div class="flex min-w-0 items-center gap-2">
+					@StatusBadge(row.LastJob)
+					<span class="text-muted-foreground truncate text-xs">{ jobRefLabel(row.LastJob) } · { web.Ago(row.LastJob.CreatedAt) }</span>
+				</div>
+			} else {
+				<span class="text-muted-foreground text-xs">no runs yet</span>
+			}
+		</div>
+		<div class="relative z-10 -ml-2 flex items-center gap-1 md:ml-0 md:justify-end">
+			<form method="post" action={ templ.SafeURL("/api/v1/bindings/" + itoa64(row.Binding.ID) + "/toggle") } class="m-0">
+				@layouts.CSRF(p.CSRFToken)
+				@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+					if row.Binding.Enabled {
+						Disable
+					} else {
+						Enable
+					}
+				}
+			</form>
+			@layouts.Confirm(layouts.ConfirmProps{
+				ID:           "del-bind-" + itoa64(row.Binding.ID),
+				Token:        p.CSRFToken,
+				Action:       "/api/v1/bindings/" + itoa64(row.Binding.ID) + "/delete",
+				Trigger:      "Remove",
+				TriggerClass: "text-destructive",
+				Title:        "Remove " + row.Binding.Repo + "?",
+				Description:  "The repo stops being checked. Its past runs stay in Jobs.",
+			})
+		</div>
+	</li>
+}
+
+templ bindingStatus(on bool) {
+	if on {
+		@layouts.Status("enabled", layouts.ToneSuccess)
+	} else {
+		@layouts.Status("disabled", layouts.ToneNeutral)
 	}
 }
 
@@ -235,7 +238,7 @@ templ reposApps(p web.Page) {
 					}
 				</div>
 			</form>
-			@layouts.Toast(pickerError(m), "err")
+			@layouts.Notice(layouts.ToneDanger, "Could not load repositories", pickerError(m))
 			if len(picker) > 0 {
 				<form method="post" action="/api/v1/bindings/bulk" class="space-y-3">
 					@layouts.CSRF(p.CSRFToken)
@@ -249,18 +252,14 @@ templ reposApps(p web.Page) {
 								Value:          r.FullName,
 								DefaultChecked: r.Bound,
 							})
-							@field.Label(field.LabelProps{For: "repo-" + r.FullName, Class: "font-mono"}) {
+							@field.Label(field.LabelProps{For: "repo-" + r.FullName}) {
 								{ r.FullName }
 							}
 							if r.Private {
-								@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-									private
-								}
+								@layouts.Status("private", layouts.ToneNeutral)
 							}
 							if r.Bound {
-								@badge.Badge() {
-									bound
-								}
+								@layouts.Status("bound", layouts.ToneSuccess)
 							}
 						}
 					}

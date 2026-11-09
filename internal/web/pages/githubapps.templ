@@ -20,7 +20,7 @@ templ GitHubApps(p web.Page) {
 	{{ settings := settingsOf(m) }}
 	{{ apps := appsOf(m) }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("CI GitHub Apps", "Your own GitHub App is what makes this a CI provider: only an App can write commit checks, and each App has exactly one webhook URL. Coolify's deploy connector cannot do this job.") {
+		@layouts.PageHead("CI GitHub Apps", "Only a GitHub App can write commit checks. Each App has one webhook URL, and receives the repos it is installed on.") {
 			@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
 				Add an App
 			}
@@ -28,7 +28,7 @@ templ GitHubApps(p web.Page) {
 		if len(apps) > 0 {
 			{{ attention, connected := splitApps(apps) }}
 			if len(attention) > 0 {
-				@appList(p, settings, "Needs attention", "Not installed anywhere, or the last check failed. Install or fix them, or remove the ones you no longer use. Removing here leaves the App on GitHub; delete it there from its settings page.", attention)
+				@appList(p, settings, "Needs attention", "Not installed anywhere, or the last check failed. Removing one here leaves it on GitHub; delete it there from Open on GitHub.", attention)
 			}
 			if len(connected) > 0 {
 				@appList(p, settings, "Connected", "", connected)
@@ -57,14 +57,22 @@ templ GitHubApps(p web.Page) {
 			{{ inspect := appOf(m, "Inspect") }}
 			{{ installs := installsOf(m) }}
 			{{ repos := ghReposOf(m) }}
-			@card.Card(card.Props{ID: "inspect", Class: "mb-6 scroll-mt-6"}) {
-				@card.Header() {
-					@card.Title() {
-						{ inspect.Name } - installations
+			<div id="inspect" class="scroll-mt-20">
+			@layouts.ListCard() {
+				@layouts.ListHead(inspect.Name+" · installations", len(installs), "Where this App is installed, and the repositories it can see.") {
+					@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantGhost, Size: button.SizeSm}) {
+						Close
 					}
 				}
-				@card.Content(card.ContentProps{Class: "space-y-4"}) {
-					@layouts.Toast(str(m, "InspectError"), "err")
+				<div class="space-y-4 p-4">
+					@layouts.Notice(layouts.ToneDanger, "Could not read this App from GitHub", str(m, "InspectError"))
+					if str(m, "InspectError") == "" && len(installs) == 0 {
+						@layouts.Notice(layouts.ToneWarning, "Not installed on any account", "Install it on the account or organization that owns the repositories you want checked, then come back.") {
+							@button.Button(button.Props{Href: "https://github.com/apps/" + inspect.Slug + "/installations/new", Target: "_blank", Size: button.SizeSm, Class: "mt-2"}) {
+								Install on GitHub
+							}
+						}
+					}
 					if len(installs) > 0 {
 						@table.Table() {
 							@table.Header() {
@@ -129,11 +137,12 @@ templ GitHubApps(p web.Page) {
 						}
 						<p class="text-muted-foreground text-xs">
 							Enable the ones you want checked on the
-							<a class="text-primary underline-offset-4 hover:underline" href="/repos">Repos</a> page.
+							<a class="text-primary underline-offset-4 hover:underline" href="/repos/pick">Repos</a> page.
 						</p>
 					}
-				}
+				</div>
 			}
+			</div>
 		}
 	}
 }
@@ -141,33 +150,26 @@ templ GitHubApps(p web.Page) {
 // appList is one bordered list of Apps: a title, a column strip, then a row
 // per App. Rows stay one line on wide screens, and the actions sit under them.
 templ appList(p web.Page, settings store.Settings, title, hint string, apps []store.GitHubApp) {
-	<section class="bg-card mb-8 overflow-hidden rounded-xl border">
-		<header class="px-4 py-3">
-			<h2 class="text-sm font-semibold">
-				{ title } <span class="text-muted-foreground ml-1 font-normal">{ itoa(len(apps)) }</span>
-			</h2>
-			if hint != "" {
-				<p class="text-muted-foreground mt-1 text-xs">{ hint }</p>
-			}
-		</header>
+	@layouts.ListCard() {
+		@layouts.ListHead(title, len(apps), hint)
 		// Same column template as appRow; Tailwind scans .templ files, not pages/*.go.
-		<div class="bg-muted/50 text-muted-foreground hidden border-y px-4 py-2 text-xs font-medium sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:gap-4">
+		<div class="bg-muted/40 text-muted-foreground hidden border-b px-4 py-2 text-xs font-medium sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:gap-4">
 			<span>App</span>
 			<span>Check name</span>
 			<span>Status</span>
 		</div>
-		<ul class="m-0 list-none divide-y border-t p-0 sm:border-t-0">
+		@layouts.List() {
 			for _, app := range apps {
 				@appRow(p, settings, app)
 			}
-		</ul>
-	</section>
+		}
+	}
 }
 
 templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
-	{{ label, variant := appStatus(app) }}
+	{{ label, tone := appStatus(app) }}
 	{{ notInstalled := app.LastError == store.AppNotInstalled }}
-	<li class="hover:bg-muted/30 px-4 py-3 transition-colors">
+	<li class="hover:bg-muted/40 px-4 py-3 transition-colors">
 		<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:items-center sm:gap-4">
 			<div class="flex min-w-0 items-center gap-3">
 				<span class="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
@@ -191,9 +193,7 @@ templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
 				}
 			</div>
 			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-				@badge.Badge(badge.Props{Variant: variant}) {
-					{ label }
-				}
+				@layouts.Status(label, tone)
 				if app.LastSeenAt != nil {
 					<span class="text-muted-foreground text-xs" title="Last successful check">{ agoPtr(app.LastSeenAt) }</span>
 				}
@@ -313,7 +313,7 @@ templ appManifestCard(p web.Page, settings store.Settings) {
 					}
 				</dl>
 			} else {
-				@layouts.Toast("Set the public base URL first. The manifest hands GitHub the webhook address at creation time, so this host has to have one before an App can be created.", "err")
+				@layouts.Notice(layouts.ToneWarning, "Set the public base URL first", "The manifest hands GitHub the webhook address at creation time, so this host has to have one before an App can be created.")
 			}
 		}
 		@card.Footer(card.FooterProps{Class: "flex flex-wrap items-center gap-2"}) {

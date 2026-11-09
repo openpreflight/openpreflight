@@ -4,13 +4,11 @@ import (
 	"github.com/openpreflight/openpreflight/internal/executor"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/skeleton"
-	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
@@ -57,95 +55,74 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			}
 		}
 	}
-	<div class="mb-8 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+	<div class="-mt-4 mb-6 flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm">
 		@StatusBadge(job)
+		<span class="font-medium">{ jobRefLabel(job) }</span>
 		if commitURL != "" {
-			<a class="text-primary font-mono hover:underline" href={ templ.SafeURL(commitURL) }>{ web.ShortSHA(job.SHA) }</a>
+			<a class="text-muted-foreground inline-flex items-center gap-1 font-mono text-xs hover:text-foreground hover:underline" href={ templ.SafeURL(commitURL) } target="_blank" rel="noopener" title="Open the commit on GitHub">
+				{ web.ShortSHA(job.SHA) }
+				@icon.ExternalLink(icon.Props{Class: "size-3"})
+			</a>
 		} else {
-			<span class="font-mono">{ web.ShortSHA(job.SHA) }</span>
+			<span class="text-muted-foreground font-mono text-xs">{ web.ShortSHA(job.SHA) }</span>
 		}
-		if job.Ref != "" {
-			<span class="text-muted-foreground font-mono text-xs">{ job.Ref }</span>
-		}
-		<span class="text-muted-foreground">{ job.Event }</span>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
+		<span class="text-muted-foreground text-xs">{ eventLabel(job) }</span>
 		if job.StartedAt != nil {
-			<span class="text-muted-foreground tabular-nums">{ web.HumanDuration(job.Duration()) }</span>
+			<span class="text-muted-foreground" aria-hidden="true">·</span>
+			<span class="text-muted-foreground text-xs tabular-nums">{ web.HumanDuration(job.Duration()) }</span>
 		}
-		<span class="text-muted-foreground">{ web.Ago(job.CreatedAt) }</span>
+		<span class="text-muted-foreground" aria-hidden="true">·</span>
+		<span class="text-muted-foreground text-xs">{ web.Ago(job.CreatedAt) }</span>
 		if job.ShareableLogs {
-			@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
-				shareable
-			}
-		} else {
-			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-				private
-			}
+			@layouts.Status("public logs", layouts.ToneWarning)
 		}
 		if job.IsFork {
-			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-				fork
-				if job.PullNumber != 0 {
-					#{ itoa(job.PullNumber) }
-				}
-			}
+			@layouts.Status("fork", layouts.ToneNeutral)
 		}
 	</div>
-	if job.Error != "" {
-		@layouts.Toast(job.Error, "err")
+	if job.Error != "" || job.SkipReason != "" {
+		<div class="mb-6">
+			if job.Error != "" {
+				@layouts.Notice(layouts.ToneDanger, "The run stopped with an error", job.Error)
+			} else {
+				@layouts.Notice(layouts.ToneInfo, "Skipped", skipReasonLabel(job.SkipReason))
+			}
+		</div>
 	}
 	if len(steps) > 0 {
-		@card.Card(card.Props{Class: "mb-8"}) {
-			@card.Header() {
-				@card.Title() {
-					Steps
-				}
-			}
-			@card.Content() {
-				@table.Table() {
-					@table.Header() {
-						@table.Row() {
-							@table.Head() {
-								<span class="sr-only">Result</span>
+		@layouts.ListCard() {
+			@layouts.ListHead("Steps", len(steps), "")
+			@layouts.List() {
+				for _, s := range steps {
+					<li class="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-3 px-4 py-2.5">
+						<span class={ stepMarkClass(s) } aria-hidden="true">{ s.Mark() }</span>
+						<div class="min-w-0">
+							<p class="text-sm font-medium">
+								{ s.Name }
+								<span class="sr-only">{ stepResultWord(s) }</span>
+							</p>
+							if s.Command != "" {
+								<code class="text-muted-foreground mt-0.5 block truncate font-mono text-xs" title={ s.Command }>{ s.Command }</code>
 							}
-							@table.Head() {
-								Step
+							if s.Err != "" {
+								<p class="text-destructive mt-0.5 text-xs [overflow-wrap:anywhere]">{ s.Err }</p>
 							}
-							@table.Head() {
-								Command
+						</div>
+						<span class="text-muted-foreground pt-0.5 text-xs tabular-nums">
+							if s.Skipped {
+								skipped
+							} else {
+								{ web.HumanDuration(s.Duration) }
 							}
-							@table.Head() {
-								Took
-							}
-						}
-					}
-					@table.Body() {
-						for _, s := range steps {
-							@table.Row() {
-								@table.Cell(table.CellProps{Class: stepMarkClass(s)}) {
-									{ s.Mark() }
-								}
-								@table.Cell() {
-									{ s.Name }
-								}
-								@table.Cell(table.CellProps{Class: "font-mono text-xs"}) {
-									{ s.Command }
-								}
-								@table.Cell(table.CellProps{Class: "text-xs tabular-nums"}) {
-									if s.Skipped {
-										{ "-" }
-									} else {
-										{ web.HumanDuration(s.Duration) }
-									}
-								}
-							}
-						}
-					}
+						</span>
+					</li>
 				}
 			}
 		}
 	}
 	if job.InFlight() || logBody != "" {
-		@card.Card(card.Props{Class: "check-run mb-8 gap-0 border-[#2a2f2a] bg-[#121412] py-0 text-[#e8ebe6]"}) {
+		@card.Card(card.Props{Class: "check-run mb-8 gap-0 overflow-hidden rounded-xl border-[#2a2f2a] bg-[#121412] py-0 text-[#e8ebe6]"}) {
 			<div class="flex h-11 items-center justify-between gap-3 border-b border-white/10 px-4">
 				<span class="font-mono text-xs tracking-wide text-white/55">Log</span>
 				if job.InFlight() {
@@ -181,13 +158,9 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 			}
 		}
 	}
-	@card.Card(card.Props{Class: "mb-8"}) {
-		@card.Header() {
-			@card.Title() {
-				Details
-			}
-		}
-		@card.Content() {
+	@layouts.ListCard() {
+		@layouts.ListHead("Details", -1, "")
+		<div class="p-4">
 			@detailList() {
 				@detailRow("Job") {
 					<span class="font-mono">{ job.ID }</span>
@@ -230,24 +203,15 @@ templ runBody(p web.Page, job store.Job, steps []executor.Result, logBody string
 					}
 				}
 				@detailRow("Log size") {
-					<span class="tabular-nums">{ itoa64(job.LogBytes) } bytes</span>
+					<span class="tabular-nums">{ humanBytes(job.LogBytes) }</span>
 				}
 			}
-		}
+		</div>
 	}
 	if len(origins) > 0 {
-		@card.Card(card.Props{Class: "mb-8"}) {
-			@card.Header() {
-				@card.Title() {
-					Where every value came from
-				}
-				@card.Description() {
-					Recorded when this commit was resolved, so it says what applied to this run and not what would apply today.
-				}
-			}
-			@card.Content() {
-				@originsTable(origins)
-			}
+		@layouts.ListCard() {
+			@layouts.ListHead("Where every value came from", -1, "Recorded when this commit was resolved, so it says what applied to this run and not what would apply today.")
+			@originsTable(origins)
 		}
 	}
 	if shared {

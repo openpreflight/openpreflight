@@ -4,9 +4,8 @@ import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
-	"github.com/openpreflight/openpreflight/internal/web/components/label"
 	"github.com/openpreflight/openpreflight/internal/web/components/pagination"
 	selectcomp "github.com/openpreflight/openpreflight/internal/web/components/select"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
@@ -18,63 +17,59 @@ templ Jobs(p web.Page) {
 	{{ list := jobsOf(m) }}
 	{{ repo := jobRepoOf(m) }}
 	{{ status := jobStatusOf(m) }}
-	{{ lede := "Every run this worker has taken, newest first. Retention is " + itoa(settings.LogRetentionDays) + " days." }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Jobs", lede)
-		@card.Card(card.Props{Class: "gap-0 py-0"}) {
+		@layouts.PageHead("Jobs", "Every run this worker has taken, newest first. "+retentionLabel(settings.LogRetentionDays))
+		@layouts.ListCard() {
 			@jobsFilter(repo, status)
-			@jobsTable(p, list, jobFiltered(m))
+			if len(list) > 0 {
+				@jobList(p, list, true)
+			} else {
+				@jobsEmpty(jobFiltered(m))
+			}
 		}
 		@jobsPager(m, len(list))
 	}
 }
 
+// jobsFilter is the list's header. Picking a status reloads at once; the repo
+// box submits on Enter.
 templ jobsFilter(repo, status string) {
-	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3" aria-label="Filter jobs">
-		<div class="flex items-center gap-2">
-			@label.Label(label.Props{For: "status", Class: filterLabelClass}) {
-				Status
+	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-2 border-b px-4 py-3" aria-label="Filter jobs" onchange="this.requestSubmit()">
+		@selectcomp.Select(selectcomp.Props{ID: "status-list", Name: "status", DefaultValue: status}) {
+			@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[10rem] shrink-0", Attributes: templ.Attributes{"aria-label": "Status"}}) {
+				@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})
 			}
-			@selectcomp.Select(selectcomp.Props{ID: "status-list", Name: "status", DefaultValue: status}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[11rem] shrink-0"}) {
-					@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})
+			@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
+				@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
+					{ allStatuses }
 				}
-				@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
-					@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
-						{ allStatuses }
-					}
-					for _, st := range store.JobStatuses {
-						@selectcomp.Item(selectcomp.ItemProps{Value: st}) {
-							{ st }
-						}
+				for _, st := range store.JobStatuses {
+					@selectcomp.Item(selectcomp.ItemProps{Value: st}) {
+						{ statusLabel(st) }
 					}
 				}
 			}
-		</div>
-		<div class="flex min-w-0 items-center gap-2">
-			@label.Label(label.Props{For: "repo", Class: filterLabelClass}) {
-				Repo
-			}
+		}
+		<div class="relative order-last min-w-0 basis-full sm:order-none sm:max-w-xs sm:flex-1 sm:basis-auto">
+			@icon.Search(icon.Props{Class: "text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"})
 			@input.Input(input.Props{
 				ID:          "repo",
 				Name:        "repo",
-				Type:        "text",
-				Placeholder: "owner/name",
+				Type:        "search",
+				Placeholder: "Filter by repo, owner/name",
 				Value:       repo,
-				Class:       "w-56 max-w-full font-mono",
-				Attributes:  templ.Attributes{"aria-label": "Repo"},
+				Class:       "pl-8",
+				Attributes:  templ.Attributes{"aria-label": "Repo", "autocomplete": "off", "spellcheck": "false"},
 			})
 		</div>
-		<div class="flex items-center gap-2 sm:ml-auto">
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				Filter
+		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
+			Filter
+		}
+		if repo != "" || status != "" {
+			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
+				Clear
 			}
-			if repo != "" || status != "" {
-				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
-					Clear
-				}
-			}
-		</div>
+		}
 	</form>
 }
 

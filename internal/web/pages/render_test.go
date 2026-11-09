@@ -5,8 +5,8 @@ package pages
 import (
 	"context"
 	"strings"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/a-h/templ"
 
@@ -183,5 +183,18 @@ func TestGitHubAppsListsAppsNeedingAttention(t *testing.T) {
 	}
 	if strings.Index(out, "orphan") > strings.Index(out, ">good<") {
 		t.Error("GitHubApps: Apps needing attention should come first")
+	}
+}
+
+// A run's error is a standing fact about the run: it has to be on the page,
+// not in a toast that is gone in fourteen seconds.
+func TestRunPageShowsErrorInline(t *testing.T) {
+	failed := store.Job{ID: "j2", Repo: "acme/api", SHA: "0123456789abcdef", Status: store.JobError, Error: "clone: token expired"}
+	out := renderPage(t, "Run", Run, page(map[string]any{"Job": failed, "Steps": []any{}, "Log": ""}))
+	if !strings.Contains(out, `role="alert"`) || !strings.Contains(out, "clone: token expired") {
+		t.Fatal("Run: error is not rendered as an inline notice")
+	}
+	if strings.Contains(out, `data-tui-toast-ssr`) {
+		t.Error("Run: error still rendered as a toast")
 	}
 }

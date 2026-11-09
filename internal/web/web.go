@@ -5,7 +5,9 @@
 package web
 
 import (
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +21,14 @@ import (
 
 //go:embed assets/css/output.css
 var outputCSS string
+
+// CSSURL is the stylesheet's address, versioned by its content: the file is
+// cached for an hour, and an upgrade must not leave the new markup styled by
+// the old CSS until that hour is up.
+var CSSURL = func() string {
+	sum := sha256.Sum256([]byte(outputCSS))
+	return "/assets/css/output.css?v=" + hex.EncodeToString(sum[:6])
+}()
 
 //go:embed assets/brand/logo.svg
 var brandLogo []byte

@@ -6,6 +6,9 @@ package icon
 // ponytail: hand-trimmed from 1702 icons, re-run the CLI to widen.
 
 var internalSvgData = map[string]string{
+	"external-link": `<path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />`,
+	"info":          `<circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />`,
+	"rotate-ccw":    `<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />`,
 	"activity":      `<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />`,
 	"check":         `<path d="M20 6 9 17l-5-5" />`,
 	"chevron-down":  `<path d="m6 9 6 6 6-6" />`,

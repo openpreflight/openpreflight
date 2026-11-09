@@ -1,0 +1,129 @@
+package layouts
+
+import "github.com/openpreflight/openpreflight/internal/web/components/icon"
+
+// Tone is the one colour vocabulary every state in the product maps to: a
+// job, an App, a Coolify instance, a health component, a binding. Five tones,
+// so the same colour always means the same thing.
+type Tone string
+
+const (
+	ToneSuccess Tone = "success"
+	ToneDanger  Tone = "danger"
+	ToneWarning Tone = "warning"
+	ToneInfo    Tone = "info"
+	// ToneLive is info that is happening now: a running job. The dot pulses.
+	ToneLive    Tone = "live"
+	ToneNeutral Tone = "neutral"
+)
+
+// The class strings live in this .templ file, not a .go file, because
+// Tailwind only scans .templ under layouts/.
+func toneClass(t Tone) string {
+	switch t {
+	case ToneSuccess:
+		return "border-success/30 bg-success/10 text-success"
+	case ToneDanger:
+		return "border-destructive/30 bg-destructive/10 text-destructive"
+	case ToneWarning:
+		return "border-warning/35 bg-warning/10 text-warning"
+	case ToneInfo, ToneLive:
+		return "border-info/35 bg-info/10 text-info"
+	default:
+		return "border-border bg-muted text-muted-foreground"
+	}
+}
+
+func noticeClass(t Tone) string {
+	switch t {
+	case ToneDanger:
+		return "border-destructive/30 bg-destructive/5 [&>svg]:text-destructive"
+	case ToneWarning:
+		return "border-warning/35 bg-warning/5 [&>svg]:text-warning"
+	case ToneSuccess:
+		return "border-success/30 bg-success/5 [&>svg]:text-success"
+	default:
+		return "border-info/30 bg-info/5 [&>svg]:text-info"
+	}
+}
+
+// Status is a state pill: a dot and a word. Every list and header uses it, so
+// "failed" on the Jobs page and "failed" on the Apps page look the same.
+templ Status(label string, tone Tone) {
+	<span data-tone={ string(tone) } class={ "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs leading-4 font-medium whitespace-nowrap", toneClass(tone) }>
+		<span class={ "size-1.5 shrink-0 rounded-full bg-current", templ.KV("dot-live", tone == ToneLive) } aria-hidden="true"></span>
+		{ label }
+	</span>
+}
+
+// Notice is an inline message about a state that persists: a job's error, an
+// instance's last failed check. It stays on the page until the state changes.
+// A toast is for "you just did X"; it is gone in seconds and must never be
+// the only place a standing problem is shown.
+templ Notice(tone Tone, title, body string) {
+	if title != "" || body != "" {
+		<div role={ noticeRole(tone) } class={ "flex gap-3 rounded-lg border px-3.5 py-3 text-sm [&>svg]:mt-0.5 [&>svg]:size-4 [&>svg]:shrink-0", noticeClass(tone) }>
+			if tone == ToneDanger || tone == ToneWarning {
+				@icon.CircleAlert()
+			} else {
+				@icon.Info()
+			}
+			<div class="min-w-0 flex-1 space-y-1">
+				if title != "" {
+					<p class="font-medium">{ title }</p>
+				}
+				if body != "" {
+					<p class="text-muted-foreground text-pretty [overflow-wrap:anywhere]">{ body }</p>
+				}
+				{ children... }
+			</div>
+		</div>
+	}
+}
+
+func noticeRole(t Tone) string {
+	if t == ToneDanger {
+		return "alert"
+	}
+	return "status"
+}
+
+// ListCard is the one container for a list of objects: jobs, repos, Apps,
+// instances, health components. Header, then rows separated by rules.
+templ ListCard() {
+	<section class="bg-card text-card-foreground mb-8 overflow-hidden rounded-xl border">
+		{ children... }
+	</section>
+}
+
+// ListHead titles a ListCard. count < 0 hides the count. Children are the
+// header's actions (a filter, a link).
+templ ListHead(title string, count int, hint string) {
+	<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-3">
+		<div class="min-w-0">
+			<h2 class="text-sm font-semibold">
+				{ title }
+				if count >= 0 {
+					<span class="text-muted-foreground ml-1 font-normal tabular-nums">{ itoa(count) }</span>
+				}
+			</h2>
+			if hint != "" {
+				<p class="text-muted-foreground mt-0.5 text-xs text-pretty">{ hint }</p>
+			}
+		</div>
+		<div class="flex flex-wrap items-center gap-2">
+			{ children... }
+		</div>
+	</div>
+}
+
+// List holds the rows. A row is an <li> with RowClass; its main link takes
+// "row-link" so the whole row is the click target, and any control in the row
+// takes "relative z-10" to stay clickable above it.
+templ List() {
+	<ul role="list" class="divide-y">
+		{ children... }
+	</ul>
+}
+
+const RowClass = "relative flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors has-[.row-link]:hover:bg-muted/40"

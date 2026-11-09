@@ -16,9 +16,9 @@ import (
 	"github.com/openpreflight/openpreflight/internal/pipeline"
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
 const setupTokenHint = "Printed in the server log when it started, as setup_token=… on the line that begins \"no admin yet\"."
@@ -105,26 +105,59 @@ type (
 	pickerRepo = web.PickerRepo
 )
 
-func jobVariant(j store.Job) badge.Variant {
+// jobTone is a job's status in the app's five-colour vocabulary. Skipped and
+// cancelled are outcomes, not problems, so they stay neutral.
+func jobTone(j store.Job) layouts.Tone {
 	switch j.Status {
 	case store.JobSuccess:
-		return badge.VariantDefault
+		return layouts.ToneSuccess
 	case store.JobFailure, store.JobError:
-		return badge.VariantDestructive
+		return layouts.ToneDanger
 	case store.JobInProgress:
-		return badge.VariantOutline
+		return layouts.ToneLive
 	case store.JobQueued:
-		return badge.VariantSecondary
+		return layouts.ToneInfo
 	default:
-		return badge.VariantGhost
+		return layouts.ToneNeutral
 	}
 }
 
-func jobBadgeClass(j store.Job) string {
-	if j.Status == store.JobInProgress {
-		return "status-live"
+// jobRefLabel is the ref as a person says it: "main", "PR #47". GitHub hands
+// over either a bare branch or a full ref depending on the event.
+func jobRefLabel(j store.Job) string {
+	ref := j.Ref
+	if rest, ok := strings.CutPrefix(ref, "refs/pull/"); ok {
+		n, _, _ := strings.Cut(rest, "/")
+		return "PR #" + n
 	}
-	return ""
+	if j.PullNumber != 0 && ref == "" {
+		return "PR #" + itoa(j.PullNumber)
+	}
+	for _, pre := range []string{"refs/heads/", "refs/tags/"} {
+		if b, ok := strings.CutPrefix(ref, pre); ok {
+			return b
+		}
+	}
+	return orDash(ref)
+}
+
+// eventLabel names what started the run, in words rather than webhook
+// vocabulary.
+func eventLabel(j store.Job) string {
+	switch j.Event {
+	case "check_suite.requested":
+		if j.PullNumber != 0 {
+			return "pull request"
+		}
+		return "push"
+	case "check_suite.rerequested", "check_run.rerequested":
+		return "re-run from GitHub"
+	case "manual.rerun":
+		return "re-run"
+	case "":
+		return "—"
+	}
+	return strings.ReplaceAll(j.Event, "_", " ")
 }
 
 func stepMarkClass(s executor.Result) string {
@@ -142,33 +175,15 @@ func stepTone(s executor.Result) string {
 	}
 }
 
-func healthVariant(lastError string, seen bool) badge.Variant {
-	if lastError != "" {
-		return badge.VariantDestructive
+// healthStatus is a Coolify instance's last check as a status pill.
+func healthStatus(lastError string, seen bool) (string, layouts.Tone) {
+	switch {
+	case lastError != "":
+		return "failed", layouts.ToneDanger
+	case seen:
+		return "connected", layouts.ToneSuccess
 	}
-	if seen {
-		return badge.VariantDefault
-	}
-	return badge.VariantSecondary
-}
-
-func healthLabel(lastError string, seen bool) string {
-	if lastError != "" {
-		return "failed"
-	}
-	if seen {
-		return "ok"
-	}
-	return "never"
-}
-
-// healthTitle puts the stored error on the badge for hover, instead of dumping
-// it into the card body (flash toast carries the live Test result).
-func healthTitle(lastError string) templ.Attributes {
-	if lastError == "" {
-		return nil
-	}
-	return templ.Attributes{"title": lastError}
+	return "not tested", layouts.ToneNeutral
 }
 
 // filterLabelClass is the label beside a control on a toolbar row, where the
@@ -421,20 +436,7 @@ func shareableChecked(editing bool, shareable bool) bool {
 
 func jobInFlight(j store.Job) bool { return j.InFlight() }
 
-func jobRefLine(j store.Job) string {
-	ref := j.Ref
-	sha := web.ShortSHA(j.SHA)
-	switch {
-	case ref != "" && sha != "":
-		return ref + " · " + sha
-	case ref != "":
-		return ref
-	case sha != "":
-		return sha
-	default:
-		return "-"
-	}
-}
+func statusLabel(st string) string { return web.JobStatusLabel(store.Job{Status: st}) }
 
 func coolifyFormAction(editing bool, id int64) string {
 	if editing {
@@ -603,16 +605,16 @@ func splitApps(apps []store.GitHubApp) (attention, connected []store.GitHubApp) 
 	return attention, connected
 }
 
-func appStatus(a store.GitHubApp) (string, badge.Variant) {
+func appStatus(a store.GitHubApp) (string, layouts.Tone) {
 	switch {
 	case a.LastError == store.AppNotInstalled:
-		return "not installed", badge.VariantOutline
+		return "not installed", layouts.ToneWarning
 	case a.LastError != "":
-		return "failed", badge.VariantDestructive
+		return "failed", layouts.ToneDanger
 	case a.LastSeenAt != nil:
-		return "connected", badge.VariantDefault
+		return "connected", layouts.ToneSuccess
 	}
-	return "not tested", badge.VariantSecondary
+	return "not tested", layouts.ToneNeutral
 }
 
 func installVariant(notInstalled bool) button.Variant {
@@ -707,4 +709,54 @@ func jobPageNumber(offset, limit int) int {
 func cancelJobDescription(j store.Job) string {
 	return "Cancelling stops " + j.Repo + " at " + web.ShortSHA(j.SHA) +
 		" where it is, and the Check Run is reported as cancelled. Re-running starts the whole pipeline again."
+}
+
+// retentionLabel says how long runs are kept, in the largest whole unit.
+func retentionLabel(days int) string {
+	switch {
+	case days <= 0:
+		return ""
+	case days == 365:
+		return "Kept for a year."
+	case days%365 == 0:
+		return "Kept for " + itoa(days/365) + " years."
+	case days == 1:
+		return "Kept for a day."
+	}
+	return "Kept for " + itoa(days) + " days."
+}
+
+// humanBytes is a byte count in binary units: 10485760 → "10 MiB".
+func humanBytes(n int64) string {
+	units := []string{"bytes", "KiB", "MiB", "GiB", "TiB"}
+	f, u := float64(n), 0
+	for f >= 1024 && u < len(units)-1 {
+		f /= 1024
+		u++
+	}
+	if u == 0 {
+		return itoa64(n) + " bytes"
+	}
+	s := strconv.FormatFloat(f, 'f', 1, 64)
+	return strings.TrimSuffix(s, ".0") + " " + units[u]
+}
+
+// dashLede says what Overview is for: how to finish setting up, until setup is
+// finished, then what the page shows.
+func dashLede(done bool) string {
+	if done {
+		return "What this worker is running, and how it has been going."
+	}
+	return "Set the public URL, add your CI GitHub App, then enable the repos it should check."
+}
+
+// stepResultWord is the step's mark read aloud, for screen readers.
+func stepResultWord(s executor.Result) string {
+	switch {
+	case s.Skipped:
+		return "skipped"
+	case s.OK():
+		return "passed"
+	}
+	return "failed"
 }

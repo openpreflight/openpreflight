@@ -29,6 +29,9 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -70,6 +73,9 @@
   --accent: #e4ebe5;
   --accent-foreground: #1a1d19;
   --destructive: #a63d33;
+  --success: #2f6f4f;
+  --warning: #8f5f00;
+  --info: #2c5f9e;
   --border: #dfe3dc;
   --input: #dfe3dc;
   --ring: #2f6f4f;
@@ -108,6 +114,9 @@
   --accent: #243028;
   --accent-foreground: #e8ebe6;
   --destructive: #e0857b;
+  --success: #7cc79c;
+  --warning: #e2b35a;
+  --info: #84b4ea;
   --border: #2a2f2a;
   --input: #2a2f2a;
   --ring: #7cc79c;
@@ -194,6 +203,18 @@
   .status-live {
     animation: status-live 1.6s ease-out infinite;
   }
+
+  /* The live dot inside a running status pill. */
+  .dot-live {
+    animation: dot-live 1.4s ease-in-out infinite;
+  }
+
+  /* A row whose primary link covers the whole row; controls sit above it. */
+  .row-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
 }
 
 @keyframes status-live {
@@ -205,5 +226,11 @@
   }
   100% {
     box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes dot-live {
+  50% {
+    opacity: 0.35;
   }
 }

@@ -17,11 +17,40 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   webhook URL GitHub refused are now stored on the App like any other error.
   Loading repositories on the Repos page re-checks it, so installing the App
   and loading again clears it.
+- **One list and one status language across the UI.** Jobs, Overview, Repos,
+  a repo's runs, Coolify, GitHub Apps and Status use the same list layout,
+  and every state (job, App, instance, binding, health) uses the same five
+  colours: passed/connected/ok green, failed red, attention amber, running
+  blue (pulsing), skipped/cancelled/disabled grey. A whole job row opens the
+  run; Re-run is an icon on the row.
+- **Plain words for machine values.** Refs read `main` and `PR #47`, events
+  read `push`, `pull request` or `re-run`, log sizes `10 MiB`, retention
+  "Kept for 14 days".
+- Overview stops giving setup instructions once setup is done, and shows its
+  numbers two by two on a phone.
+- Coolify instances are a list with their last error on the row; adding one
+  is folded under the list.
+- Settings forms save from a button under the fields, not the page header.
+- The sidebar footer is one line (Docker state and version); the theme
+  toggle says which theme it is on.
+- The content column stops at a readable width on wide screens.
 
 ### Fixed
 
 - Long messages in a notification wrap inside it instead of running off the
   edge.
+- **Errors that last are shown on the page, not in a toast.** A run's error
+  or skip reason, a Coolify instance's failed check, an inspect failure, a
+  repo picker failure and dry-run errors stayed on screen for 8–14 seconds
+  and were then gone.
+- A failed run with a long step command no longer scrolls the page sideways
+  and hides Re-run.
+- The browser no longer fills the Coolify form with the operator's login
+  (Base URL got the username, API token the password).
+- After an upgrade the browser could keep the old stylesheet for up to an
+  hour; the stylesheet URL now changes when its content does.
+- Form placeholders are fainter than real values, so an example no longer
+  reads as a saved setting.
 
 ## [2.4.0] - 2026-11-07
 

@@ -41,7 +41,7 @@ templ RepoResolve(p web.Page) {
 			}
 		</form>
 		if failure != "" {
-			@layouts.Toast("The dry run could not be attempted: "+failure, "err")
+			@layouts.Notice(layouts.ToneDanger, "The dry run could not be attempted", failure)
 		} else {
 			@card.Card(card.Props{Class: "mb-6"}) {
 				@card.Header() {
@@ -71,12 +71,14 @@ templ RepoResolve(p web.Page) {
 					}
 				}
 			}
-			for _, msg := range res.Errors {
-				@layouts.Toast(msg, "err")
-			}
-			for _, msg := range res.Warnings {
-				@layouts.Toast(msg, "warn")
-			}
+			<div class="space-y-3">
+				for _, msg := range res.Errors {
+					@layouts.Notice(layouts.ToneDanger, "", msg)
+				}
+				for _, msg := range res.Warnings {
+					@layouts.Notice(layouts.ToneWarning, "", msg)
+				}
+			</div>
 			<div class="mt-6 grid gap-4">
 				@card.Card() {
 					@card.Header() {
