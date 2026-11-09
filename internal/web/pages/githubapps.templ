@@ -280,8 +280,14 @@ templ appManifestCard(p web.Page, settings store.Settings) {
 		}
 		@card.Footer(card.FooterProps{Class: "flex flex-wrap items-center gap-2"}) {
 			if settings.PublicBaseURL != "" {
-				<form method="post" action="/api/v1/github-apps/manifest/start" class="m-0">
+				<form method="post" action="/api/v1/github-apps/manifest/start" class="m-0 flex flex-wrap items-center gap-2">
 					@layouts.CSRF(p.CSRFToken)
+					@input.Input(input.Props{
+						Name:        "org",
+						Class:       "h-8 w-56 text-xs",
+						Placeholder: "Organization (blank = your account)",
+						Attributes:  templ.Attributes{"aria-label": "GitHub organization that will own the App"},
+					})
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
 						Create with GitHub
 					}

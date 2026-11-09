@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +19,21 @@ import (
 )
 
 const githubNewAppURL = "https://github.com/settings/apps/new"
+
+// githubLogin matches a GitHub user or org name.
+var githubLogin = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$`)
+
+// newAppURL is where the manifest is posted. A private App can only be
+// installed on the account that owns it, so org repos need an org-owned App.
+func newAppURL(org string) (string, error) {
+	if org == "" {
+		return githubNewAppURL, nil
+	}
+	if !githubLogin.MatchString(org) {
+		return "", fmt.Errorf("%q is not a valid GitHub organization name", org)
+	}
+	return "https://github.com/organizations/" + org + "/settings/apps/new", nil
+}
 
 const manifestFormHTML = `<!doctype html>
 <meta charset="utf-8">
@@ -66,11 +82,16 @@ func (s *Server) startAppManifest(w http.ResponseWriter, r *http.Request, _ stor
 		s.badRequest(w, r, errors.New("set the public base URL in Settings before creating an App with GitHub"))
 		return
 	}
+	action, err := newAppURL(strings.TrimSpace(r.FormValue("org")))
+	if err != nil {
+		s.badRequest(w, r, err)
+		return
+	}
 	state := s.csrfToken(w, r)
 	manifest := appManifest(base)
 	if wantsJSON(r) {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"action":   githubNewAppURL,
+			"action":   action,
 			"manifest": manifest,
 			"state":    state,
 		})
@@ -83,7 +104,7 @@ func (s *Server) startAppManifest(w http.ResponseWriter, r *http.Request, _ stor
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	fmt.Fprintf(w, manifestFormHTML, html.EscapeString(githubNewAppURL), html.EscapeString(string(raw)), html.EscapeString(state))
+	fmt.Fprintf(w, manifestFormHTML, html.EscapeString(action), html.EscapeString(string(raw)), html.EscapeString(state))
 }
 
 func (s *Server) callbackAppManifest(w http.ResponseWriter, r *http.Request, _ store.User) {

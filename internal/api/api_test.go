@@ -1339,3 +1339,15 @@ func TestRepoPageRedirectsUnknownBinding(t *testing.T) {
 		t.Fatalf("status %d location %q", rec.Code, rec.Header().Get("Location"))
 	}
 }
+
+func TestNewAppURL(t *testing.T) {
+	if got, _ := newAppURL(""); got != githubNewAppURL {
+		t.Fatalf("personal: %q", got)
+	}
+	if got, _ := newAppURL("winpra"); got != "https://github.com/organizations/winpra/settings/apps/new" {
+		t.Fatalf("org: %q", got)
+	}
+	if _, err := newAppURL("../evil"); err == nil {
+		t.Fatal("bad org name accepted")
+	}
+}
