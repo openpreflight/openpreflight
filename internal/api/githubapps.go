@@ -149,7 +149,8 @@ func (s *Server) updateApp(w http.ResponseWriter, r *http.Request, _ store.User)
 	s.reply(w, r, http.StatusOK, map[string]any{"github_app": app}, "/github-apps", "Saved.", "ok")
 }
 
-// runAppTest mints an App JWT and lists installations.
+// runAppTest mints an App JWT and lists installations. Every outcome is stored
+// on the App, so the page still shows it after the flash message is gone.
 func (s *Server) runAppTest(ctx context.Context, id int64) (string, string) {
 	client, app, err := s.appClient(id)
 	if err != nil {
@@ -158,22 +159,40 @@ func (s *Server) runAppTest(ctx context.Context, id int64) (string, string) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
-	installs, err := client.Installations(ctx)
+	installs, err := s.recordInstallations(ctx, client, id)
 	if err != nil {
-		s.store.RecordGitHubAppTest(id, err.Error())
 		return err.Error(), "err"
 	}
-	if err := s.store.RecordGitHubAppTest(id, ""); err != nil {
-		return err.Error(), "err"
+	// Only for the settings link; a failure here is not a failed test.
+	if org, err := client.OwnerOrg(ctx); err == nil {
+		s.store.SetGitHubAppOwnerOrg(id, org)
 	}
 	if len(installs) == 0 {
-		return fmt.Sprintf("App %q authenticated, but it is not installed anywhere yet — install it at https://github.com/apps/%s/installations/new on the account that owns the repos you want checked.", app.Name, app.Slug), "err"
+		return fmt.Sprintf("App %q authenticated, but it is not installed anywhere yet. Install it on the account that owns the repos you want checked.", app.Name), "warn"
 	}
 	accounts := make([]string, 0, len(installs))
 	for _, i := range installs {
 		accounts = append(accounts, i.Account.Login)
 	}
 	return fmt.Sprintf("App %q authenticated. Installed on: %s.", app.Name, joinMax(accounts, 6)), "ok"
+}
+
+// recordInstallations lists the App's installations and stores the App's
+// health from the answer: an error, not installed, or fine.
+func (s *Server) recordInstallations(ctx context.Context, client *githubapp.Client, id int64) ([]githubapp.Installation, error) {
+	installs, err := client.Installations(ctx)
+	switch {
+	case err != nil:
+		s.store.RecordGitHubAppTest(id, err.Error())
+		return nil, err
+	case len(installs) == 0:
+		s.store.RecordGitHubAppTest(id, store.AppNotInstalled)
+	default:
+		if err := s.store.RecordGitHubAppTest(id, ""); err != nil {
+			return nil, err
+		}
+	}
+	return installs, nil
 }
 
 func (s *Server) testApp(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -213,7 +232,9 @@ func (s *Server) loadAppRepos(ctx context.Context, id int64) ([]githubapp.Instal
 	if err != nil {
 		return nil, nil, err
 	}
-	installs, err := client.Installations(ctx)
+	// Loading repos is a test too: installing the App on GitHub and loading
+	// again clears the "not installed" state without a separate Test click.
+	installs, err := s.recordInstallations(ctx, client, id)
 	if err != nil {
 		return nil, nil, err
 	}

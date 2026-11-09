@@ -196,6 +196,13 @@ ALTER TABLE jobs ADD COLUMN plan_origins TEXT NOT NULL DEFAULT '';
 	{"0009_job_base_sha", `
 ALTER TABLE jobs ADD COLUMN base_sha TEXT NOT NULL DEFAULT '';
 `},
+
+	// 0010: the organization that owns an App, so the page can link to the
+	// App's settings on GitHub (user-owned and org-owned Apps live at
+	// different URLs). '' means a personal account, or not tested yet.
+	{"0010_github_app_owner_org", `
+ALTER TABLE github_apps ADD COLUMN owner_org TEXT NOT NULL DEFAULT '';
+`},
 }
 
 func (s *Store) migrate() error {

@@ -35,7 +35,7 @@ type Page struct {
 	Nav              string
 	User             *store.User
 	Flash            string
-	FlashKind        string // ok | err
+	FlashKind        string // ok | warn | err
 	CSRFToken        string
 	Data             any
 	Narrow           bool // login / setup: narrower main column

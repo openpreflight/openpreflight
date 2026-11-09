@@ -17,6 +17,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 )
 
@@ -589,6 +590,55 @@ func dashStats(recent []store.Job, inflight, enabled, bound int) []dashStat {
 
 // appSubtitle names an App without repeating its own title: the slug is only
 // worth a line when it differs from the name it was derived from.
+// splitApps puts Apps that cannot do their job (not installed, or failing)
+// apart from the ones that can, so the broken ones are listed first.
+func splitApps(apps []store.GitHubApp) (attention, connected []store.GitHubApp) {
+	for _, a := range apps {
+		if a.LastError != "" {
+			attention = append(attention, a)
+		} else {
+			connected = append(connected, a)
+		}
+	}
+	return attention, connected
+}
+
+func appStatus(a store.GitHubApp) (string, badge.Variant) {
+	switch {
+	case a.LastError == store.AppNotInstalled:
+		return "not installed", badge.VariantOutline
+	case a.LastError != "":
+		return "failed", badge.VariantDestructive
+	case a.LastSeenAt != nil:
+		return "connected", badge.VariantDefault
+	}
+	return "not tested", badge.VariantSecondary
+}
+
+func installVariant(notInstalled bool) button.Variant {
+	if notInstalled {
+		return button.VariantDefault
+	}
+	return button.VariantGhost
+}
+
+// appSettingsURL is the App's settings page on GitHub, where it is edited or
+// deleted. Org-owned Apps live under the org; OwnerOrg is filled by Test.
+// ponytail: github.com only, like the install link.
+func appSettingsURL(a store.GitHubApp) string {
+	if a.OwnerOrg != "" {
+		return "https://github.com/organizations/" + a.OwnerOrg + "/settings/apps/" + a.Slug
+	}
+	return "https://github.com/settings/apps/" + a.Slug
+}
+
+func appOwnerSubtitle(a store.GitHubApp) string {
+	if a.OwnerOrg != "" {
+		return appSubtitle(a) + " · " + a.OwnerOrg
+	}
+	return appSubtitle(a)
+}
+
 func appSubtitle(a store.GitHubApp) string {
 	if a.Slug != "" && a.Slug != a.Name {
 		return a.Slug + " · App ID " + itoa64(a.AppID)

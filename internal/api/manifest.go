@@ -148,18 +148,25 @@ func (s *Server) callbackAppManifest(w http.ResponseWriter, r *http.Request, _ s
 		return
 	}
 	hook := webhookURL(settings.PublicBaseURL, app.Slug)
+	var hookErr error
 	if hook != "" {
-		if client, _, err := s.appClient(app.ID); err == nil {
-			if err := client.SetHookConfig(ctx, hook); err != nil {
-				s.log.Warn("set app webhook url", "app", app.ID, "error", err)
-			}
+		client, _, err := s.appClient(app.ID)
+		if err == nil {
+			err = client.SetHookConfig(ctx, hook)
+		}
+		if err != nil {
+			hookErr = err
+			s.log.Warn("set app webhook url", "app", app.ID, "error", err)
 		}
 	}
 	msg, kind := s.runAppTest(ctx, app.ID)
-	hint := ""
-	if hook != "" {
-		hint = " Webhook URL: " + hook
+	if hookErr != nil {
+		// Kept on the App, not only flashed: without the webhook URL GitHub
+		// never calls this worker, and nothing else would say why.
+		msg = fmt.Sprintf("GitHub did not take the webhook URL (%v). Set it on the App's settings page to %s", hookErr, hook)
+		kind = "err"
+		s.store.RecordGitHubAppTest(app.ID, msg)
 	}
 	s.reply(w, r, http.StatusCreated, map[string]any{"github_app": app, "test": msg},
-		"/github-apps", msg+hint, kind)
+		"/github-apps", msg, kind)
 }

@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The GitHub Apps page is a list, with broken Apps listed first.** Apps that
+  are not installed anywhere, or whose last check failed, get their own
+  "Needs attention" list with the stored error, Install, Open on GitHub (the
+  App's settings page, under the organization for an org-owned App) and
+  Remove.
+- **An App's last check outlives the notification.** "Not installed" and a
+  webhook URL GitHub refused are now stored on the App like any other error.
+  Loading repositories on the Repos page re-checks it, so installing the App
+  and loading again clears it.
+
+### Fixed
+
+- Long messages in a notification wrap inside it instead of running off the
+  edge.
+
 ## [2.4.0] - 2026-11-07
 
 ### Added

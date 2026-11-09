@@ -60,8 +60,10 @@ type GitHubApp struct {
 	CheckName  string     `json:"check_name"`
 	LastSeenAt *time.Time `json:"last_seen_at"`
 	LastError  string     `json:"last_error"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	// OwnerOrg is the owning organization's login, or '' for a personal account.
+	OwnerOrg  string    `json:"owner_org"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	PEMRedacted           string `json:"pem"`
 	WebhookSecretRedacted string `json:"webhook_secret"`

@@ -386,6 +386,8 @@ func TestAppManifestCreatesAnApp(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		case r.Method == http.MethodGet && r.URL.Path == "/app/installations":
 			json.NewEncoder(w).Encode([]any{})
+		case r.Method == http.MethodGet && r.URL.Path == "/app":
+			json.NewEncoder(w).Encode(map[string]any{"owner": map[string]any{"login": "acme", "type": "Organization"}})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -459,6 +461,11 @@ func TestAppManifestCreatesAnApp(t *testing.T) {
 	}
 	if created.ID == 0 || created.AppID != 9191 {
 		t.Fatalf("created app: %+v", created)
+	}
+	// No installations yet: that outlives the flash, and the owner is known
+	// so the page can link to the org's settings for the App.
+	if created.LastError != store.AppNotInstalled || created.OwnerOrg != "acme" {
+		t.Fatalf("health after callback: last_error=%q owner_org=%q", created.LastError, created.OwnerOrg)
 	}
 	gotPEM, err := ts.store.DecryptPEM(created)
 	if err != nil || strings.TrimSpace(gotPEM) != strings.TrimSpace(pemData) {

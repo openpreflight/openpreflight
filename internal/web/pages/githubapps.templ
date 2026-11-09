@@ -26,84 +26,13 @@ templ GitHubApps(p web.Page) {
 			}
 		}
 		if len(apps) > 0 {
-			<div class="mb-8 grid gap-4">
-				for _, app := range apps {
-					@card.Card(card.Props{Size: card.SizeSm}) {
-						@card.Header() {
-							@card.Title(card.TitleProps{Class: "truncate"}) {
-								{ app.Name }
-							}
-							@card.Description(card.DescriptionProps{Class: "font-mono text-xs"}) {
-								{ appSubtitle(app) }
-							}
-							@card.Action() {
-								@badge.Badge(badge.Props{
-									Variant:    healthVariant(app.LastError, app.LastSeenAt != nil),
-									Attributes: healthTitle(app.LastError),
-								}) {
-									{ healthLabel(app.LastError, app.LastSeenAt != nil) }
-								}
-							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-3"}) {
-							<p class="text-muted-foreground text-xs">
-								Writes a check named
-								if app.CheckName != "" {
-									<span class="text-foreground font-mono">{ app.CheckName }</span>
-								} else {
-									<span class="text-foreground font-mono">{ settings.DefaultCheckName }</span>
-									<span>(global default)</span>
-								}
-							</p>
-							@field.Field() {
-								@field.Label(field.LabelProps{For: "hook-" + itoa64(app.ID)}) {
-									Webhook URL
-								}
-								@input.Input(input.Props{
-									ID:         "hook-" + itoa64(app.ID),
-									Type:       "text",
-									Class:      "font-mono text-xs",
-									ReadOnly:   true,
-									Value:      web.WebhookURL(settings.PublicBaseURL, app.Slug),
-									Attributes: templ.Attributes{"aria-label": "Webhook URL for " + app.Name, "onfocus": templ.JSUnsafeFuncCall("this.select()")},
-								})
-							}
-							if p.Flash == "" && app.LastError != "" {
-								@layouts.Toast(app.LastError, "err")
-							}
-							if app.LastError == "" && app.LastSeenAt != nil {
-								<p class="text-muted-foreground text-xs">{ agoPtr(app.LastSeenAt) }</p>
-							}
-						}
-						@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
-							<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
-								@layouts.CSRF(p.CSRFToken)
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
-									Test
-								}
-							</form>
-							// ponytail: github.com only; GHES installs live at <host>/github-apps/<slug>/installations/new.
-							@button.Button(button.Props{Href: "https://github.com/apps/" + app.Slug + "/installations/new", Target: "_blank", Variant: button.VariantOutline, Size: button.SizeSm}) {
-								Install on GitHub
-							}
-							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantOutline, Size: button.SizeSm}) {
-								Edit
-							}
-							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID) + "#inspect", Variant: button.VariantGhost, Size: button.SizeSm}) {
-								Installations
-							}
-							@layouts.Confirm(layouts.ConfirmProps{
-								ID:          "del-app-" + itoa64(app.ID),
-								Token:       p.CSRFToken,
-								Action:      "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
-								Trigger:     "Remove",
-								Title:       "Remove this App?",
-								Description: "Its repo bindings are removed too.",
-							})
-						}
-					}
-				}
-			</div>
+			{{ attention, connected := splitApps(apps) }}
+			if len(attention) > 0 {
+				@appList(p, settings, "Needs attention", "Not installed anywhere, or the last check failed. Install or fix them, or remove the ones you no longer use. Removing here leaves the App on GitHub; delete it there from its settings page.", attention)
+			}
+			if len(connected) > 0 {
+				@appList(p, settings, "Connected", "", connected)
+			}
 		} else {
 			@empty.Empty(empty.Props{Class: emptyPageClass}) {
 				@empty.Header() {
@@ -207,6 +136,115 @@ templ GitHubApps(p web.Page) {
 			}
 		}
 	}
+}
+
+// appList is one bordered list of Apps: a title, a column strip, then a row
+// per App. Rows stay one line on wide screens, and the actions sit under them.
+templ appList(p web.Page, settings store.Settings, title, hint string, apps []store.GitHubApp) {
+	<section class="bg-card mb-8 overflow-hidden rounded-xl border">
+		<header class="px-4 py-3">
+			<h2 class="text-sm font-semibold">
+				{ title } <span class="text-muted-foreground ml-1 font-normal">{ itoa(len(apps)) }</span>
+			</h2>
+			if hint != "" {
+				<p class="text-muted-foreground mt-1 text-xs">{ hint }</p>
+			}
+		</header>
+		// Same column template as appRow; Tailwind scans .templ files, not pages/*.go.
+		<div class="bg-muted/50 text-muted-foreground hidden border-y px-4 py-2 text-xs font-medium sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:gap-4">
+			<span>App</span>
+			<span>Check name</span>
+			<span>Status</span>
+		</div>
+		<ul class="m-0 list-none divide-y border-t p-0 sm:border-t-0">
+			for _, app := range apps {
+				@appRow(p, settings, app)
+			}
+		</ul>
+	</section>
+}
+
+templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
+	{{ label, variant := appStatus(app) }}
+	{{ notInstalled := app.LastError == store.AppNotInstalled }}
+	<li class="hover:bg-muted/30 px-4 py-3 transition-colors">
+		<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:items-center sm:gap-4">
+			<div class="flex min-w-0 items-center gap-3">
+				<span class="bg-muted flex size-9 shrink-0 items-center justify-center rounded-lg">
+					@icon.Github(icon.Props{Class: "size-4"})
+				</span>
+				<div class="min-w-0">
+					<a
+						href={ templ.SafeURL("/github-apps?inspect=" + itoa64(app.ID) + "#inspect") }
+						class="block truncate text-sm font-medium underline-offset-4 hover:underline"
+						title="Show installations and repositories"
+					>{ app.Name }</a>
+					<p class="text-muted-foreground truncate font-mono text-xs">{ appOwnerSubtitle(app) }</p>
+				</div>
+			</div>
+			<div class="min-w-0 truncate text-xs">
+				if app.CheckName != "" {
+					<span class="font-mono">{ app.CheckName }</span>
+				} else {
+					<span class="font-mono">{ settings.DefaultCheckName }</span>
+					<span class="text-muted-foreground">(default)</span>
+				}
+			</div>
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+				@badge.Badge(badge.Props{Variant: variant}) {
+					{ label }
+				}
+				if app.LastSeenAt != nil {
+					<span class="text-muted-foreground text-xs" title="Last successful check">{ agoPtr(app.LastSeenAt) }</span>
+				}
+			</div>
+		</div>
+		<div class="mt-2 space-y-2 sm:pl-12">
+			if app.LastError != "" {
+				<p class={ "flex items-start gap-1.5 text-xs", templ.KV("text-destructive", !notInstalled), templ.KV("text-muted-foreground", notInstalled) }>
+					@icon.CircleAlert(icon.Props{Class: "mt-px size-3.5 shrink-0"})
+					<span class="min-w-0 [overflow-wrap:anywhere]">{ app.LastError }</span>
+				</p>
+			}
+			<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+				<p class="text-muted-foreground m-0 flex min-w-0 max-w-full items-center gap-1.5 text-xs">
+					<span class="shrink-0">Webhook</span>
+					<code
+						class="bg-muted text-foreground min-w-0 truncate rounded px-1.5 py-0.5 font-mono text-[11px] select-all"
+						title="Webhook URL (click to select)"
+					>{ web.WebhookURL(settings.PublicBaseURL, app.Slug) }</code>
+				</p>
+				<div class="ml-auto flex flex-wrap items-center gap-1">
+					<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
+						@layouts.CSRF(p.CSRFToken)
+						@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
+							Test
+						}
+					</form>
+					// ponytail: github.com only; GHES installs live at <host>/github-apps/<slug>/installations/new.
+					@button.Button(button.Props{Href: "https://github.com/apps/" + app.Slug + "/installations/new", Target: "_blank", Variant: installVariant(notInstalled), Size: button.SizeSm}) {
+						Install
+					}
+					@button.Button(button.Props{Href: appSettingsURL(app), Target: "_blank", Variant: button.VariantGhost, Size: button.SizeSm}) {
+						Open on GitHub
+					}
+					@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantGhost, Size: button.SizeSm}) {
+						Edit
+					}
+					@layouts.Confirm(layouts.ConfirmProps{
+						ID:             "del-app-" + itoa64(app.ID),
+						Token:          p.CSRFToken,
+						Action:         "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
+						Trigger:        "Remove",
+						TriggerVariant: button.VariantGhost,
+						TriggerClass:   "text-destructive",
+						Title:          "Remove " + app.Name + "?",
+						Description:    "Its repo bindings are removed too. The App itself stays on GitHub until you delete it there.",
+					})
+				</div>
+			</div>
+		</div>
+	</li>
 }
 
 templ GitHubAppsEditorPage(p web.Page) {
