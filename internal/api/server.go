@@ -70,11 +70,17 @@ func New(st *store.Store, cfg config.Config, runner *queue.Runner, log *slog.Log
 	if !hasUsers {
 		// Until an admin exists, /setup is the only door into the console, and
 		// on a public URL whoever reaches it first would own the instance. The
-		// token goes to the server log, which only the operator can read.
-		raw := make([]byte, 24)
-		rand.Read(raw)
-		s.setupToken = base64.RawURLEncoding.EncodeToString(raw)
-		log.Info("no admin yet: enter this setup token on /setup to create one", "setup_token", s.setupToken)
+		// token is one the operator set in the environment, or a random one
+		// printed to the server log. Either way only the operator has it.
+		if cfg.SetupToken != "" {
+			s.setupToken = cfg.SetupToken
+			log.Info("no admin yet: enter the value of CI_SETUP_TOKEN on /setup to create one")
+		} else {
+			raw := make([]byte, 24)
+			rand.Read(raw)
+			s.setupToken = base64.RawURLEncoding.EncodeToString(raw)
+			log.Info("no admin yet: enter this setup token on /setup to create one (or set CI_SETUP_TOKEN and restart)", "setup_token", s.setupToken)
+		}
 	}
 	return s, nil
 }

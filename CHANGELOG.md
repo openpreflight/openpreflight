@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`CI_SETUP_TOKEN` sets the setup token**, so whoever can set the
+  deployment's environment (Coolify's UI, a compose file, a Kubernetes
+  secret) can finish setup without reading the server log. It must be at
+  least 16 characters. Unset, the server prints a random token to its log
+  as before.
+
 ### Changed
 
 - **The GitHub Apps page is a list, with broken Apps listed first.** Apps that

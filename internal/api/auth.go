@@ -112,8 +112,8 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	// must refuse rather than match an empty field.
 	if s.setupToken == "" || subtle.ConstantTimeCompare([]byte(in.Str("setup_token")), []byte(s.setupToken)) != 1 {
 		s.reply(w, r, http.StatusForbidden,
-			map[string]string{"error": "setup_token is missing or wrong; the server prints it to its log at startup"},
-			"/setup", "That setup token is wrong. Copy it from the server log, where it is printed at startup.", "err")
+			map[string]string{"error": "setup_token is missing or wrong; it is CI_SETUP_TOKEN, or printed to the server log at startup"},
+			"/setup", "That setup token is wrong. It is the value of CI_SETUP_TOKEN, or printed in the server log at startup.", "err")
 		return
 	}
 	username := in.Str("username")

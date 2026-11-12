@@ -23,6 +23,9 @@ type Config struct {
 	// BootstrapAdminPassword, when set, seeds the admin user on first boot so
 	// a fresh container can be driven by API without the browser wizard.
 	BootstrapAdminPassword string
+	// SetupToken, when set, is the token /setup asks for, so whoever can set
+	// the deployment's environment can finish setup without reading its log.
+	SetupToken string
 	// PublicBaseURL seeds the settings row on first boot only.
 	PublicBaseURL string
 	// DockerHost is passed to the docker CLI as DOCKER_HOST. Empty uses the
@@ -43,6 +46,8 @@ var ErrNoSecretKey = errors.New("CI_SECRET_KEY is required (32+ bytes of entropy
 // before use, so this is an entropy floor, not a cipher constraint.
 const minSecretKeyLen = 32
 
+const minSetupTokenLen = 16
+
 // Load reads the environment and validates it.
 func Load() (Config, error) {
 	c := Config{
@@ -50,6 +55,7 @@ func Load() (Config, error) {
 		DataDir:                cmp.Or(os.Getenv("DATA_DIR"), "/data"),
 		SecretKey:              os.Getenv("CI_SECRET_KEY"),
 		BootstrapAdminPassword: os.Getenv("CI_BOOTSTRAP_ADMIN_PASSWORD"),
+		SetupToken:             strings.TrimSpace(os.Getenv("CI_SETUP_TOKEN")),
 		PublicBaseURL:          strings.TrimRight(os.Getenv("CI_PUBLIC_BASE_URL"), "/"),
 		OldSecretKey:           os.Getenv("CI_SECRET_KEY_OLD"),
 		ClientIPHeader:         strings.TrimSpace(os.Getenv("CI_CLIENT_IP_HEADER")),
@@ -64,6 +70,11 @@ func Load() (Config, error) {
 	}
 	if c.OldSecretKey != "" && len(strings.TrimSpace(c.OldSecretKey)) < minSecretKeyLen {
 		return Config{}, errors.New("CI_SECRET_KEY_OLD is set but shorter than 32 bytes")
+	}
+	// It stands between a public URL and owning the instance until an admin
+	// exists: a short one could be guessed in that window.
+	if c.SetupToken != "" && len(c.SetupToken) < minSetupTokenLen {
+		return Config{}, fmt.Errorf("CI_SETUP_TOKEN is set but shorter than %d characters", minSetupTokenLen)
 	}
 	if c.DataDir == "" {
 		return Config{}, errors.New("DATA_DIR must not be empty")

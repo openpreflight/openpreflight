@@ -129,6 +129,21 @@ func TestSetupRequiresTheLoggedToken(t *testing.T) {
 	ts.login(t)
 }
 
+// TestSetupTokenFromEnv: an operator without access to the server log sets
+// CI_SETUP_TOKEN, and that is the token /setup takes.
+func TestSetupTokenFromEnv(t *testing.T) {
+	ts := newTestServer(t)
+	cfg := ts.cfg
+	cfg.SetupToken = "chosen-by-the-operator"
+	srv, err := New(ts.store, cfg, ts.runner, ts.log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if srv.setupToken != "chosen-by-the-operator" {
+		t.Fatalf("setup token = %q, want CI_SETUP_TOKEN", srv.setupToken)
+	}
+}
+
 // TestLoginIsRateLimited: guesses are capped per client address, a success
 // resets the count, and one client's lockout does not reach another.
 func TestLoginIsRateLimited(t *testing.T) {

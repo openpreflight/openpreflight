@@ -20,7 +20,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
-const setupTokenHint = "Printed in the server log when it started, as setup_token=… on the line that begins \"no admin yet\"."
+const setupTokenHint = "The value of CI_SETUP_TOKEN, if the deployment sets one. Otherwise it is in the server log, as setup_token=… on the line that begins \"no admin yet\"."
 
 const setupPasswordHint = "At least 12 characters. There is no password reset in v1, so keep it somewhere you can find."
 
