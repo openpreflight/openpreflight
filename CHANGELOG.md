@@ -77,7 +77,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   while GitHub still delivered nothing. A URL on another host (a relay such
   as smee) is left alone.
 - Leaving the Add repository or App inspect page before GitHub answers no
-  longer saves "context canceled" as the App's error.
+  longer saves "context canceled" as the App's error. A Test that times out
+  is still recorded as a failure.
+- If GitHub cannot say where the webhook goes (an outage, a rate limit), a
+  stored webhook problem stays until a check can confirm it is fixed.
+- An App that authenticates but is not installed counts as seen, and Status
+  says "not installed on any account" for it instead of blaming a rotated key.
+- Filtering the Jobs list keeps the chosen rows per page.
+- The pass rate and its weekly change both leave out cancelled runs, so the
+  two compare the same thing; cancelled runs no longer count towards run time.
 - The Activity chart's first day counted no runs created in its first second.
 - Creating an App from the manifest takes its owner from GitHub's reply
   instead of asking again, and Test only asks while the owner is unknown.

@@ -488,7 +488,12 @@ func TestAppTestFlagsAWrongWebhookURL(t *testing.T) {
 	ts := newTestServer(t)
 	token := ts.login(t)
 	hook := "https://ci.example.com/webhook/openpreflight"
+	hookDown := false
 	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hookDown && r.URL.Path == "/app/hook/config" {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
 		switch r.URL.Path {
 		case "/app/installations":
 			json.NewEncoder(w).Encode([]any{map[string]any{"id": 1, "account": map[string]any{"login": "acme"}}})
@@ -524,6 +529,13 @@ func TestAppTestFlagsAWrongWebhookURL(t *testing.T) {
 	if h := health(); !strings.Contains(h, hook) {
 		t.Fatalf("loading repos cleared a webhook URL that is still wrong: %q", h)
 	}
+	// GitHub failing to say where the webhook goes is not news that it is fixed.
+	hookDown = true
+	ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/"+itoa(app.ID)+"/test", "")
+	if h := health(); !strings.Contains(h, hook) {
+		t.Fatalf("an unreadable webhook URL cleared the stored problem: %q", h)
+	}
+	hookDown = false
 
 	hook = "https://ci.example.com/webhook/hooked"
 	ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/"+itoa(app.ID)+"/test", "")

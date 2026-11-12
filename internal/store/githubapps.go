@@ -231,7 +231,8 @@ func (s *Store) SetGitHubAppOwnerOrg(id int64, org string) error {
 // RecordGitHubAppTest stores the outcome of a Test click.
 func (s *Store) RecordGitHubAppTest(id int64, errMsg string) error {
 	var seen any
-	if errMsg == "" {
+	// Not installed still authenticated: the credentials were seen to work.
+	if errMsg == "" || errMsg == AppNotInstalled {
 		seen = formatTime(now())
 	}
 	_, err := s.db.Exec(`UPDATE github_apps SET last_seen_at = COALESCE(?, last_seen_at),

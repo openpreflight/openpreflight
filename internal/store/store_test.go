@@ -880,6 +880,7 @@ func TestBackupCopiesAnOpenDatabase(t *testing.T) {
 func TestDailyJobCounts(t *testing.T) {
 	st := newTestStore(t)
 	app := mustApp(t, st, "ci")
+	day := time.Now().UTC().YearDay()
 	for _, status := range []string{JobSuccess, JobSuccess, JobFailure, JobSkipped, ""} {
 		j, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/api", SHA: "a"})
 		if err != nil {
@@ -894,6 +895,9 @@ func TestDailyJobCounts(t *testing.T) {
 	days, err := st.DailyJobCounts(14, time.Now())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if time.Now().UTC().YearDay() != day {
+		t.Skip("crossed UTC midnight while creating jobs")
 	}
 	if len(days) != 14 {
 		t.Fatalf("got %d days, want 14", len(days))

@@ -21,7 +21,7 @@ templ Jobs(p web.Page) {
 		@layouts.PageHead("Jobs", "Every run this worker has taken, newest first. "+retentionLabel(settings.LogRetentionDays))
 		@layouts.ListCard() {
 			<div>
-				@jobsFilter(repo, status)
+				@jobsFilter(repo, status, jobLimitOf(m))
 				if len(list) > 0 {
 					@jobList(p, list, true)
 				} else {
@@ -35,8 +35,12 @@ templ Jobs(p web.Page) {
 
 // jobsFilter is the list's header. Picking a status reloads at once; the repo
 // box submits on Enter.
-templ jobsFilter(repo, status string) {
+templ jobsFilter(repo, status string, limit int) {
 	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-2 border-b px-4 py-3" aria-label="Filter jobs" onchange="this.requestSubmit()">
+		// Filtering keeps the chosen page size; it only starts over at page 1.
+		if limit != jobPageSize {
+			<input type="hidden" name="limit" value={ itoa(limit) }/>
+		}
 		@selectcomp.Select(selectcomp.Props{ID: "status-list", Name: "status", DefaultValue: status}) {
 			@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[10rem] shrink-0", Attributes: templ.Attributes{"aria-label": "Status"}}) {
 				@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})

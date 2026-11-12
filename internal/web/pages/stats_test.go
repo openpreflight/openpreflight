@@ -35,8 +35,8 @@ func TestDashTiles(t *testing.T) {
 		{
 			// A skipped job is not a failure - counting it as one would show a
 			// red pass rate for a repo that is behaving exactly as configured.
-			name:   "skipped runs count towards nothing",
-			recent: []store.Job{job(store.JobSuccess, 10), job(store.JobSkipped, 0)},
+			name:   "skipped and cancelled runs count towards nothing",
+			recent: []store.Job{job(store.JobSuccess, 10), job(store.JobSkipped, 0), job(store.JobCancelled, 300)},
 			rate:   "100", unit: "%",
 			mid: "10s",
 		},

@@ -650,7 +650,12 @@ type dashTile struct {
 	Lines    [][2]string // {lead, emphasised}
 }
 
-func finished(j store.Job) bool { return !j.InFlight() && j.Status != store.JobSkipped }
+// finished is a run with a result: passed, failed or errored. Skipped and
+// cancelled runs have none, so the pass rate, its weekly change and run times
+// all leave them out alike.
+func finished(j store.Job) bool {
+	return !j.InFlight() && j.Status != store.JobSkipped && j.Status != store.JobCancelled
+}
 
 func failedJob(j store.Job) bool { return j.Status == store.JobFailure || j.Status == store.JobError }
 
@@ -677,8 +682,8 @@ func weekRates(daily []store.DayCount) (last, prev int, ok bool) {
 }
 
 // dashTiles reads the same recent-jobs slice the repo list is built from, so
-// the numbers and the rows under them describe the same runs. Skipped and
-// in-flight jobs are not results, so they count towards nothing.
+// the numbers and the rows under them describe the same runs. Skipped,
+// cancelled and in-flight jobs are not results, so they count towards nothing.
 func dashTiles(recent []store.Job, daily []store.DayCount, cards []dashRepo, enabled, bound, inflight int) []dashTile {
 	done, passed := 0, 0
 	var durs []time.Duration
