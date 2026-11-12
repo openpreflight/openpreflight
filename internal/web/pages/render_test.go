@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/a-h/templ"
 
@@ -161,10 +162,39 @@ func TestShellHasRefresh(t *testing.T) {
 	}
 }
 
-// The webhook URL field selects itself on focus; templ strips a plain-string handler.
-func TestGitHubAppsWebhookFieldSelects(t *testing.T) {
-	out := renderPage(t, "GitHubApps", GitHubApps, page(map[string]any{"Apps": []store.GitHubApp{{Name: "ci"}}}))
-	if !strings.Contains(out, `onfocus="this.select()"`) {
-		t.Error("GitHubApps: webhook URL field lost its onfocus handler")
+// Broken Apps are listed apart with their stored error, a link to their
+// settings on GitHub (under the org when an org owns them), and Remove.
+func TestGitHubAppsListsAppsNeedingAttention(t *testing.T) {
+	seen := time.Now()
+	out := renderPage(t, "GitHubApps", GitHubApps, page(map[string]any{"Apps": []store.GitHubApp{
+		{ID: 1, Name: "good", Slug: "good", LastSeenAt: &seen},
+		{ID: 2, Name: "orphan", Slug: "orphan", OwnerOrg: "acme", LastError: store.AppNotInstalled},
+	}}))
+	for _, want := range []string{
+		"Needs attention", "Connected", store.AppNotInstalled,
+		"https://github.com/organizations/acme/settings/apps/orphan",
+		"https://github.com/settings/apps/good",
+		`action="/api/v1/github-apps/2/delete"`,
+		"select-all",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("GitHubApps: missing %q", want)
+		}
+	}
+	if strings.Index(out, "orphan") > strings.Index(out, ">good<") {
+		t.Error("GitHubApps: Apps needing attention should come first")
+	}
+}
+
+// A run's error is a standing fact about the run: it has to be on the page,
+// not in a toast that is gone in fourteen seconds.
+func TestRunPageShowsErrorInline(t *testing.T) {
+	failed := store.Job{ID: "j2", Repo: "acme/api", SHA: "0123456789abcdef", Status: store.JobError, Error: "clone: token expired"}
+	out := renderPage(t, "Run", Run, page(map[string]any{"Job": failed, "Steps": []any{}, "Log": ""}))
+	if !strings.Contains(out, `role="alert"`) || !strings.Contains(out, "clone: token expired") {
+		t.Fatal("Run: error is not rendered as an inline notice")
+	}
+	if strings.Contains(out, `data-tui-toast-ssr`) {
+		t.Error("Run: error still rendered as a toast")
 	}
 }

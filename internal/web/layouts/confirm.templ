@@ -27,6 +27,10 @@ type ConfirmProps struct {
 	// have to aim at rather than the one you land on.
 	TriggerClass string
 
+	// MenuItem renders the trigger as a destructive RowMenu item instead of
+	// a button. The dialog itself is portaled to <body> either way.
+	MenuItem bool
+
 	Title       string
 	Description string
 
@@ -65,13 +69,17 @@ func confirmDefaults(p ConfirmProps) ConfirmProps {
 templ Confirm(props ConfirmProps) {
 	{{ p := confirmDefaults(props) }}
 	@alertdialog.AlertDialog(alertdialog.Props{ID: p.ID}) {
-		@button.Button(button.Props{
-			Variant:    p.TriggerVariant,
-			Size:       button.SizeSm,
-			Class:      p.TriggerClass,
-			Attributes: alertdialog.TriggerFor(p.ID),
-		}) {
-			{ p.Trigger }
+		if p.MenuItem {
+			<button type="button" role="menuitem" class={ MenuDangerClass } { alertdialog.TriggerFor(p.ID)... }>{ p.Trigger }</button>
+		} else {
+			@button.Button(button.Props{
+				Variant:    p.TriggerVariant,
+				Size:       button.SizeSm,
+				Class:      p.TriggerClass,
+				Attributes: alertdialog.TriggerFor(p.ID),
+			}) {
+				{ p.Trigger }
+			}
 		}
 		@alertdialog.Content() {
 			@alertdialog.Header() {

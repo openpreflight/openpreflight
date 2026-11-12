@@ -3,11 +3,8 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
-	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/components/table"
@@ -20,86 +17,19 @@ templ GitHubApps(p web.Page) {
 	{{ settings := settingsOf(m) }}
 	{{ apps := appsOf(m) }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("CI GitHub Apps", "Your own GitHub App is what makes this a CI provider: only an App can write commit checks, and each App has exactly one webhook URL. Coolify's deploy connector cannot do this job.") {
+		@layouts.PageHead("CI GitHub Apps", "Only a GitHub App can write commit checks. Each App has one webhook URL, and receives the repos it is installed on.") {
 			@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
 				Add an App
 			}
 		}
 		if len(apps) > 0 {
-			<div class="mb-8 grid gap-4">
-				for _, app := range apps {
-					@card.Card(card.Props{Size: card.SizeSm}) {
-						@card.Header() {
-							@card.Title(card.TitleProps{Class: "truncate"}) {
-								{ app.Name }
-							}
-							@card.Description(card.DescriptionProps{Class: "font-mono text-xs"}) {
-								{ appSubtitle(app) }
-							}
-							@card.Action() {
-								@badge.Badge(badge.Props{
-									Variant:    healthVariant(app.LastError, app.LastSeenAt != nil),
-									Attributes: healthTitle(app.LastError),
-								}) {
-									{ healthLabel(app.LastError, app.LastSeenAt != nil) }
-								}
-							}
-						}
-						@card.Content(card.ContentProps{Class: "space-y-3"}) {
-							<p class="text-muted-foreground text-xs">
-								Writes a check named
-								if app.CheckName != "" {
-									<span class="text-foreground font-mono">{ app.CheckName }</span>
-								} else {
-									<span class="text-foreground font-mono">{ settings.DefaultCheckName }</span>
-									<span>(global default)</span>
-								}
-							</p>
-							@field.Field() {
-								@field.Label(field.LabelProps{For: "hook-" + itoa64(app.ID)}) {
-									Webhook URL
-								}
-								@input.Input(input.Props{
-									ID:         "hook-" + itoa64(app.ID),
-									Type:       "text",
-									Class:      "font-mono text-xs",
-									ReadOnly:   true,
-									Value:      web.WebhookURL(settings.PublicBaseURL, app.Slug),
-									Attributes: templ.Attributes{"aria-label": "Webhook URL for " + app.Name, "onfocus": templ.JSUnsafeFuncCall("this.select()")},
-								})
-							}
-							if p.Flash == "" && app.LastError != "" {
-								@layouts.Toast(app.LastError, "err")
-							}
-							if app.LastError == "" && app.LastSeenAt != nil {
-								<p class="text-muted-foreground text-xs">{ agoPtr(app.LastSeenAt) }</p>
-							}
-						}
-						@card.Footer(card.FooterProps{Class: "flex flex-wrap gap-2"}) {
-							<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
-								@layouts.CSRF(p.CSRFToken)
-								@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
-									Test
-								}
-							</form>
-							@button.Button(button.Props{Href: "/github-apps/" + itoa64(app.ID) + "/edit", Variant: button.VariantOutline, Size: button.SizeSm}) {
-								Edit
-							}
-							@button.Button(button.Props{Href: "/github-apps?inspect=" + itoa64(app.ID) + "#inspect", Variant: button.VariantGhost, Size: button.SizeSm}) {
-								Installations
-							}
-							@layouts.Confirm(layouts.ConfirmProps{
-								ID:          "del-app-" + itoa64(app.ID),
-								Token:       p.CSRFToken,
-								Action:      "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
-								Trigger:     "Remove",
-								Title:       "Remove this App?",
-								Description: "Its repo bindings are removed too.",
-							})
-						}
-					}
-				}
-			</div>
+			{{ attention, connected := splitApps(apps) }}
+			if len(attention) > 0 {
+				@appList(p, settings, "Needs attention", "Not installed anywhere, or the last check failed. Removing one here leaves it on GitHub; to delete it there, use ⋯ → Open on GitHub.", attention)
+			}
+			if len(connected) > 0 {
+				@appList(p, settings, "Connected", "", connected)
+			}
 		} else {
 			@empty.Empty(empty.Props{Class: emptyPageClass}) {
 				@empty.Header() {
@@ -124,14 +54,22 @@ templ GitHubApps(p web.Page) {
 			{{ inspect := appOf(m, "Inspect") }}
 			{{ installs := installsOf(m) }}
 			{{ repos := ghReposOf(m) }}
-			@card.Card(card.Props{ID: "inspect", Class: "mb-6 scroll-mt-6"}) {
-				@card.Header() {
-					@card.Title() {
-						{ inspect.Name } - installations
+			<div id="inspect" class="scroll-mt-20">
+			@layouts.ListCard() {
+				@layouts.ListHead(inspect.Name+" · installations", len(installs), "Where this App is installed, and the repositories it can see.") {
+					@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantGhost, Size: button.SizeSm}) {
+						Close
 					}
 				}
-				@card.Content(card.ContentProps{Class: "space-y-4"}) {
-					@layouts.Toast(str(m, "InspectError"), "err")
+				<div class="space-y-4 p-4">
+					@layouts.Notice(layouts.ToneDanger, "Could not read this App from GitHub", str(m, "InspectError"))
+					if str(m, "InspectError") == "" && len(installs) == 0 {
+						@layouts.Notice(layouts.ToneWarning, "Not installed on any account", "Install it on the account or organization that owns the repositories you want checked, then come back.") {
+							@button.Button(button.Props{Href: "https://github.com/apps/" + inspect.Slug + "/installations/new", Target: "_blank", Size: button.SizeSm, Class: "mt-2"}) {
+								Install on GitHub
+							}
+						}
+					}
 					if len(installs) > 0 {
 						@table.Table() {
 							@table.Header() {
@@ -196,13 +134,152 @@ templ GitHubApps(p web.Page) {
 						}
 						<p class="text-muted-foreground text-xs">
 							Enable the ones you want checked on the
-							<a class="text-primary underline-offset-4 hover:underline" href="/repos">Repos</a> page.
+							<a class="text-primary underline-offset-4 hover:underline" href="/repos/pick">Repos</a> page.
 						</p>
 					}
-				}
+				</div>
 			}
+			</div>
 		}
 	}
+}
+
+// appList is one bordered list of Apps: a title, a column strip, then a row
+// per App. Rows stay one line on wide screens, and the actions sit under them.
+templ appList(p web.Page, settings store.Settings, title, hint string, apps []store.GitHubApp) {
+	@layouts.ListCard() {
+		@layouts.ListHead(title, len(apps), hint)
+		// Same column template as appRow; Tailwind scans .templ files, not pages/*.go.
+		<div>
+			<div class="bg-muted/40 text-muted-foreground hidden border-b px-4 py-2 text-xs font-medium sm:grid sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:gap-4">
+				<span class="pl-12">App</span>
+				<span>Check name</span>
+				<span>Status</span>
+			</div>
+			@layouts.List() {
+				for _, app := range apps {
+					@appRow(p, settings, app)
+				}
+			}
+		</div>
+	}
+}
+
+templ appRow(p web.Page, settings store.Settings, app store.GitHubApp) {
+	{{ label, tone := appStatus(app) }}
+	{{ notInstalled := app.LastError == store.AppNotInstalled }}
+	// Each App is a small card: what it is and how it is doing on top, then a
+	// dashed rule and a tinted footer holding its webhook and its actions, so
+	// the buttons are visibly this App's and not the next one's.
+	<li>
+		<div class="px-4 py-3">
+		<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_10rem] sm:items-center sm:gap-4">
+			<div class="flex min-w-0 items-center gap-3">
+				<span class={ "flex size-9 shrink-0 items-center justify-center rounded-lg border", appTileClass(app) }>
+					@layouts.GitHubMark("size-[18px]")
+				</span>
+				<div class="min-w-0">
+					<a
+						href={ templ.SafeURL("/github-apps?inspect=" + itoa64(app.ID) + "#inspect") }
+						class="block truncate text-sm font-medium underline-offset-4 hover:underline"
+						title="Show installations and repositories"
+					>{ app.Name }</a>
+					<p class="text-muted-foreground truncate font-mono text-xs">{ appOwnerSubtitle(app) }</p>
+				</div>
+			</div>
+			<div class="min-w-0 truncate text-xs">
+				if app.CheckName != "" {
+					<span class="font-mono">{ app.CheckName }</span>
+				} else {
+					<span class="font-mono">{ settings.DefaultCheckName }</span>
+					<span class="text-muted-foreground">(default)</span>
+				}
+			</div>
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+				@layouts.Status(label, tone)
+				if app.LastSeenAt != nil {
+					<span class="text-muted-foreground text-xs" title="Last successful check">{ agoPtr(app.LastSeenAt) }</span>
+				}
+			</div>
+		</div>
+		if app.LastError != "" {
+			<p class={ "mt-2 flex items-start gap-1.5 text-xs sm:pl-12", templ.KV("text-destructive", !notInstalled), templ.KV("text-muted-foreground", notInstalled) }>
+				@icon.CircleAlert(icon.Props{Class: "mt-px size-3.5 shrink-0"})
+				<span class="min-w-0 [overflow-wrap:anywhere]">{ app.LastError }</span>
+			</p>
+		}
+		</div>
+		<div class="bg-muted/30 border-t border-dashed px-4 py-2 sm:pl-16">
+			<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+				<p class="text-muted-foreground m-0 flex min-w-0 max-w-full items-center gap-1.5 text-xs">
+					<span class="shrink-0">Webhook</span>
+					<code
+						class="bg-muted text-foreground min-w-0 truncate rounded px-1.5 py-0.5 font-mono text-[11px] select-all"
+						title="Webhook URL (click to select)"
+					>{ web.WebhookURL(settings.PublicBaseURL, app.Slug) }</code>
+				</p>
+				// One button for the thing this App most likely needs, the rest
+				// in the menu: a row of five equal links made every App look like
+				// it needed all five.
+				<div class="ml-auto flex items-center gap-1">
+					if notInstalled {
+						// ponytail: github.com only; GHES installs live at <host>/github-apps/<slug>/installations/new.
+						@button.Button(button.Props{Href: "https://github.com/apps/" + app.Slug + "/installations/new", Target: "_blank", Size: button.SizeSm}) {
+							Install on GitHub
+							@icon.ExternalLink(icon.Props{Class: "size-3.5"})
+						}
+					} else {
+						<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
+							@layouts.CSRF(p.CSRFToken)
+							@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantOutline, Size: button.SizeSm}) {
+								@icon.RefreshCw(icon.Props{Class: "size-3.5"})
+								Test
+							}
+						</form>
+					}
+					@layouts.RowMenu("app-menu-"+itoa64(app.ID), "More actions for "+app.Name) {
+						if notInstalled {
+							<form method="post" action={ templ.SafeURL("/api/v1/github-apps/" + itoa64(app.ID) + "/test") } class="m-0">
+								@layouts.CSRF(p.CSRFToken)
+								<button type="submit" role="menuitem" class={ layouts.MenuItemClass }>
+									@icon.RefreshCw()
+									Test again
+								</button>
+							</form>
+						} else {
+							<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("https://github.com/apps/" + app.Slug + "/installations/new") } target="_blank" rel="noopener">
+								@icon.FolderGit()
+								Install on another account
+							</a>
+						}
+						<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL(appSettingsURL(app)) } target="_blank" rel="noopener">
+							@icon.ExternalLink()
+							Open on GitHub
+						</a>
+						<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/github-apps?inspect=" + itoa64(app.ID) + "#inspect") }>
+							@icon.Search()
+							Installations and repos
+						</a>
+						<a role="menuitem" class={ layouts.MenuItemClass } href={ templ.SafeURL("/github-apps/" + itoa64(app.ID) + "/edit") }>
+							@icon.Settings()
+							Edit
+						</a>
+						@layouts.MenuSeparator()
+						@layouts.Confirm(layouts.ConfirmProps{
+							ID:          "del-app-" + itoa64(app.ID),
+							Token:       p.CSRFToken,
+							Action:      "/api/v1/github-apps/" + itoa64(app.ID) + "/delete",
+							Trigger:     "Remove from this worker",
+							Confirm:     "Remove",
+							MenuItem:    true,
+							Title:       "Remove " + app.Name + "?",
+							Description: "Its repo bindings are removed too. The App itself stays on GitHub until you delete it there.",
+						})
+					}
+				</div>
+			</div>
+		</div>
+	</li>
 }
 
 templ GitHubAppsEditorPage(p web.Page) {
@@ -215,26 +292,20 @@ templ GitHubAppsEditorPage(p web.Page) {
 		if !editing {
 			// Two ways in, and they are not equal: the manifest flow fills in
 			// every field below from GitHub's own response. Showing it as a
-			// card and the paste form as a disclosure is the whole of the
-			// recommendation — nothing here ranks them in prose.
+			// panel and the paste form as a disclosure is the whole of the
+			// recommendation; nothing here ranks them in prose.
 			@appManifestCard(p, settings)
-			<details class="group border-border hover:border-foreground/25 mb-8 rounded-xl border transition-colors open:border-border">
-				<summary class="flex cursor-pointer list-none items-center gap-2.5 px-4 py-3.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+			<details class="group">
+				<summary class="bg-muted/60 hover:bg-muted mb-6 flex cursor-pointer list-none items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium transition-colors [&::-webkit-details-marker]:hidden">
 					@icon.ChevronRight(icon.Props{Class: "size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"})
 					<span>Paste credentials from an App you registered yourself</span>
 					<span class="text-muted-foreground ml-auto text-xs font-normal">GitHub Enterprise</span>
 				</summary>
-				<div class="border-t px-4 pt-5 pb-5">
-					@appManualHelp(settings)
-					@appCredentialsForm(p, settings, editing, edit)
-				</div>
+				@appManualHelp(settings)
+				@appCredentialsForm(p, settings, editing, edit)
 			</details>
 		} else {
-			@card.Card() {
-				@card.Content() {
-					@appCredentialsForm(p, settings, editing, edit)
-				}
-			}
+			@appCredentialsForm(p, settings, editing, edit)
 		}
 	}
 }
@@ -243,221 +314,195 @@ templ GitHubAppsEditorPage(p web.Page) {
 // the manifest hands GitHub the webhook URL up front, so the unset case is a
 // blocked action with the fix next to it rather than a form that fails later.
 templ appManifestCard(p web.Page, settings store.Settings) {
-	@card.Card(card.Props{Class: "mb-6"}) {
-		@card.Header() {
-			@card.Title() {
-				Create the App on GitHub
-			}
-			@card.Description() {
-				GitHub shows you a review screen with the permissions this worker needs, then hands the
-				App back. Every field below is filled in for you, including the private key.
-			}
-			@card.Action() {
-				@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-					Recommended
-				}
-			}
+	@layouts.ListCard() {
+		@layouts.ListHead("Create the App on GitHub", -1, "GitHub shows you a review screen with the permissions this worker needs, then hands the App back with every credential filled in, including the private key.") {
+			@layouts.Status("recommended", layouts.ToneSuccess)
 		}
-		@card.Content() {
+		<div>
 			if settings.PublicBaseURL != "" {
-				<dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-					@appManifestFact("Webhook URL GitHub will be given") {
-						<span class="font-mono text-xs break-all">{ webhookHint(settings.PublicBaseURL) }</span>
+				<div class="p-4">
+					@detailList() {
+						@detailRow("Webhook URL") {
+							<span class="font-mono break-all">{ webhookHint(settings.PublicBaseURL) }</span>
+						}
+						@detailRow("Permissions") {
+							<span class="font-mono">checks: write, contents: read, metadata: read</span>
+						}
+						@detailRow("Events") {
+							Check suite, Check run
+						}
 					}
-					@appManifestFact("Permissions it will ask for") {
-						<span class="font-mono text-xs">checks: write</span>,
-						<span class="font-mono text-xs">contents: read</span>,
-						<span class="font-mono text-xs">metadata: read</span>
-					}
-				</dl>
-			} else {
-				@layouts.Toast("Set the public base URL first. The manifest hands GitHub the webhook address at creation time, so this host has to have one before an App can be created.", "err")
-			}
-		}
-		@card.Footer(card.FooterProps{Class: "flex flex-wrap items-center gap-2"}) {
-			if settings.PublicBaseURL != "" {
-				<form method="post" action="/api/v1/github-apps/manifest/start" class="m-0">
+				</div>
+				<form method="post" action="/api/v1/github-apps/manifest/start" class="bg-muted/30 m-0 flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
 					@layouts.CSRF(p.CSRFToken)
+					@input.Input(input.Props{
+						Name:        "org",
+						Class:       "h-8 w-full text-xs sm:w-64",
+						Placeholder: "Organization (blank = your account)",
+						Attributes:  templ.Attributes{"aria-label": "GitHub organization that will own the App", "autocomplete": "off"},
+					})
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+						@layouts.GitHubMark("size-3.5")
 						Create with GitHub
 					}
 				</form>
 			} else {
-				@button.Button(button.Props{Href: "/settings", Size: button.SizeSm}) {
-					Set the public base URL
-				}
+				<div class="p-4">
+					@layouts.Notice(layouts.ToneWarning, "Set the public base URL first", "The manifest hands GitHub the webhook address at creation time, so this host has to have one before an App can be created.") {
+						<div class="pt-2">
+							@button.Button(button.Props{Href: "/settings", Size: button.SizeSm, Variant: button.VariantOutline}) {
+								Set the public base URL
+							}
+						</div>
+					}
+				</div>
 			}
-		}
+		</div>
 	}
 }
 
-templ appManifestFact(label string) {
-	<div class="min-w-0">
-		<dt class="text-muted-foreground text-xs">{ label }</dt>
-		<dd class="mt-0.5 min-w-0">
-			{ children... }
-		</dd>
-	</div>
-}
-
 templ appManualHelp(settings store.Settings) {
-	<ol class="text-muted-foreground mb-5 space-y-1.5 text-xs leading-relaxed">
-		<li>
-			1. Register the App at
-			<a class="text-primary underline-offset-4 hover:underline" href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>.
-		</li>
-		<li>
-			2. Permissions: <code class="text-foreground font-mono">checks: write</code>,
-			<code class="text-foreground font-mono">contents: read</code>,
-			<code class="text-foreground font-mono">metadata: read</code>. Subscribe to
-			<strong class="text-foreground">Check suite</strong> and <strong class="text-foreground">Check run</strong>.
-		</li>
-		<li>
-			3. Webhook URL: <code class="text-foreground font-mono break-all">{ webhookHint(settings.PublicBaseURL) }</code>,
-			where the slug is the one you enter below.
-		</li>
-		<li>4. Generate a private key, then paste the App ID, the webhook secret and the PEM here.</li>
-	</ol>
+	@layouts.ListCard() {
+		@layouts.ListHead("Register the App yourself", -1, "Then paste what GitHub gives you into the fields below.")
+		<ol class="text-muted-foreground list-decimal space-y-1.5 py-4 pr-4 pl-9 text-xs leading-relaxed">
+			<li>
+				Register the App at
+				<a class="text-primary underline-offset-4 hover:underline" href="https://github.com/settings/apps/new" target="_blank" rel="noreferrer">Settings → Developer settings → GitHub Apps</a>.
+			</li>
+			<li>
+				Permissions: <code class="text-foreground font-mono">checks: write</code>,
+				<code class="text-foreground font-mono">contents: read</code>,
+				<code class="text-foreground font-mono">metadata: read</code>. Subscribe to
+				<strong class="text-foreground">Check suite</strong> and <strong class="text-foreground">Check run</strong>.
+			</li>
+			<li>
+				Webhook URL: <code class="text-foreground font-mono break-all">{ webhookHint(settings.PublicBaseURL) }</code>,
+				where the slug is the one you enter below.
+			</li>
+			<li>Generate a private key, then paste the App ID, the webhook secret and the PEM here.</li>
+		</ol>
+	}
 }
 
 templ appCredentialsForm(p web.Page, settings store.Settings, editing bool, edit store.GitHubApp) {
-	<form method="post" action={ templ.SafeURL(appFormAction(editing, edit.ID)) } class="flex flex-col gap-8">
+	<form method="post" action={ templ.SafeURL(appFormAction(editing, edit.ID)) }>
 		@layouts.CSRF(p.CSRFToken)
-		@formSection("Identity", "The name is yours; the slug is GitHub's half of the webhook URL.") {
-			<div class="grid gap-4 sm:grid-cols-2">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "name"}) {
-						Name
-					}
+		@layouts.ListCard() {
+			@layouts.ListHead("Identity", -1, "The name is yours; the slug is GitHub's half of the webhook URL.")
+			<div class="divide-y">
+				@fieldRow("name", "Name", "Shown in this worker and nowhere on GitHub.") {
 					@input.Input(input.Props{
 						ID: "name", Name: "name", Type: "text", Placeholder: "openpreflight-ci",
 						Required: true, Value: edit.Name, Attributes: noAutofill,
 					})
-					@field.Description() {
-						Shown on this page and nowhere on GitHub.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "slug"}) {
-						Slug
-					}
+				@fieldRow("slug", "Slug", appSlugHint(editing)) {
 					@input.Input(input.Props{
 						ID: "slug", Name: "slug", Type: "text", Class: "font-mono",
 						Placeholder: "openpreflight-ci", Value: edit.Slug, Attributes: slugAttrs,
 					})
-					@field.Description() {
-						if editing {
-							The webhook URL ends in this. Changing it breaks deliveries until you change the App on GitHub to match.
-						} else {
-							Lowercase letters, digits and dashes. Defaults from the name.
-						}
-					}
 				}
 			</div>
 		}
-		@formSection("Where it talks to", "") {
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "app_id"}) {
-						App ID
-					}
+		@layouts.ListCard() {
+			@layouts.ListHead("Where it talks to", -1, "")
+			<div class="divide-y">
+				@fieldRow("app_id", "App ID", "The number on the App's settings page on GitHub.") {
 					@input.Input(input.Props{
-						ID: "app_id", Name: "app_id", Type: "number", Required: true,
+						ID: "app_id", Name: "app_id", Type: "number", Required: true, Class: "w-40",
 						Value:      appIDValue(editing, edit.AppID),
 						Attributes: templ.Attributes{"min": "1", "autocomplete": "off", "inputmode": "numeric"},
 					})
-					@field.Description() {
-						The number on the App's settings page.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "api_url"}) {
-						API URL
-					}
+				@fieldRow("api_url", "API URL", "Change only for GitHub Enterprise.") {
 					@input.Input(input.Props{
-						ID: "api_url", Name: "api_url", Type: "url", Class: "font-mono text-xs",
+						ID: "api_url", Name: "api_url", Type: "url", Class: "font-mono",
 						Value: apiURLValue(editing, edit.APIURL), Attributes: noAutofill,
 					})
-					@field.Description() {
-						Change only for GitHub Enterprise.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "check_name"}) {
-						Check name
-					}
+				@fieldRow("check_name", "Check name", "What GitHub shows next to a commit. Blank uses "+settings.DefaultCheckName+"; a repo can still set its own.") {
 					@input.Input(input.Props{
 						ID: "check_name", Name: "check_name", Type: "text",
 						Placeholder: settings.DefaultCheckName, Value: edit.CheckName, Attributes: noAutofill,
 					})
-					@field.Description() {
-						Blank uses the global default.
+				}
+			</div>
+		}
+		@layouts.ListCard() {
+			@layouts.ListHead("Credentials", -1, "Both are stored encrypted with CI_SECRET_KEY and are never shown again.")
+			<div class="divide-y">
+				@fieldRow("webhook_secret", "Webhook secret", appSecretHint(editing)) {
+					@input.Input(input.Props{
+						ID: "webhook_secret", Name: "webhook_secret", Type: "password",
+						Required: !editing, Attributes: secretAttrs,
+					})
+				}
+				@fieldRow("pem", "Private key (PEM)", appPEMHint(editing)) {
+					@textarea.Textarea(textarea.Props{
+						ID:          "pem",
+						Name:        "pem",
+						Class:       "min-h-40 font-mono text-xs",
+						// Deliberately only the opening line: the whole-page leak
+						// check greps for the END marker, and a placeholder carrying
+						// one would blind that check for good.
+						Placeholder: "-----BEGIN RSA PRIVATE KEY-----",
+						Attributes:  pemAttrs(editing),
+					})
+				}
+			</div>
+		}
+		@formBar() {
+			if !editing {
+				<span class="text-muted-foreground hidden text-xs md:inline">Saving calls GitHub once to check the credentials work.</span>
+			}
+			<div class="ml-auto flex items-center gap-2">
+				@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantOutline, Size: button.SizeSm}) {
+					Cancel
+				}
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+					if editing {
+						Save changes
+					} else {
+						Add and test
 					}
 				}
 			</div>
 		}
-		@formSection("Credentials", "Both are stored encrypted with CI_SECRET_KEY and are never displayed again.") {
-			@field.Field() {
-				@field.Label(field.LabelProps{For: "webhook_secret"}) {
-					Webhook secret
-				}
-				@input.Input(input.Props{
-					ID: "webhook_secret", Name: "webhook_secret", Type: "password",
-					Required: !editing, Attributes: secretAttrs,
-				})
-				@field.Description() {
-					if editing {
-						Leave blank to keep the stored secret.
-					} else {
-						Must match the secret set on the App. Use a different one per App.
-					}
-				}
-			}
-			@field.Field() {
-				@field.Label(field.LabelProps{For: "pem"}) {
-					Private key (PEM)
-				}
-				@textarea.Textarea(textarea.Props{
-					ID:          "pem",
-					Name:        "pem",
-					Class:       "min-h-40 font-mono text-xs",
-					// Deliberately only the opening line: the whole-page leak
-					// check greps for the END marker, and a placeholder carrying
-					// one would blind that check for good.
-					Placeholder: "-----BEGIN RSA PRIVATE KEY-----",
-					Attributes:  pemAttrs(editing),
-				})
-				@field.Description() {
-					if editing {
-						Leave blank to keep the stored key.
-					} else {
-						The whole file GitHub downloaded, including the BEGIN and END lines.
-					}
-				}
-			}
-		}
-		@formActions() {
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				if editing {
-					Save changes
-				} else {
-					Add and test
-				}
-			}
-			@button.Button(button.Props{Href: "/github-apps", Variant: button.VariantOutline, Size: button.SizeSm}) {
-				Cancel
-			}
-			if !editing {
-				<span class="text-muted-foreground text-xs">Saving calls GitHub once to check the credentials work.</span>
-			}
-		}
 	</form>
 }
 
-// formActions is the footer every editor form ends with: a rule, then the
-// buttons. Separate so the two editors cannot drift apart.
-templ formActions() {
-	<div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-5">
-		{ children... }
-	</div>
+func appSlugHint(editing bool) string {
+	if editing {
+		return "The webhook URL ends in this. Changing it breaks deliveries until you change the App on GitHub to match."
+	}
+	return "Lowercase letters, digits and dashes. Defaults from the name."
+}
+
+func appSecretHint(editing bool) string {
+	if editing {
+		return "Leave blank to keep the stored secret."
+	}
+	return "Must match the secret set on the App. Use a different one per App."
+}
+
+func appPEMHint(editing bool) string {
+	if editing {
+		return "Leave blank to keep the stored key."
+	}
+	return "The whole file GitHub downloaded, including the BEGIN and END lines."
+}
+
+// appTileClass tints an App's tile by its state, so the icon column reads as a
+// status column at a glance: the mark is the same on every row, the colour is not.
+func appTileClass(a store.GitHubApp) string {
+	_, tone := appStatus(a)
+	switch tone {
+	case layouts.ToneDanger:
+		return "border-destructive/25 bg-destructive/10 text-destructive"
+	case layouts.ToneWarning:
+		return "border-warning/30 bg-warning/10 text-warning"
+	case layouts.ToneSuccess:
+		return "border-success/25 bg-success/10 text-success"
+	}
+	return "bg-muted text-muted-foreground"
 }

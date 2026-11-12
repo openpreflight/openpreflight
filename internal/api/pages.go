@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/openpreflight/openpreflight/internal/coolify"
 	"github.com/openpreflight/openpreflight/internal/executor"
@@ -55,6 +56,11 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		s.fail(w, r, err)
 		return
 	}
+	daily, err := s.store.DailyJobCounts(14, time.Now())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	latest := latestJobByRepo(recent)
 	enabled := 0
 	var cards []web.DashRepo
@@ -89,6 +95,7 @@ func (s *Server) pageDashboard(w http.ResponseWriter, r *http.Request, user stor
 		"Recent":          recent,
 		"InFlight":        inflight,
 		"RepoCards":       cards,
+		"Daily":           daily,
 	}))
 }
 
@@ -438,7 +445,7 @@ func (s *Server) pageReposNew(w http.ResponseWriter, r *http.Request, user store
 	if !ok {
 		return
 	}
-	p := s.page(w, r, &user, "Add a binding", "repos", base.data)
+	p := s.page(w, r, &user, "Add a repository", "repos", base.data)
 	p.Crumbs = []web.Crumb{
 		{Label: "Repos", Href: "/repos"},
 		{Label: "New"},
@@ -567,12 +574,25 @@ func (s *Server) pageJobs(w http.ResponseWriter, r *http.Request, user store.Use
 		s.fail(w, r, err)
 		return
 	}
+	// The page shows 25 rows unless asked for more; the JSON API keeps its
+	// own default of 100.
+	if r.URL.Query().Get("limit") == "" {
+		q := r.URL.Query()
+		q.Set("limit", "25")
+		r.URL.RawQuery = q.Encode()
+	}
 	jobs, f, ok := s.loadJobs(w, r)
 	if !ok {
 		return
 	}
+	total, err := s.store.CountJobs(f)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	s.render(w, "jobs", s.page(w, r, &user, "Jobs", "jobs", map[string]any{
 		"Settings": settings,
+		"Total":    total,
 		"Jobs":     jobs,
 		"Repo":     f.Repo,
 		"Status":   f.Status,

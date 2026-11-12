@@ -21,6 +21,18 @@ type ManifestApp struct {
 	Name          string `json:"name"`
 	PEM           string `json:"pem"`
 	WebhookSecret string `json:"webhook_secret"`
+	Owner         struct {
+		Login string `json:"login"`
+		Type  string `json:"type"`
+	} `json:"owner"`
+}
+
+// OwnerOrg is the owning organization's login, or "" for a personal account.
+func (m ManifestApp) OwnerOrg() string {
+	if m.Owner.Type != "Organization" {
+		return ""
+	}
+	return m.Owner.Login
 }
 
 // ConvertManifest exchanges a one-time code from GitHub's App manifest flow.
@@ -65,6 +77,22 @@ func ConvertManifest(ctx context.Context, apiURL, code string) (ManifestApp, err
 		out.Name = out.Slug
 	}
 	return out, nil
+}
+
+// HookURL is where GitHub currently delivers the App's webhooks; "" when none
+// is set.
+func (c *Client) HookURL(ctx context.Context) (string, error) {
+	auth, err := c.appAuth()
+	if err != nil {
+		return "", err
+	}
+	var cfg struct {
+		URL string `json:"url"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/app/hook/config", auth, nil, &cfg); err != nil {
+		return "", err
+	}
+	return cfg.URL, nil
 }
 
 // SetHookConfig points the App webhook at hookURL (App JWT).

@@ -1,7 +1,7 @@
 # CSS is compiled from Tailwind at image-build time so a forgotten
 # `npm run css` cannot ship stale styles. The runtime image stays a
 # static Go binary.
-FROM node:22.23.4-alpine AS css
+FROM node:26.13.0-alpine AS css
 WORKDIR /web
 COPY internal/web/package.json internal/web/package-lock.json ./
 RUN npm ci
@@ -13,7 +13,7 @@ RUN npm run css
 
 # Build: pure Go, so the binary is static and the runtime image needs no libc
 # shim. modernc.org/sqlite is what makes CGO_ENABLED=0 possible.
-FROM golang:1.26.10-alpine AS build
+FROM golang:1.26.11-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

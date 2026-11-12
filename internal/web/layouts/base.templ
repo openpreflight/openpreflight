@@ -26,7 +26,7 @@ templ Base(p web.Page) {
 					} catch (e) {}
 				})();
 			</script>
-			<link rel="stylesheet" href="/assets/css/output.css"/>
+			<link rel="stylesheet" href={ web.CSSURL }/>
 			@components.Scripts()
 		</head>
 		<body class="min-h-svh bg-background text-foreground">
@@ -71,6 +71,42 @@ templ Base(p web.Page) {
 							if (cur === "system") apply("system");
 						});
 					} catch (e) {}
+				})();
+			</script>
+			<script>
+				// Row menus are popovers: the browser keeps one open at a time and
+				// closes it on an outside click or Escape. This only places the
+				// menu under its button (above it when there is no room below),
+				// and closes it after an item is used or the page moves.
+				(function () {
+					function openMenu() {
+						return document.querySelector("[data-row-menu]:popover-open");
+					}
+					// Hidden until placed: toggle fires after the popover is shown.
+					document.addEventListener("beforetoggle", function (e) {
+						if (e.target instanceof HTMLElement && e.target.hasAttribute("data-row-menu") && e.newState === "open") e.target.style.visibility = "hidden";
+					}, true);
+					document.addEventListener("toggle", function (e) {
+						var menu = e.target;
+						if (!(menu instanceof HTMLElement) || !menu.hasAttribute("data-row-menu") || e.newState !== "open") return;
+						var btn = document.querySelector('[popovertarget="' + menu.id + '"]');
+						if (!btn) return;
+						var r = btn.getBoundingClientRect();
+						var h = menu.offsetHeight, w = menu.offsetWidth;
+						var below = r.bottom + 4 + h <= window.innerHeight;
+						menu.style.position = "fixed";
+						menu.style.top = (below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)) + "px";
+						menu.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + "px";
+						menu.style.visibility = "";
+					}, true);
+					document.addEventListener("click", function (e) {
+						var item = e.target instanceof Element && e.target.closest("[data-row-menu] [role=menuitem]");
+						var m = item && item.closest("[data-row-menu]");
+						if (m && m.matches(":popover-open")) m.hidePopover();
+					});
+					function hide() { var m = openMenu(); if (m) m.hidePopover(); }
+					window.addEventListener("scroll", hide, true);
+					window.addEventListener("resize", hide);
 				})();
 			</script>
 		</body>
