@@ -13,7 +13,7 @@ RUN npm run css
 
 # Build: pure Go, so the binary is static and the runtime image needs no libc
 # shim. modernc.org/sqlite is what makes CGO_ENABLED=0 possible.
-FROM golang:1.26.11-alpine AS build
+FROM golang:1.27.0-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
