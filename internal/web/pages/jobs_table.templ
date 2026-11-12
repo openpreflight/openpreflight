@@ -6,122 +6,69 @@ import (
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
-	"github.com/openpreflight/openpreflight/internal/web/components/table"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
-templ jobsTable(p web.Page, list []store.Job, filtered bool) {
-	if len(list) == 0 {
-		if filtered {
-			@empty.Empty(empty.Props{Class: emptyInCardClass}) {
-				@empty.Header() {
-					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-						@icon.Search()
-					}
-					@empty.Title() {
-						No jobs match this filter
-					}
-					@empty.Description() {
-						Try a different repo or status, or clear the filter to see every run.
-					}
-				}
-				@empty.Content() {
-					@button.Button(button.Props{Href: "/jobs", Size: button.SizeSm}) {
-						Clear filters
-					}
-				}
-			}
-		} else {
-			@empty.Empty(empty.Props{Class: emptyInCardClass}) {
-				@empty.Header() {
-					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-						@icon.Workflow()
-					}
-					@empty.Title() {
-						No jobs yet
-					}
-					@empty.Description() {
-						GitHub creates one by sending a check_suite for a repo with an enabled binding.
-					}
-				}
-				@empty.Content() {
-					@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
-						Enable a repo
-					}
-				}
-			}
-		}
-	} else {
-		@table.Table() {
-			@table.Header() {
-				@table.Row() {
-					@table.Head() {
-						Status
-					}
-					@table.Head() {
-						Repo
-					}
-					@table.Head(table.HeadProps{Class: "hidden lg:table-cell"}) {
-						Event
-					}
-					@table.Head() {
-						Took
-					}
-					@table.Head() {
-						When
-					}
-					@table.Head() {
-						<span class="sr-only">Actions</span>
-					}
-				}
-			}
-			@table.Body() {
-				for _, j := range list {
-					@jobsRow(p, j)
-				}
-			}
+// jobList is every list of runs in the app: Overview, Jobs, a repo's page.
+// showRepo is false on a page that is already about one repository, where the
+// row leads with the ref instead of repeating the repo name.
+templ jobList(p web.Page, jobs []store.Job, showRepo bool) {
+	@layouts.List() {
+		for _, j := range jobs {
+			@jobRow(p, j, showRepo)
 		}
 	}
 }
 
-templ jobsRow(p web.Page, j store.Job) {
-	@table.Row() {
-		@table.Cell() {
-			@StatusBadge(j)
-			if j.Error != "" {
-				<div class="text-muted-foreground max-w-[16rem] truncate text-xs">{ j.Error }</div>
+// jobRow: status, what ran, how long, when, and the one action a reader of a
+// red row wants. The whole row opens the run.
+templ jobRow(p web.Page, j store.Job, showRepo bool) {
+	<li class="relative grid grid-cols-[0.5rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-muted/40 sm:grid-cols-[6rem_minmax(0,1fr)_4.5rem_5.5rem_4.5rem]">
+		<div>
+			// A phone has no room for a pill column: a dot, with the word for
+			// screen readers and on hover.
+			<span class={ "block size-2 rounded-full sm:hidden", jobDotClass(j) } title={ web.JobStatusLabel(j) }>
+				<span class="sr-only">{ web.JobStatusLabel(j) }</span>
+			</span>
+			<span class="hidden sm:inline-flex" aria-hidden="true">
+				@StatusBadge(j)
+			</span>
+		</div>
+		<div class="min-w-0">
+			<a class="row-link block truncate text-sm font-medium" href={ templ.SafeURL("/runs/" + j.ID) }>
+				if showRepo {
+					{ j.Repo }
+				} else {
+					{ jobRefLabel(j) }
+				}
+			</a>
+			<p class="text-muted-foreground mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs">
+				if showRepo {
+					<span class="truncate">{ jobRefLabel(j) }</span>
+					<span aria-hidden="true">·</span>
+				}
+				<span class="font-mono">{ web.ShortSHA(j.SHA) }</span>
+				<span aria-hidden="true">·</span>
+				<span>{ eventLabel(j) }</span>
+				<span class="sm:hidden" aria-hidden="true">·</span>
+				<span class="tabular-nums sm:hidden">{ web.Ago(j.CreatedAt) }</span>
+			</p>
+			if why := repoFailureReason(j); why != "" {
+				<p class={ "mt-0.5 truncate text-xs", whyClass(j) } title={ why }>{ why }</p>
 			}
-		}
-		@table.Cell() {
-			<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
-			<div class="text-muted-foreground font-mono text-xs">{ jobRefLine(j) }</div>
-		}
-		@table.Cell(table.CellProps{Class: "text-muted-foreground hidden max-w-[12rem] truncate text-xs lg:table-cell"}) {
-			{ j.Event }
-		}
-		@table.Cell(table.CellProps{Class: "tabular-nums text-xs"}) {
+		</div>
+		<div class="text-muted-foreground hidden text-right text-xs tabular-nums sm:block">
 			if j.StartedAt != nil {
 				{ web.HumanDuration(j.Duration()) }
 			} else {
-				{ "-" }
+				{ "—" }
 			}
-		}
-		@table.Cell(table.CellProps{Class: "text-muted-foreground tabular-nums text-xs"}) {
-			{ web.Ago(j.CreatedAt) }
-		}
-		@table.Cell(table.CellProps{Class: "whitespace-nowrap"}) {
-			<div class="flex items-center justify-end gap-1">
-				@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantOutline, Size: button.SizeSm}) {
-					Logs
-				}
-				<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + j.ID + "/rerun") } class="m-0">
-					@layouts.CSRF(p.CSRFToken)
-					@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
-						Re-run
-					}
-				</form>
+		</div>
+		<div class="text-muted-foreground hidden text-right text-xs tabular-nums sm:block">{ web.Ago(j.CreatedAt) }</div>
+		<div class="relative z-10 flex items-center justify-end gap-0.5">
+			if p.User != nil {
 				if jobInFlight(j) {
-					// A row in a long table is the easiest place in this app to
+					// A row in a long list is the easiest place in this app to
 					// mis-click, and the rows either side are a different run.
 					@layouts.Confirm(layouts.ConfirmProps{
 						ID:           "cancel-job-" + j.ID,
@@ -134,66 +81,85 @@ templ jobsRow(p web.Page, j store.Job) {
 						Confirm:      "Cancel the run",
 						Dismiss:      "Keep running",
 					})
+				} else {
+					<form method="post" action={ templ.SafeURL("/api/v1/jobs/" + j.ID + "/rerun") } class="m-0">
+						@layouts.CSRF(p.CSRFToken)
+						@button.Button(button.Props{
+							Type:       button.TypeSubmit,
+							Variant:    button.VariantGhost,
+							Size:       button.SizeIconSm,
+							Class:      "text-muted-foreground hover:text-foreground",
+							Attributes: templ.Attributes{"title": "Re-run", "aria-label": "Re-run " + j.Repo + " " + web.ShortSHA(j.SHA)},
+						}) {
+							@icon.RotateCcw()
+						}
+					</form>
 				}
-			</div>
-		}
-	}
+			}
+		</div>
+	</li>
 }
 
-// jobTable lists runs. showRepo is false on a page that is already about one
-// repository, where repeating its name in every row is noise.
-templ jobTable(jobs []store.Job, showRepo bool) {
-	@table.Table() {
-		@table.Header() {
-			@table.Row() {
-				@table.Head() {
-					Status
+// jobDotClass colours the phone-width status dot like the pill it stands in for.
+func jobDotClass(j store.Job) string {
+	switch jobTone(j) {
+	case layouts.ToneSuccess:
+		return "bg-success"
+	case layouts.ToneDanger:
+		return "bg-destructive"
+	case layouts.ToneLive:
+		return "bg-info dot-live"
+	case layouts.ToneInfo:
+		return "bg-info"
+	}
+	return "bg-muted-foreground/50"
+}
+
+// whyClass colours the reason line: red for a failure, muted for a skip or a
+// cancel, which are outcomes rather than problems.
+func whyClass(j store.Job) string {
+	if j.Status == store.JobFailure || j.Status == store.JobError {
+		return "text-destructive"
+	}
+	return "text-muted-foreground"
+}
+
+templ jobsEmpty(filtered bool) {
+	if filtered {
+		@empty.Empty(empty.Props{Class: emptyInCardClass}) {
+			@empty.Header() {
+				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+					@icon.Search()
 				}
-				if showRepo {
-					@table.Head() {
-						Repo
-					}
-				} else {
-					@table.Head() {
-						Commit
-					}
+				@empty.Title() {
+					No jobs match this filter
 				}
-				@table.Head() {
-					When
+				@empty.Description() {
+					Try a different repo or status, or clear the filter to see every run.
 				}
-				@table.Head() {
-					<span class="sr-only">Actions</span>
+			}
+			@empty.Content() {
+				@button.Button(button.Props{Href: "/jobs", Size: button.SizeSm, Variant: button.VariantOutline}) {
+					Clear filters
 				}
 			}
 		}
-		@table.Body() {
-			for _, j := range jobs {
-				@table.Row() {
-					@table.Cell() {
-						@StatusBadge(j)
-					}
-					@table.Cell() {
-						if showRepo {
-							<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ j.Repo }</a>
-							<div class="text-muted-foreground font-mono text-xs">{ jobRefLine(j) }</div>
-						} else {
-							<a class="font-mono text-sm font-medium hover:text-foreground hover:underline" href={ templ.SafeURL("/runs/" + j.ID) }>{ web.ShortSHA(j.SHA) }</a>
-							<div class="text-muted-foreground font-mono text-xs">
-								{ orDash(j.Ref) }
-								if j.PlanSource != "" {
-									· { j.PlanSource }
-								}
-							</div>
-						}
-					}
-					@table.Cell(table.CellProps{Class: "text-muted-foreground tabular-nums text-xs"}) {
-						{ web.Ago(j.CreatedAt) }
-					}
-					@table.Cell(table.CellProps{Class: "whitespace-nowrap"}) {
-						@button.Button(button.Props{Href: "/runs/" + j.ID, Variant: button.VariantOutline, Size: button.SizeSm}) {
-							Logs
-						}
-					}
+	} else {
+		@empty.Empty(empty.Props{Class: emptyInCardClass}) {
+			@empty.Header() {
+				@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+					@icon.Workflow()
+				}
+				@empty.Title() {
+					No jobs yet
+				}
+				@empty.Description() {
+					A job appears when GitHub sends a check suite for a repo with an enabled binding.
+				}
+			}
+			@empty.Content() {
+				@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
+					Enable a repo
 				}
 			}
 		}

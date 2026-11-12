@@ -27,11 +27,13 @@
   ].join(" ");
 
   var CONTENT_CLASS =
-    "flex h-full items-center gap-3 overflow-hidden p-4 transition-opacity duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-behind:opacity-0 data-expanded:opacity-100";
+    "flex h-full items-start gap-3 overflow-hidden p-4 transition-opacity duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-behind:opacity-0 data-expanded:opacity-100";
   var TITLE_CLASS = "text-sm font-medium";
-  var DESCRIPTION_CLASS = "text-sm text-muted-foreground";
+  // Messages carry URLs and API errors; let them wrap anywhere instead of
+  // running past the edge of the toast.
+  var DESCRIPTION_CLASS = "text-sm text-muted-foreground break-words [overflow-wrap:anywhere]";
   var ICON_CLASS =
-    "shrink-0 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4";
+    "mt-0.5 shrink-0 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4";
 
   // The Button component's classes, resolved for variant outline size sm
   // (ToastAction) and variant ghost size icon-sm (ToastClose): the base is
@@ -41,7 +43,7 @@
   var ACTION_CLASS = [BUTTON_BASE, "border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5 shrink-0"].join(" ");
   var CLOSE_CLASS = [
     BUTTON_BASE,
-    "hover:bg-muted dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg relative shrink-0 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground",
+    "-mt-1 -mr-1 hover:bg-muted dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg relative shrink-0 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground",
   ].join(" ");
 
   var ICONS = {

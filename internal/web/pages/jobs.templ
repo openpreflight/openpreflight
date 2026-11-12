@@ -4,9 +4,8 @@ import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
+	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
-	"github.com/openpreflight/openpreflight/internal/web/components/label"
 	"github.com/openpreflight/openpreflight/internal/web/components/pagination"
 	selectcomp "github.com/openpreflight/openpreflight/internal/web/components/select"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
@@ -18,95 +17,140 @@ templ Jobs(p web.Page) {
 	{{ list := jobsOf(m) }}
 	{{ repo := jobRepoOf(m) }}
 	{{ status := jobStatusOf(m) }}
-	{{ lede := "Every run this worker has taken, newest first. Retention is " + itoa(settings.LogRetentionDays) + " days." }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Jobs", lede)
-		@card.Card(card.Props{Class: "gap-0 py-0"}) {
-			@jobsFilter(repo, status)
-			@jobsTable(p, list, jobFiltered(m))
+		@layouts.PageHead("Jobs", "Every run this worker has taken, newest first. "+retentionLabel(settings.LogRetentionDays))
+		@layouts.ListCard() {
+			<div>
+				@jobsFilter(repo, status, jobLimitOf(m))
+				if len(list) > 0 {
+					@jobList(p, list, true)
+				} else {
+					@jobsEmpty(jobFiltered(m))
+				}
+				@jobsPager(m, len(list))
+			</div>
 		}
-		@jobsPager(m, len(list))
 	}
 }
 
-templ jobsFilter(repo, status string) {
-	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-3" aria-label="Filter jobs">
-		<div class="flex items-center gap-2">
-			@label.Label(label.Props{For: "status", Class: filterLabelClass}) {
-				Status
+// jobsFilter is the list's header. Picking a status reloads at once; the repo
+// box submits on Enter.
+templ jobsFilter(repo, status string, limit int) {
+	<form method="get" action="/jobs" class="flex flex-wrap items-center gap-2 border-b px-4 py-3" aria-label="Filter jobs" onchange="this.requestSubmit()">
+		// Filtering keeps the chosen page size; it only starts over at page 1.
+		if limit != jobPageSize {
+			<input type="hidden" name="limit" value={ itoa(limit) }/>
+		}
+		@selectcomp.Select(selectcomp.Props{ID: "status-list", Name: "status", DefaultValue: status}) {
+			@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[10rem] shrink-0", Attributes: templ.Attributes{"aria-label": "Status"}}) {
+				@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})
 			}
-			@selectcomp.Select(selectcomp.Props{ID: "status-list", Name: "status", DefaultValue: status}) {
-				@selectcomp.Trigger(selectcomp.TriggerProps{ID: "status", Class: "w-[11rem] shrink-0"}) {
-					@selectcomp.Value(selectcomp.ValueProps{Placeholder: allStatuses})
+			@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
+				@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
+					{ allStatuses }
 				}
-				@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
-					@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
-						{ allStatuses }
-					}
-					for _, st := range store.JobStatuses {
-						@selectcomp.Item(selectcomp.ItemProps{Value: st}) {
-							{ st }
-						}
+				for _, st := range store.JobStatuses {
+					@selectcomp.Item(selectcomp.ItemProps{Value: st}) {
+						{ statusLabel(st) }
 					}
 				}
 			}
-		</div>
-		<div class="flex min-w-0 items-center gap-2">
-			@label.Label(label.Props{For: "repo", Class: filterLabelClass}) {
-				Repo
-			}
+		}
+		<div class="relative order-last min-w-0 basis-full sm:order-none sm:max-w-xs sm:flex-1 sm:basis-auto">
+			@icon.Search(icon.Props{Class: "text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"})
 			@input.Input(input.Props{
 				ID:          "repo",
 				Name:        "repo",
-				Type:        "text",
-				Placeholder: "owner/name",
+				Type:        "search",
+				Placeholder: "Filter by repo, owner/name",
 				Value:       repo,
-				Class:       "w-56 max-w-full font-mono",
-				Attributes:  templ.Attributes{"aria-label": "Repo"},
+				Class:       "pl-8",
+				Attributes:  templ.Attributes{"aria-label": "Repo", "autocomplete": "off", "spellcheck": "false"},
 			})
 		</div>
-		<div class="flex items-center gap-2 sm:ml-auto">
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				Filter
+		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
+			Filter
+		}
+		if repo != "" || status != "" {
+			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
+				Clear
 			}
-			if repo != "" || status != "" {
-				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantGhost, Size: button.SizeSm}) {
-					Clear
-				}
-			}
-		</div>
+		}
 	</form>
 }
 
+// jobsPager is the list's footer: rows per page on the left, where you are
+// and the pages on the right. It sits inside the list panel, so the list and
+// the way through it read as one thing.
 templ jobsPager(m map[string]any, n int) {
 	{{ repo := jobRepoOf(m) }}
 	{{ status := jobStatusOf(m) }}
 	{{ limit := jobLimitOf(m) }}
 	{{ offset := jobOffsetOf(m) }}
-	if offset > 0 || n == limit {
-		// The list is keyset-free: the server knows there is a next page only
-		// because this one came back full. So there is no last page to jump to
-		// and no total to count against - Previous, where you are, Next.
-		@pagination.Pagination(pagination.Props{Class: "mt-4 justify-start", Attributes: templ.Attributes{"aria-label": "Jobs pagination"}}) {
-			@pagination.Content() {
-				@pagination.Item() {
-					@pagination.Previous(pagination.PreviousProps{
-						Href:     jobsPath(repo, status, limit, jobPrevOffset(offset, limit)),
-						Disabled: offset == 0,
-					})
+	{{ total := asInt(m, "Total") }}
+	{{ cur := jobPageNumber(offset, limit) }}
+	if total > 0 {
+		<div class="bg-muted/30 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t px-4 py-2.5">
+			<form method="get" action="/jobs" class="text-muted-foreground flex items-center gap-2 text-xs" onchange="this.requestSubmit()">
+				if repo != "" {
+					<input type="hidden" name="repo" value={ repo }/>
 				}
-				@pagination.Item() {
-					@pagination.Link(pagination.LinkProps{IsActive: true, Attributes: templ.Attributes{"aria-current": "page"}}) {
-						{ itoa(jobPageNumber(offset, limit)) }
+				if status != "" {
+					<input type="hidden" name="status" value={ status }/>
+				}
+				<label for="limit">Rows per page</label>
+				@selectcomp.Select(selectcomp.Props{ID: "limit-list", Name: "limit", DefaultValue: itoa(limit)}) {
+					@selectcomp.Trigger(selectcomp.TriggerProps{ID: "limit", Class: "h-7 w-[4.5rem] text-xs"}) {
+						@selectcomp.Value()
+					}
+					@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
+						for _, size := range jobPageSizes {
+							@selectcomp.Item(selectcomp.ItemProps{Value: itoa(size)}) {
+								{ itoa(size) }
+							}
+						}
 					}
 				}
-				@pagination.Item() {
-					@pagination.Next(pagination.NextProps{
-						Href:     jobsPath(repo, status, limit, offset+limit),
-						Disabled: n < limit,
-					})
+				<noscript><button type="submit" class="underline">Apply</button></noscript>
+			</form>
+			<div class="flex items-center gap-3">
+				<span class="text-muted-foreground text-xs tabular-nums">{ jobRange(total, limit, offset, n) }</span>
+				@pagination.Pagination(pagination.Props{Class: "mx-0 w-auto", Attributes: templ.Attributes{"aria-label": "Jobs pages"}}) {
+					@pagination.Content(pagination.ContentProps{Class: "gap-0.5"}) {
+						@pagination.Item() {
+							@pagination.Previous(pagination.PreviousProps{
+								Href:       jobsPath(repo, status, limit, jobPrevOffset(offset, limit)),
+								Disabled:   offset == 0,
+								Text:       " ",
+								Attributes: templ.Attributes{"aria-label": "Previous page"},
+							})
+						}
+						for _, pg := range jobPages(total, limit, offset) {
+							@pagination.Item() {
+								if pg == 0 {
+									@pagination.Ellipsis()
+								} else if pg == cur {
+									@pagination.Link(pagination.LinkProps{IsActive: true, Href: jobsPath(repo, status, limit, (pg-1)*limit), Attributes: templ.Attributes{"aria-current": "page"}}) {
+										{ itoa(pg) }
+									}
+								} else {
+									@pagination.Link(pagination.LinkProps{Href: jobsPath(repo, status, limit, (pg-1)*limit)}) {
+										{ itoa(pg) }
+									}
+								}
+							}
+						}
+						@pagination.Item() {
+							@pagination.Next(pagination.NextProps{
+								Href:       jobsPath(repo, status, limit, offset+limit),
+								Disabled:   offset+n >= total,
+								Text:       " ",
+								Attributes: templ.Attributes{"aria-label": "Next page"},
+							})
+						}
+					}
 				}
-			}
-		}
+			</div>
+		</div>
 	}
 }

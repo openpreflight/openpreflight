@@ -1,6 +1,6 @@
 module github.com/openpreflight/openpreflight
 
-go 1.26.10
+go 1.26.11
 
 require (
 	github.com/Oudwins/tailwind-merge-go v0.2.3

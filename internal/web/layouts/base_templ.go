@@ -69,7 +69,20 @@ func Base(p web.Page) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<script>\n\t\t\t\t(function () {\n\t\t\t\t\ttry {\n\t\t\t\t\t\tvar t = localStorage.getItem(\"theme\") || \"system\";\n\t\t\t\t\t\tvar dark = t === \"dark\" || (t === \"system\" && window.matchMedia(\"(prefers-color-scheme: dark)\").matches);\n\t\t\t\t\t\tdocument.documentElement.classList.toggle(\"dark\", dark);\n\t\t\t\t\t} catch (e) {}\n\t\t\t\t})();\n\t\t\t</script><link rel=\"stylesheet\" href=\"/assets/css/output.css\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<script>\n\t\t\t\t(function () {\n\t\t\t\t\ttry {\n\t\t\t\t\t\tvar t = localStorage.getItem(\"theme\") || \"system\";\n\t\t\t\t\t\tvar dark = t === \"dark\" || (t === \"system\" && window.matchMedia(\"(prefers-color-scheme: dark)\").matches);\n\t\t\t\t\t\tdocument.documentElement.classList.toggle(\"dark\", dark);\n\t\t\t\t\t} catch (e) {}\n\t\t\t\t})();\n\t\t\t</script><link rel=\"stylesheet\" href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(web.CSSURL).ResolveURL(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 29, Col: 43}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -77,7 +90,7 @@ func Base(p web.Page) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</head><body class=\"min-h-svh bg-background text-foreground\"><a class=\"bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5\" href=\"#main\">Skip to content</a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</head><body class=\"min-h-svh bg-background text-foreground\"><a class=\"bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:px-3 focus:py-1.5\" href=\"#main\">Skip to content</a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -93,7 +106,7 @@ func Base(p web.Page) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<script>\n\t\t\t\t(function () {\n\t\t\t\t\tfunction apply(t) {\n\t\t\t\t\t\tvar dark = t === \"dark\" || (t === \"system\" && window.matchMedia(\"(prefers-color-scheme: dark)\").matches);\n\t\t\t\t\t\tdocument.documentElement.classList.toggle(\"dark\", dark);\n\t\t\t\t\t}\n\t\t\t\t\tfunction caption(t) {\n\t\t\t\t\t\tif (t === \"light\") return \"Light\";\n\t\t\t\t\t\tif (t === \"dark\") return \"Dark\";\n\t\t\t\t\t\treturn \"System\";\n\t\t\t\t\t}\n\t\t\t\t\tfunction sync(t) {\n\t\t\t\t\t\tapply(t);\n\t\t\t\t\t\tdocument.querySelectorAll(\"[data-theme-cycle]\").forEach(function (btn) {\n\t\t\t\t\t\t\tbtn.setAttribute(\"data-theme\", t);\n\t\t\t\t\t\t\tbtn.setAttribute(\"aria-label\", \"Theme: \" + t);\n\t\t\t\t\t\t\tvar el = btn.querySelector(\".theme-label\");\n\t\t\t\t\t\t\tif (el) el.textContent = caption(t);\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t\tvar cur = \"system\";\n\t\t\t\t\ttry { cur = localStorage.getItem(\"theme\") || \"system\"; } catch (err) {}\n\t\t\t\t\tsync(cur);\n\t\t\t\t\tdocument.addEventListener(\"click\", function (e) {\n\t\t\t\t\t\tvar btn = e.target.closest(\"[data-theme-cycle]\");\n\t\t\t\t\t\tif (!btn) return;\n\t\t\t\t\t\tvar order = [\"system\", \"light\", \"dark\"];\n\t\t\t\t\t\tvar next = order[(order.indexOf(cur) + 1) % order.length];\n\t\t\t\t\t\tcur = next;\n\t\t\t\t\t\ttry { localStorage.setItem(\"theme\", next); } catch (err) {}\n\t\t\t\t\t\tsync(next);\n\t\t\t\t\t});\n\t\t\t\t\ttry {\n\t\t\t\t\t\twindow.matchMedia(\"(prefers-color-scheme: dark)\").addEventListener(\"change\", function () {\n\t\t\t\t\t\t\tif (cur === \"system\") apply(\"system\");\n\t\t\t\t\t\t});\n\t\t\t\t\t} catch (e) {}\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<script>\n\t\t\t\t(function () {\n\t\t\t\t\tfunction apply(t) {\n\t\t\t\t\t\tvar dark = t === \"dark\" || (t === \"system\" && window.matchMedia(\"(prefers-color-scheme: dark)\").matches);\n\t\t\t\t\t\tdocument.documentElement.classList.toggle(\"dark\", dark);\n\t\t\t\t\t}\n\t\t\t\t\tfunction caption(t) {\n\t\t\t\t\t\tif (t === \"light\") return \"Light\";\n\t\t\t\t\t\tif (t === \"dark\") return \"Dark\";\n\t\t\t\t\t\treturn \"System\";\n\t\t\t\t\t}\n\t\t\t\t\tfunction sync(t) {\n\t\t\t\t\t\tapply(t);\n\t\t\t\t\t\tdocument.querySelectorAll(\"[data-theme-cycle]\").forEach(function (btn) {\n\t\t\t\t\t\t\tbtn.setAttribute(\"data-theme\", t);\n\t\t\t\t\t\t\tbtn.setAttribute(\"aria-label\", \"Theme: \" + t);\n\t\t\t\t\t\t\tvar el = btn.querySelector(\".theme-label\");\n\t\t\t\t\t\t\tif (el) el.textContent = caption(t);\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t\tvar cur = \"system\";\n\t\t\t\t\ttry { cur = localStorage.getItem(\"theme\") || \"system\"; } catch (err) {}\n\t\t\t\t\tsync(cur);\n\t\t\t\t\tdocument.addEventListener(\"click\", function (e) {\n\t\t\t\t\t\tvar btn = e.target.closest(\"[data-theme-cycle]\");\n\t\t\t\t\t\tif (!btn) return;\n\t\t\t\t\t\tvar order = [\"system\", \"light\", \"dark\"];\n\t\t\t\t\t\tvar next = order[(order.indexOf(cur) + 1) % order.length];\n\t\t\t\t\t\tcur = next;\n\t\t\t\t\t\ttry { localStorage.setItem(\"theme\", next); } catch (err) {}\n\t\t\t\t\t\tsync(next);\n\t\t\t\t\t});\n\t\t\t\t\ttry {\n\t\t\t\t\t\twindow.matchMedia(\"(prefers-color-scheme: dark)\").addEventListener(\"change\", function () {\n\t\t\t\t\t\t\tif (cur === \"system\") apply(\"system\");\n\t\t\t\t\t\t});\n\t\t\t\t\t} catch (e) {}\n\t\t\t\t})();\n\t\t\t</script><script>\n\t\t\t\t// Row menus are popovers: the browser keeps one open at a time and\n\t\t\t\t// closes it on an outside click or Escape. This only places the\n\t\t\t\t// menu under its button (above it when there is no room below),\n\t\t\t\t// and closes it after an item is used or the page moves.\n\t\t\t\t(function () {\n\t\t\t\t\tfunction openMenu() {\n\t\t\t\t\t\treturn document.querySelector(\"[data-row-menu]:popover-open\");\n\t\t\t\t\t}\n\t\t\t\t\t// Hidden until placed: toggle fires after the popover is shown.\n\t\t\t\t\tdocument.addEventListener(\"beforetoggle\", function (e) {\n\t\t\t\t\t\tif (e.target instanceof HTMLElement && e.target.hasAttribute(\"data-row-menu\") && e.newState === \"open\") e.target.style.visibility = \"hidden\";\n\t\t\t\t\t}, true);\n\t\t\t\t\tdocument.addEventListener(\"toggle\", function (e) {\n\t\t\t\t\t\tvar menu = e.target;\n\t\t\t\t\t\tif (!(menu instanceof HTMLElement) || !menu.hasAttribute(\"data-row-menu\") || e.newState !== \"open\") return;\n\t\t\t\t\t\tvar btn = document.querySelector('[popovertarget=\"' + menu.id + '\"]');\n\t\t\t\t\t\tif (!btn) return;\n\t\t\t\t\t\tvar r = btn.getBoundingClientRect();\n\t\t\t\t\t\tvar h = menu.offsetHeight, w = menu.offsetWidth;\n\t\t\t\t\t\tvar below = r.bottom + 4 + h <= window.innerHeight;\n\t\t\t\t\t\tmenu.style.position = \"fixed\";\n\t\t\t\t\t\tmenu.style.top = (below ? r.bottom + 4 : Math.max(8, r.top - 4 - h)) + \"px\";\n\t\t\t\t\t\tmenu.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + \"px\";\n\t\t\t\t\t\tmenu.style.visibility = \"\";\n\t\t\t\t\t}, true);\n\t\t\t\t\tdocument.addEventListener(\"click\", function (e) {\n\t\t\t\t\t\tvar item = e.target instanceof Element && e.target.closest(\"[data-row-menu] [role=menuitem]\");\n\t\t\t\t\t\tvar m = item && item.closest(\"[data-row-menu]\");\n\t\t\t\t\t\tif (m && m.matches(\":popover-open\")) m.hidePopover();\n\t\t\t\t\t});\n\t\t\t\t\tfunction hide() { var m = openMenu(); if (m) m.hidePopover(); }\n\t\t\t\t\twindow.addEventListener(\"scroll\", hide, true);\n\t\t\t\t\twindow.addEventListener(\"resize\", hide);\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -118,20 +131,20 @@ func CSRF(token string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<input type=\"hidden\" name=\"csrf\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<input type=\"hidden\" name=\"csrf\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(token).Resolve(ctx)
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(token).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 81, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 117, Col: 47}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -156,7 +169,7 @@ func Brand() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<a class=\"brand group-data-[collapsible=icon]:gap-0\" href=\"/\"><img src=\"/assets/brand/logo.svg\" width=\"28\" height=\"28\" alt=\"\" class=\"size-7 shrink-0 rounded-md object-contain\"> <span class=\"group-data-[collapsible=icon]:hidden\">openpreflight</span></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a class=\"brand group-data-[collapsible=icon]:gap-0\" href=\"/\"><img src=\"/assets/brand/logo.svg\" width=\"28\" height=\"28\" alt=\"\" class=\"size-7 shrink-0 rounded-md object-contain\"> <span class=\"group-data-[collapsible=icon]:hidden\">openpreflight</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -180,53 +193,53 @@ func PageHead(title, lede string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"mb-8 flex flex-wrap items-start justify-between gap-4\"><div class=\"min-w-0 flex-1 basis-80\"><h1 class=\"text-2xl font-semibold tracking-tight text-balance\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"mb-8 flex flex-wrap items-start justify-between gap-4\"><div class=\"min-w-0 flex-1 basis-80\"><h1 class=\"text-2xl font-semibold tracking-tight text-balance\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 96, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 132, Col: 73}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</h1>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</h1>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if lede != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<p class=\"text-muted-foreground mt-1.5 max-w-3xl text-sm leading-relaxed text-pretty\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p class=\"text-muted-foreground mt-1.5 max-w-3xl text-sm leading-relaxed text-pretty\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(lede)
+			var templ_7745c5c3_Var10 string
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(lede)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 98, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 134, Col: 96}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div class=\"flex shrink-0 flex-wrap items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div><div class=\"flex shrink-0 flex-wrap items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ_7745c5c3_Var7.Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templ_7745c5c3_Var8.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -252,30 +265,30 @@ func SectionHead(title string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
+		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1\"><h2 class=\"text-base font-semibold\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1\"><h2 class=\"text-base font-semibold\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		var templ_7745c5c3_Var12 string
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 111, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/web/layouts/base.templ`, Line: 147, Col: 45}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</h2><div class=\"flex flex-wrap items-center gap-2\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ_7745c5c3_Var10.Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</h2><div class=\"flex flex-wrap items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></div>")
+		templ_7745c5c3_Err = templ_7745c5c3_Var11.Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

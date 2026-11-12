@@ -6,6 +6,108 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The GitHub Apps page is a list, with broken Apps listed first.** Apps that
+  are not installed anywhere, or whose last check failed, get their own
+  "Needs attention" list with the stored error, Install, Open on GitHub (the
+  App's settings page, under the organization for an org-owned App) and
+  Remove.
+- **An App's last check outlives the notification.** "Not installed" and a
+  webhook URL GitHub refused are now stored on the App like any other error.
+  Loading repositories on the Repos page re-checks it, so installing the App
+  and loading again clears it.
+- **One list and one status language across the UI.** Jobs, Overview, Repos,
+  a repo's runs, Coolify, GitHub Apps and Status use the same list layout,
+  and every state (job, App, instance, binding, health) uses the same five
+  colours: passed/connected/ok green, failed red, attention amber, running
+  blue (pulsing), skipped/cancelled/disabled grey. A whole job row opens the
+  run; Re-run is an icon on the row.
+- **Plain words for machine values.** Refs read `main` and `PR #47`, events
+  read `push`, `pull request` or `re-run`, log sizes `10 MiB`, retention
+  "Kept for 14 days".
+- **Jobs pages properly.** The list ends in a footer with rows per page
+  (25, 50 or 100), "26–50 of 87" and numbered pages, instead of a bare
+  Previous / Next under a 100-row page. Filters carry across pages.
+- **A new Overview.** Three tiles (pass rate with its week-on-week change,
+  median run time with p90 and the slowest repo, enabled repos with how many
+  are failing), every enabled repo with a strip of its last ten runs, and a
+  chart of finished runs per day for two weeks, stacked by outcome. It stops
+  giving setup instructions once setup is done.
+- Panels are two-tone: the title on a muted frame, the content inset.
+- GitHub Apps show the GitHub mark, tinted by the App's state.
+- **One action per row, the rest in a menu.** A GitHub App shows Install on
+  GitHub when it is not installed and Test otherwise; a Coolify instance
+  shows Test; a repo shows Enable or Disable. Everything else (Open on
+  GitHub, Edit, installations, dry run, Remove) is under ⋯, with Remove set
+  apart in red and still behind a confirmation.
+- **A clearer Add / Edit repository form.** Each setting is a row with its
+  label and explanation on the left and the control on the right, in three
+  panels: Repository (with a `github.com/` prefix on the name), When to run,
+  and Access (Enabled and Public build logs as switches, the second marked
+  as widening who can read output). Check name, pipeline file, timeout and
+  fallback commands fold into Overrides, which says what each falls back to
+  and opens on its own when a binding sets one. Save and Cancel sit in a bar
+  pinned to the bottom of the window. The Coolify field only appears when
+  there is an instance to pick.
+- **Every form uses the same rows.** Settings (Configuration, Runner, Logs,
+  Admin), the GitHub App editor and the Coolify add / edit form now use the
+  same label-left rows as the repository form. Numbers show their unit
+  ("seconds", "bytes", "days"), Skip fork pull requests is a switch, and each
+  settings panel saves from its own footer. The App editor's long form keeps
+  Save and Cancel pinned to the bottom of the window. Adding an App puts
+  "Create the App on GitHub" in a panel with the webhook URL, permissions and
+  events it will ask for.
+- **The dry run reads like a run page.** The verdict heads a panel with a
+  pill (would run / would skip / would fail), steps are a list with the
+  layer that supplied each command, and the ref box is a single row.
+- Each GitHub App reads as its own card: what it is and its state on top,
+  then a rule and a footer with its webhook URL and its actions.
+- Coolify instances are a list with their last error on the row; adding one
+  is folded under the list.
+- The sidebar footer is one line (Docker state and version); the theme
+  toggle says which theme it is on.
+
+### Fixed
+
+- **Built with Go 1.26.11**, which fixes a `net/http` vulnerability in
+  1.26.10 that govulncheck reports as reachable from this code.
+- **Test checks where GitHub sends the App's webhooks.** A webhook URL that
+  is missing, or points at this worker under the wrong slug (what is left
+  when GitHub refuses the URL at creation), marks the App failed with the URL
+  to set. Before, the next successful Test or repo load cleared that warning
+  while GitHub still delivered nothing. A URL on another host (a relay such
+  as smee) is left alone.
+- Leaving the Add repository or App inspect page before GitHub answers no
+  longer saves "context canceled" as the App's error. A Test that times out
+  is still recorded as a failure.
+- If GitHub cannot say where the webhook goes (an outage, a rate limit), a
+  stored webhook problem stays until a check can confirm it is fixed.
+- An App that authenticates but is not installed counts as seen, and Status
+  says "not installed on any account" for it instead of blaming a rotated key.
+- Filtering the Jobs list keeps the chosen rows per page.
+- The pass rate and its weekly change both leave out cancelled runs, so the
+  two compare the same thing; cancelled runs no longer count towards run time.
+- The Activity chart's first day counted no runs created in its first second.
+- Creating an App from the manifest takes its owner from GitHub's reply
+  instead of asking again, and Test only asks while the owner is unknown.
+- The Activity panel says "runs", not "finished runs", and its legend says
+  "Skipped or cancelled", matching what the chart counts.
+- Long messages in a notification wrap inside it instead of running off the
+  edge.
+- **Errors that last are shown on the page, not in a toast.** A run's error
+  or skip reason, a Coolify instance's failed check, an inspect failure, a
+  repo picker failure and dry-run errors stayed on screen for 8–14 seconds
+  and were then gone.
+- A failed run with a long step command no longer scrolls the page sideways
+  and hides Re-run.
+- The browser no longer fills the Coolify form with the operator's login
+  (Base URL got the username, API token the password).
+- After an upgrade the browser could keep the old stylesheet for up to an
+  hour; the stylesheet URL now changes when its content does.
+- Form placeholders are fainter than real values, so an example no longer
+  reads as a saved setting.
+
 ## [2.4.0] - 2026-11-07
 
 ### Added

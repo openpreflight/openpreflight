@@ -876,3 +876,57 @@ func TestBackupCopiesAnOpenDatabase(t *testing.T) {
 		t.Fatalf("job in backup: %+v %v", got, err)
 	}
 }
+
+func TestDailyJobCounts(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	day := time.Now().UTC().YearDay()
+	for _, status := range []string{JobSuccess, JobSuccess, JobFailure, JobSkipped, ""} {
+		j, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/api", SHA: "a"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status != "" {
+			if err := st.FinishJob(j.ID, status, status, "[]", ""); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	days, err := st.DailyJobCounts(14, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if time.Now().UTC().YearDay() != day {
+		t.Skip("crossed UTC midnight while creating jobs")
+	}
+	if len(days) != 14 {
+		t.Fatalf("got %d days, want 14", len(days))
+	}
+	today := days[13]
+	if today.Passed != 2 || today.Failed != 1 || today.Other != 1 {
+		t.Fatalf("today = %+v, want 2 passed, 1 failed, 1 other (queued not counted)", today)
+	}
+	if days[0].Passed+days[0].Failed+days[0].Other != 0 {
+		t.Fatalf("13 days ago should be empty: %+v", days[0])
+	}
+}
+
+func TestCountJobsIgnoresLimitAndOffset(t *testing.T) {
+	st := newTestStore(t)
+	app := mustApp(t, st, "ci")
+	for i := 0; i < 3; i++ {
+		if _, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/api", SHA: "a"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := st.EnqueueJob(JobInput{GitHubAppID: app.ID, Repo: "acme/web", SHA: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := st.CountJobs(JobList{Repo: "acme/api", Limit: 1, Offset: 2})
+	if err != nil || n != 3 {
+		t.Fatalf("CountJobs = %d, %v; want 3", n, err)
+	}
+	if n, _ := st.CountJobs(JobList{}); n != 4 {
+		t.Fatalf("CountJobs all = %d, want 4", n)
+	}
+}
