@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-12
+
 ### Added
 
 - **`CI_SETUP_TOKEN` sets the setup token**, so whoever can set the
@@ -684,7 +686,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.4.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.5.0
 [2.4.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.4.0
 [2.3.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.2
 [2.3.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.1
