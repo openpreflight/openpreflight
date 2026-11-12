@@ -114,6 +114,7 @@
     if (t.getAttribute("data-type") === "loading") return;
     var vp = viewportOf(t);
     var timeout = parseInt(t.getAttribute("data-tui-toast-timeout"), 10);
+    if (timeout < 0) return; // an error stays until it is closed
     if (!timeout) {
       timeout = parseInt(vp.getAttribute("data-tui-toaster-timeout"), 10) || 5000;
     }

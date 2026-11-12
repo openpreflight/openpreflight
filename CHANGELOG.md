@@ -18,6 +18,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Pick repositories, Sign in and Create the admin account use the new
+  panels.** The picker has a Source panel (App, and Coolify when there is
+  one) and a Repositories list with private / bound pills, saved from the
+  bar pinned to the bottom; choosing an App loads the list without a button.
+  The signed-out pages put their title on the muted frame and the form
+  inset, with the button in the panel's footer.
+- **An error notification stays until it is closed.** It used to disappear
+  after 14 seconds, often before a long API error could be read. Success and
+  warning notifications still close on their own.
 - **The GitHub Apps page is a list, with broken Apps listed first.** Apps that
   are not installed anywhere, or whose last check failed, get their own
   "Needs attention" list with the stored error, Install, Open on GitHub (the

@@ -3,10 +3,8 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/checkbox"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
-	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	selectcomp "github.com/openpreflight/openpreflight/internal/web/components/select"
@@ -23,7 +21,7 @@ templ ReposPick(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ apps := appsOf(m) }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Pick repositories", "Choose an App, optionally a Coolify source, then check the repos this worker should run.")
+		@layouts.PageHead("Pick repositories", "Choose an App, then check the repositories this worker should run.")
 		if len(apps) == 0 {
 			@reposNeedApp()
 		} else {
@@ -210,20 +208,17 @@ templ reposApps(p web.Page) {
 	{{ selectedApp := asInt64(m, "SelectedAppID") }}
 	{{ selectedCoolify := asInt64(m, "SelectedCoolifyID") }}
 	{{ picker := pickerOf(m) }}
-	@card.Card() {
-		@card.Content(card.ContentProps{Class: "space-y-4"}) {
-			// onchange sits on the form, not on each select: the component
-			// submits its value through a hidden input whose change event
-			// bubbles, and picking a source should reload the list without a
-			// second click, exactly as it did before.
-			<form method="get" action="/repos/pick" class="grid gap-4 sm:grid-cols-3" onchange="this.submit()">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "app_id"}) {
-						CI GitHub App
-					}
+	// onchange sits on the form, not on each select: the component submits
+	// its value through a hidden input whose change event bubbles, so picking
+	// a source reloads the list without a second click.
+	<form method="get" action="/repos/pick" onchange="this.submit()">
+		@layouts.ListCard() {
+			@layouts.ListHead("Source", -1, "The App must be installed on every repository you pick: it receives the webhooks, writes the checks and clones the code.")
+			<div class="divide-y">
+				@fieldRow("app_id", "GitHub App", "Repositories come from this App's installations.") {
 					@selectcomp.Select(selectcomp.Props{ID: "app_id-list", Name: "app_id", DefaultValue: idValue(selectedApp)}) {
 						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "app_id", Class: "w-full"}) {
-							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "- select -"})
+							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Choose an App"})
 						}
 						@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
 							for _, a := range apps {
@@ -234,79 +229,94 @@ templ reposApps(p web.Page) {
 						}
 					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "coolify_id"}) {
-						Repo list from
-					}
-					@selectcomp.Select(selectcomp.Props{ID: "coolify_id-list", Name: "coolify_id", DefaultValue: idValue(selectedCoolify)}) {
-						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "coolify_id", Class: "w-full"}) {
-							@selectcomp.Value(selectcomp.ValueProps{Placeholder: appInstallationsLabel})
-						}
-						@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
-							@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
-								{ appInstallationsLabel }
+				if len(instances) > 0 {
+					@fieldRow("coolify_id", "Repo list from", "Optional. A Coolify connector's list is inventory only; the App above still does the webhook, the check and the clone.") {
+						@selectcomp.Select(selectcomp.Props{ID: "coolify_id-list", Name: "coolify_id", DefaultValue: idValue(selectedCoolify)}) {
+							@selectcomp.Trigger(selectcomp.TriggerProps{ID: "coolify_id", Class: "w-full"}) {
+								@selectcomp.Value(selectcomp.ValueProps{Placeholder: appInstallationsLabel})
 							}
-							for _, inst := range instances {
-								@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(inst.ID)}) {
-									Coolify: { inst.Name }
+							@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
+								@selectcomp.Item(selectcomp.ItemProps{Value: ""}) {
+									{ appInstallationsLabel }
+								}
+								for _, inst := range instances {
+									@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(inst.ID)}) {
+										Coolify: { inst.Name }
+									}
 								}
 							}
 						}
 					}
-					@field.Description() {
-						A Coolify connector's repo list is inventory only; the App above still does the webhook, the check and the clone.
-					}
 				}
-				<div class="flex items-end">
+			</div>
+			// Without script the selects still post; this is their submit.
+			<noscript>
+				<div class="bg-muted/30 flex justify-end border-t px-4 py-3">
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
 						Load repositories
 					}
 				</div>
-			</form>
+			</noscript>
+		}
+	</form>
+	if pickerError(m) != "" {
+		<div class="mb-6">
 			@layouts.Notice(layouts.ToneDanger, "Could not load repositories", pickerError(m))
-			if len(picker) > 0 {
-				<form method="post" action="/api/v1/bindings/bulk" class="space-y-3">
-					@layouts.CSRF(p.CSRFToken)
-					<input type="hidden" name="github_app_id" value={ itoa64(selectedApp) }/>
-					<input type="hidden" name="coolify_instance_id" value={ itoa64(selectedCoolify) }/>
+		</div>
+	}
+	if len(picker) > 0 {
+		<form method="post" action="/api/v1/bindings/bulk">
+			@layouts.CSRF(p.CSRFToken)
+			<input type="hidden" name="github_app_id" value={ itoa64(selectedApp) }/>
+			<input type="hidden" name="coolify_instance_id" value={ itoa64(selectedCoolify) }/>
+			@layouts.ListCard() {
+				@layouts.ListHead("Repositories", len(picker), "Checked repositories get a binding. Unchecking one removes its binding. A pipeline runs the repository's own commands on this host, so pick only code you trust.")
+				@layouts.List() {
 					for _, r := range picker {
-						@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
-							@checkbox.Checkbox(checkbox.Props{
-								ID:             "repo-" + r.FullName,
-								Name:           "repo",
-								Value:          r.FullName,
-								DefaultChecked: r.Bound,
-							})
-							@field.Label(field.LabelProps{For: "repo-" + r.FullName}) {
-								{ r.FullName }
-							}
-							if r.Private {
-								@layouts.Status("private", layouts.ToneNeutral)
-							}
-							if r.Bound {
-								@layouts.Status("bound", layouts.ToneSuccess)
-							}
-						}
+						<li>
+							<label for={ "repo-" + r.FullName } class="hover:bg-muted/40 flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors">
+								@checkbox.Checkbox(checkbox.Props{
+									ID:             "repo-" + r.FullName,
+									Name:           "repo",
+									Value:          r.FullName,
+									DefaultChecked: r.Bound,
+								})
+								@layouts.GitHubMark("text-muted-foreground size-4 shrink-0")
+								<span class="min-w-0 flex-1 truncate font-mono text-sm" title={ r.FullName }>{ r.FullName }</span>
+								if r.Private {
+									@layouts.Status("private", layouts.ToneNeutral)
+								}
+								if r.Bound {
+									@layouts.Status("bound", layouts.ToneSuccess)
+								}
+							</label>
+						</li>
 					}
-					@field.Description() {
-						Unchecking a repo removes its binding. Only private repos you trust should be enabled: a pipeline runs the repo's own commands on this host.
+				}
+			}
+			@formBar() {
+				<div class="ml-auto flex gap-2">
+					@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
+						Cancel
 					}
 					@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
 						Save selection
 					}
-				</form>
-			} else if selectedApp != 0 && pickerError(m) == "" {
-				@empty.Empty(empty.Props{Class: emptyInCardClass}) {
-					@empty.Header() {
-						@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-							@icon.FolderGit()
-						}
-						@empty.Title() {
-							No repositories on this source
-						}
-						@empty.Description() {
-							Install the App on a GitHub account or org, or pick a Coolify connector that has repos, then load again.
-						}
+				</div>
+			}
+		</form>
+	} else if selectedApp != 0 && pickerError(m) == "" {
+		@layouts.ListCard() {
+			@empty.Empty(empty.Props{Class: emptyInCardClass}) {
+				@empty.Header() {
+					@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
+						@icon.FolderGit()
+					}
+					@empty.Title() {
+						No repositories on this source
+					}
+					@empty.Description() {
+						Install the App on a GitHub account or organization, or pick a Coolify connector that has repositories, then choose the App again.
 					}
 				}
 			}
