@@ -70,6 +70,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Built with Go 1.26.11**, which fixes a `net/http` vulnerability in
+  1.26.10 that govulncheck reports as reachable from this code.
 - **Test checks where GitHub sends the App's webhooks.** A webhook URL that
   is missing, or points at this worker under the wrong slug (what is left
   when GitHub refuses the URL at creation), marks the App failed with the URL
