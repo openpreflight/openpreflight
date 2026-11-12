@@ -59,6 +59,11 @@ func TestSettingsSeedAndSave(t *testing.T) {
 	if err := st.SaveSettings(got); err != nil {
 		t.Fatal(err)
 	}
+	// Two first reads at boot (the pruner and a request) both find no row and
+	// both seed: the loser must neither fail nor reset what was saved.
+	if err := st.seedSettings(defaultSettings()); err != nil {
+		t.Fatalf("second seed: %v", err)
+	}
 	again, err := st.Settings()
 	if err != nil {
 		t.Fatal(err)

@@ -108,6 +108,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   hour; the stylesheet URL now changes when its content does.
 - Form placeholders are fainter than real values, so an example no longer
   reads as a saved setting.
+- A fresh install no longer logs `UNIQUE constraint failed: settings.id` when
+  two parts of the server read the settings for the first time at once.
+- The Repos page's "Add a binding" button says "Add a repository", like the
+  page it opens.
+
+### Upgrade
+
+Migration `0010_github_app_owner_org` adds one column to `github_apps` on first
+boot. No configuration change is needed.
 
 ## [2.4.0] - 2026-11-07
 
