@@ -80,6 +80,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A Coolify base URL behind a login page says so.** Pointing an instance at
+  an address behind Cloudflare Access or another sign-in gateway failed with
+  "invalid character '<' looking for beginning of value". It now says the API
+  call was redirected to a login page, and the Base URL hint says to use the
+  address the worker reaches directly (on the same host, usually
+  `http://127.0.0.1:8000`).
 - **Built with Go 1.27.4**, which fixes a `net/http` vulnerability
   (GO-2026-6859) that govulncheck reports as reachable from this code in
   1.26.10 and 1.27.3. The CSS build stage uses Node 26.

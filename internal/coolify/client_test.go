@@ -215,3 +215,25 @@ func TestCreateComposeApplicationRequiresUUIDs(t *testing.T) {
 		t.Fatal("expected an error without project and server uuids")
 	}
 }
+
+// TestLoginPageIsReportedClearly: a base URL behind Cloudflare Access (or any
+// SSO gateway) redirects the API call to a sign-in page. The error must say
+// that, not "invalid character '<'".
+func TestLoginPageIsReportedClearly(t *testing.T) {
+	login := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("<html>sign in</html>"))
+	}))
+	defer login.Close()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, login.URL+"/cdn-cgi/access/login", http.StatusFound)
+	}))
+	defer proxy.Close()
+
+	for name, base := range map[string]string{"redirected": proxy.URL, "html": login.URL} {
+		_, err := New(base, "tok").CurrentTeam(context.Background())
+		if err == nil || !strings.Contains(err.Error(), "login page") {
+			t.Errorf("%s: err = %v, want it to name the login page", name, err)
+		}
+	}
+}
