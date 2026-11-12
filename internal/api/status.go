@@ -85,10 +85,14 @@ func (s *Server) statusGitHub() health.Component {
 			Detail: "no GitHub App configured",
 			Action: "Add one at GitHub Apps. Only an App can write a Check Run, so nothing can be reported without it."}
 	}
-	var failing []string
+	var failing, notInstalled []string
 	var unverified int
 	newest := time.Time{}
 	for _, a := range apps {
+		if a.LastError == store.AppNotInstalled {
+			notInstalled = append(notInstalled, a.Name)
+			continue
+		}
 		if strings.TrimSpace(a.LastError) != "" {
 			failing = append(failing, a.Name)
 			continue
@@ -106,6 +110,10 @@ func (s *Server) statusGitHub() health.Component {
 		return health.Component{Name: "GitHub", State: health.StateWarn,
 			Detail: fmt.Sprintf("%s last reported an error", strings.Join(failing, ", ")),
 			Action: "Open the App and press Test. A rotated private key or a changed App ID is the usual cause."}
+	case len(notInstalled) > 0:
+		return health.Component{Name: "GitHub", State: health.StateWarn,
+			Detail: fmt.Sprintf("%s not installed on any account", strings.Join(notInstalled, ", ")),
+			Action: "Install the App on the account that owns the repos, then press Test."}
 	case unverified == len(apps):
 		return health.Component{Name: "GitHub", State: health.StateWarn,
 			Detail: plural(len(apps), "App") + ", never verified",

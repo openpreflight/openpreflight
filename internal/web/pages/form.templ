@@ -1,0 +1,62 @@
+package pages
+
+import "github.com/openpreflight/openpreflight/internal/web/components/icon"
+
+// fieldRow is one setting: label and explanation on the left, the control on
+// the right. On a phone the two stack.
+templ fieldRow(id, label, hint string) {
+	<div class="grid gap-x-10 gap-y-2 px-4 py-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+		<div>
+			<label for={ id } class="text-sm font-medium">{ label }</label>
+			if hint != "" {
+				<p class="text-muted-foreground mt-0.5 text-xs leading-relaxed text-pretty">{ hint }</p>
+			}
+		</div>
+		<div class="min-w-0 md:max-w-xl md:pt-0.5">
+			{ children... }
+		</div>
+	</div>
+}
+
+// switchRow is an on/off setting. A checkbox underneath, so the form posts
+// name=1 exactly as before; role=switch tells assistive tech what it looks
+// like. warn tints the explanation for settings that widen who can see what.
+templ switchRow(id, name, label, hint string, on, warn bool) {
+	<label for={ id } class="flex cursor-pointer items-start justify-between gap-6 px-4 py-4">
+		<div class="min-w-0">
+			<p class="text-sm font-medium">{ label }</p>
+			<p class={ "mt-0.5 flex items-start gap-1.5 text-xs leading-relaxed text-pretty", templ.KV("text-muted-foreground", !warn), templ.KV("text-warning", warn) }>
+				if warn {
+					@icon.CircleAlert(icon.Props{Class: "mt-0.5 size-3.5 shrink-0"})
+				}
+				<span>{ hint }</span>
+			</p>
+		</div>
+		<input
+			id={ id }
+			name={ name }
+			type="checkbox"
+			value="1"
+			role="switch"
+			checked?={ on }
+			class="bg-input checked:bg-primary focus-visible:outline-ring relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full transition-colors before:absolute before:top-0.5 before:left-0.5 before:size-4 before:rounded-full before:bg-white before:shadow-sm before:transition-transform checked:before:translate-x-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+		/>
+	</label>
+}
+
+// formBar ends a long editor form: pinned to the bottom of the window, so
+// saving never needs a scroll. Put the Cancel and Save buttons in a
+// "ml-auto" group; anything before it sits on the left.
+templ formBar() {
+	<div class="bg-background/85 sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+		{ children... }
+	</div>
+}
+
+// unitInput puts a unit after a short number field: "900 seconds".
+templ unitInput(unit string) {
+	<div class="flex items-center gap-2">
+		{ children... }
+		<span class="text-muted-foreground text-xs">{ unit }</span>
+	</div>
+}

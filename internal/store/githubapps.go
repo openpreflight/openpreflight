@@ -13,7 +13,7 @@ import (
 )
 
 const ghCols = `id, name, slug, app_id, pem_enc, webhook_secret_enc, api_url, check_name,
-	last_seen_at, last_error, created_at, updated_at`
+	last_seen_at, last_error, owner_org, created_at, updated_at`
 
 // slugPattern keeps the slug safe to put in the webhook path.
 var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
@@ -25,7 +25,7 @@ func (s *Store) scanGitHubApp(sc interface{ Scan(...any) error }) (GitHubApp, er
 		ca, ua   string
 	)
 	if err := sc.Scan(&a.ID, &a.Name, &a.Slug, &a.AppID, &a.pemEnc, &a.webhookSecretEnc,
-		&a.APIURL, &a.CheckName, &lastSeen, &a.LastError, &ca, &ua); err != nil {
+		&a.APIURL, &a.CheckName, &lastSeen, &a.LastError, &a.OwnerOrg, &ca, &ua); err != nil {
 		return GitHubApp{}, err
 	}
 	a.LastSeenAt = parseTimePtr(lastSeen)
@@ -215,10 +215,24 @@ func (s *Store) UpdateGitHubApp(id int64, in GitHubAppInput) (GitHubApp, error) 
 	return s.GitHubApp(id)
 }
 
+// AppNotInstalled is the stored health of an App that authenticates but has no
+// installation: it can do nothing until someone installs it, so it is kept like
+// an error rather than lost with the flash message.
+const AppNotInstalled = "Authenticated, but not installed on any account yet."
+
+// SetGitHubAppOwnerOrg records which organization owns the App; empty means a user.
+func (s *Store) SetGitHubAppOwnerOrg(id int64, org string) error {
+	if _, err := s.db.Exec(`UPDATE github_apps SET owner_org = ? WHERE id = ?`, org, id); err != nil {
+		return fmt.Errorf("store: set github app owner: %w", err)
+	}
+	return nil
+}
+
 // RecordGitHubAppTest stores the outcome of a Test click.
 func (s *Store) RecordGitHubAppTest(id int64, errMsg string) error {
 	var seen any
-	if errMsg == "" {
+	// Not installed still authenticated: the credentials were seen to work.
+	if errMsg == "" || errMsg == AppNotInstalled {
 		seen = formatTime(now())
 	}
 	_, err := s.db.Exec(`UPDATE github_apps SET last_seen_at = COALESCE(?, last_seen_at),
