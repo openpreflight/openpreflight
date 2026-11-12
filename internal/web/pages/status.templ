@@ -3,13 +3,11 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
 
 templ StatusBadge(j store.Job) {
-	@badge.Badge(badge.Props{Variant: jobVariant(j), Class: jobBadgeClass(j)}) {
-		{ web.JobStatusLabel(j) }
-	}
+	@layouts.Status(web.JobStatusLabel(j), jobTone(j))
 }
 
 // LastRun is the one-line summary of a repository's most recent job. Both the

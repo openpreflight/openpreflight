@@ -4,9 +4,11 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/openpreflight/openpreflight/internal/githubapp"
@@ -149,7 +151,8 @@ func (s *Server) updateApp(w http.ResponseWriter, r *http.Request, _ store.User)
 	s.reply(w, r, http.StatusOK, map[string]any{"github_app": app}, "/github-apps", "Saved.", "ok")
 }
 
-// runAppTest mints an App JWT and lists installations.
+// runAppTest mints an App JWT and lists installations. Every outcome is stored
+// on the App, so the page still shows it after the flash message is gone.
 func (s *Server) runAppTest(ctx context.Context, id int64) (string, string) {
 	client, app, err := s.appClient(id)
 	if err != nil {
@@ -158,22 +161,88 @@ func (s *Server) runAppTest(ctx context.Context, id int64) (string, string) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
-	installs, err := client.Installations(ctx)
+	installs, health, err := s.recordInstallations(ctx, client, app)
 	if err != nil {
-		s.store.RecordGitHubAppTest(id, err.Error())
 		return err.Error(), "err"
 	}
-	if err := s.store.RecordGitHubAppTest(id, ""); err != nil {
-		return err.Error(), "err"
+	if health != "" && health != store.AppNotInstalled {
+		return health, "err"
+	}
+	// Only for the settings link; a failure here is not a failed test. An
+	// org owner, once known, is not asked again.
+	// ponytail: a personal App stores "" and so is asked on every Test (one
+	// cheap call per click); an owner_type column would end that.
+	if app.OwnerOrg == "" {
+		if org, err := client.OwnerOrg(ctx); err == nil && org != "" {
+			s.store.SetGitHubAppOwnerOrg(id, org)
+		}
 	}
 	if len(installs) == 0 {
-		return fmt.Sprintf("App %q authenticated, but it is not installed anywhere yet — install it on the org or account that owns the repos you want checked.", app.Name), "err"
+		return fmt.Sprintf("App %q authenticated, but it is not installed anywhere yet. Install it on the account that owns the repos you want checked.", app.Name), "warn"
 	}
 	accounts := make([]string, 0, len(installs))
 	for _, i := range installs {
 		accounts = append(accounts, i.Account.Login)
 	}
 	return fmt.Sprintf("App %q authenticated. Installed on: %s.", app.Name, joinMax(accounts, 6)), "ok"
+}
+
+// recordInstallations lists the App's installations and checks where GitHub
+// sends its webhooks, then stores the App's health: an error, a webhook going
+// to the wrong place, not installed, or fine. It returns that health.
+func (s *Server) recordInstallations(ctx context.Context, client *githubapp.Client, app store.GitHubApp) ([]githubapp.Installation, string, error) {
+	installs, err := client.Installations(ctx)
+	if err != nil {
+		// A request the browser abandoned says nothing about the App; a
+		// timeout does (GitHub, or the API URL, is not answering).
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			s.store.RecordGitHubAppTest(app.ID, err.Error())
+		}
+		return nil, "", err
+	}
+	health, known := s.hookProblem(ctx, client, app)
+	if health == "" && len(installs) == 0 {
+		health = store.AppNotInstalled
+	}
+	// A webhook URL that could not be read must not wipe a stored hook
+	// problem; anything else (not installed, an old error) still updates.
+	if !known && strings.HasPrefix(app.LastError, hookProblemPrefix) {
+		return installs, app.LastError, nil
+	}
+	if err := s.store.RecordGitHubAppTest(app.ID, health); err != nil {
+		// The installations are real; a failed write must not hide them.
+		s.log.Warn("record app health", "app", app.ID, "error", err)
+	}
+	return installs, health, nil
+}
+
+const hookProblemPrefix = "GitHub sends this App's webhooks to"
+
+// hookProblem says why GitHub would not deliver this App's webhooks here, or
+// "" when it would; known is false when the URL could not be read. Without
+// it, a webhook URL GitHub refused at creation would be wiped from the page by the next
+// successful Test, while GitHub still sends nothing.
+func (s *Server) hookProblem(ctx context.Context, client *githubapp.Client, app store.GitHubApp) (problem string, known bool) {
+	settings, err := s.store.Settings()
+	if err != nil || settings.PublicBaseURL == "" {
+		return "", err == nil
+	}
+	want := webhookURL(settings.PublicBaseURL, app.Slug)
+	got, err := client.HookURL(ctx)
+	if err != nil {
+		s.log.Warn("read app webhook url", "app", app.ID, "error", err)
+		return "", false
+	}
+	// ponytail: a URL on another host is a relay the operator chose (smee, a
+	// tunnel); only a missing URL or one on this host with the wrong slug is
+	// certainly wrong.
+	if got == want || (got != "" && !strings.HasPrefix(got, settings.PublicBaseURL+"/")) {
+		return "", true
+	}
+	if got == "" {
+		got = "nowhere"
+	}
+	return fmt.Sprintf(hookProblemPrefix+" %s, not %s. Change the webhook URL on the App's settings page on GitHub.", got, want), true
 }
 
 func (s *Server) testApp(w http.ResponseWriter, r *http.Request, _ store.User) {
@@ -209,11 +278,13 @@ func (s *Server) appRepos(w http.ResponseWriter, r *http.Request, _ store.User) 
 
 // loadAppRepos returns installations and the union of their repositories.
 func (s *Server) loadAppRepos(ctx context.Context, id int64) ([]githubapp.Installation, []githubapp.Repository, error) {
-	client, _, err := s.appClient(id)
+	client, app, err := s.appClient(id)
 	if err != nil {
 		return nil, nil, err
 	}
-	installs, err := client.Installations(ctx)
+	// Loading repos is a test too: installing the App on GitHub and loading
+	// again clears the "not installed" state without a separate Test click.
+	installs, _, err := s.recordInstallations(ctx, client, app)
 	if err != nil {
 		return nil, nil, err
 	}
