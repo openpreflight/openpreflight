@@ -41,6 +41,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   shows Test; a repo shows Enable or Disable. Everything else (Open on
   GitHub, Edit, installations, dry run, Remove) is under ⋯, with Remove set
   apart in red and still behind a confirmation.
+- **A clearer Add / Edit repository form.** Each setting is a row with its
+  label and explanation on the left and the control on the right, in three
+  panels: Repository (with a `github.com/` prefix on the name), When to run,
+  and Access (Enabled and Public build logs as switches, the second marked
+  as widening who can read output). Check name, pipeline file, timeout and
+  fallback commands fold into Overrides, which says what each falls back to
+  and opens on its own when a binding sets one. Save and Cancel sit in a bar
+  pinned to the bottom of the window. The Coolify field only appears when
+  there is an instance to pick.
 - Each GitHub App reads as its own card: what it is and its state on top,
   then a rule and a footer with its webhook URL and its actions.
 - Coolify instances are a list with their last error on the row; adding one

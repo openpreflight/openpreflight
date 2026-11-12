@@ -37,7 +37,13 @@ templ ReposEditorPage(p web.Page) {
 	{{ apps := appsOf(m) }}
 	{{ editing := has(m, "Edit") }}
 	@layouts.Shell(p) {
-		@layouts.PageHead(bindingFormTitle(editing), "A binding is one owner/name on one App. Empty branches and paths allow everything.")
+		@layouts.PageHead(bindingFormTitle(editing, bindingOf(m).Repo), bindingFormLede(editing)) {
+			if !editing && len(apps) > 0 {
+				@button.Button(button.Props{Href: "/repos/pick", Variant: button.VariantOutline, Size: button.SizeSm}) {
+					Pick from an App instead
+				}
+			}
+		}
 		if len(apps) == 0 {
 			@reposNeedApp()
 		} else {
@@ -309,11 +315,7 @@ templ reposApps(p web.Page) {
 }
 
 templ reposEditor(p web.Page) {
-	@card.Card() {
-		@card.Content() {
-			@reposEditorForm(p)
-		}
-	}
+	@reposEditorForm(p)
 }
 
 templ reposEditorForm(p web.Page) {
@@ -323,37 +325,27 @@ templ reposEditorForm(p web.Page) {
 	{{ instances := instancesOf(m) }}
 	{{ editing := has(m, "Edit") }}
 	{{ edit := bindingOf(m) }}
-	// Five groups, because a binding answers five questions in order: which
-	// repo, when to run, what to call it, what to run, and who may read it.
-	// Flat, the same fields read as twelve unrelated boxes.
-	<form method="post" action="/api/v1/bindings" class="flex flex-col gap-8">
+	// A binding answers four questions in order: which repo, when to run it,
+	// who may read the output, and (rarely) what to override. Each is a panel
+	// of label-left, control-right rows, so the eye runs down one column of
+	// labels instead of across three columns of boxes.
+	<form method="post" action="/api/v1/bindings">
 		@layouts.CSRF(p.CSRFToken)
-		@formSection("Which repository", "") {
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_repo"}) {
-						Repo
-					}
-					@input.Input(input.Props{
-						ID: "b_repo", Name: "repo", Type: "text", Class: "font-mono",
-						Placeholder: "owner/name", Required: true, Value: edit.Repo,
-						ReadOnly: editing, Attributes: noAutofill,
-					})
-					@field.Description() {
-						if editing {
-							Fixed. Remove the binding and add another to point at a different repo.
-						} else {
-							Exactly as GitHub spells it, owner and name.
-						}
-					}
+		@layouts.ListCard() {
+			@layouts.ListHead("Repository", -1, "Which repository, and which App receives its webhooks and writes its checks.")
+			<div class="divide-y">
+				@fieldRow("b_repo", "Repository", repoHint(editing)) {
+					<div class={ "border-input flex h-8 w-full min-w-0 items-center overflow-hidden rounded-lg border focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50", templ.KV("bg-muted/50", editing) }>
+						<span class="text-muted-foreground bg-muted/60 flex h-full shrink-0 items-center gap-1.5 border-r px-2.5 text-xs">
+							@layouts.GitHubMark("size-3.5")
+							github.com/
+						</span>
+						<input id="b_repo" name="repo" type="text" required placeholder="owner/name" value={ edit.Repo } readonly?={ editing } class="placeholder:text-muted-foreground/55 h-full min-w-0 flex-1 bg-transparent px-2.5 font-mono text-sm outline-none" { noAutofill... }/>
+					</div>
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_app"}) {
-						CI GitHub App
-					}
-					// A native select submits its first option when nothing is chosen.
-					// This one submits only what is selected, so the first App is the
-					// explicit default on a new binding rather than an accident of order.
+				@fieldRow("b_app", "GitHub App", "Verifies the webhook signature and writes the Check Run. The App must be installed on this repository.") {
+					// Submits only what is selected, so the first App is the explicit
+					// default on a new binding rather than an accident of order.
 					@selectcomp.Select(selectcomp.Props{ID: "b_app-list", Name: "github_app_id", Required: true, DefaultValue: editAppValue(editing, edit.GitHubAppID, apps)}) {
 						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_app", Class: "w-full"}) {
 							@selectcomp.Value(selectcomp.ValueProps{Placeholder: firstAppName(apps)})
@@ -366,65 +358,46 @@ templ reposEditorForm(p web.Page) {
 							}
 						}
 					}
-					@field.Description() {
-						Verifies the webhook and writes the Check Run.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_coolify"}) {
-						Coolify instance
-					}
-					@selectcomp.Select(selectcomp.Props{ID: "b_coolify-list", Name: "coolify_instance_id", DefaultValue: editInstValue(editing, edit.CoolifyInstanceID)}) {
-						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_coolify", Class: "w-full"}) {
-							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "none"})
-						}
-						@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
-							@selectcomp.Item(selectcomp.ItemProps{Value: "0"}) {
-								none
+				if len(instances) > 0 {
+					@fieldRow("b_coolify", "Coolify instance", "Optional. Bookkeeping only: Coolify never runs or reports the job.") {
+						@selectcomp.Select(selectcomp.Props{ID: "b_coolify-list", Name: "coolify_instance_id", DefaultValue: editInstValue(editing, edit.CoolifyInstanceID)}) {
+							@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_coolify", Class: "w-full"}) {
+								@selectcomp.Value(selectcomp.ValueProps{Placeholder: "None"})
 							}
-							for _, inst := range instances {
-								@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(inst.ID)}) {
-									{ inst.Name }
+							@selectcomp.Content(selectcomp.ContentProps{DisableAlignItemWithTrigger: true, Align: selectcomp.AlignStart}) {
+								@selectcomp.Item(selectcomp.ItemProps{Value: "0"}) {
+									None
+								}
+								for _, inst := range instances {
+									@selectcomp.Item(selectcomp.ItemProps{Value: itoa64(inst.ID)}) {
+										{ inst.Name }
+									}
 								}
 							}
 						}
 					}
-					@field.Description() {
-						Optional. Bookkeeping only: it never runs the job.
-					}
+				} else {
+					<input type="hidden" name="coolify_instance_id" value={ editInstValue(editing, edit.CoolifyInstanceID) }/>
 				}
 			</div>
 		}
-		@formSection("When to run", "Both filters are empty by default, which means every push to every branch is checked.") {
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_branches"}) {
-						Branches
-					}
+		@layouts.ListCard() {
+			@layouts.ListHead("When to run", -1, "Leave both filters empty to check every push to every branch.")
+			<div class="divide-y">
+				@fieldRow("b_branches", "Branches", "Comma-separated globs. Empty allows every branch.") {
 					@input.Input(input.Props{
-						ID: "b_branches", Name: "branches", Type: "text", Class: "font-mono text-xs",
+						ID: "b_branches", Name: "branches", Type: "text", Class: "font-mono",
 						Placeholder: branchesPlaceholder, Value: edit.Branches, Attributes: noAutofill,
 					})
-					@field.Description() {
-						Comma-separated globs. Empty allows every branch.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_paths"}) {
-						Paths
-					}
+				@fieldRow("b_paths", "Paths", "Comma-separated globs. A commit that touches none of them is reported as skipped.") {
 					@input.Input(input.Props{
-						ID: "b_paths", Name: "paths", Type: "text", Class: "font-mono text-xs",
+						ID: "b_paths", Name: "paths", Type: "text", Class: "font-mono",
 						Placeholder: "frontend/**, packages/api/**", Value: edit.Paths, Attributes: noAutofill,
 					})
-					@field.Description() {
-						Empty allows every path. A commit touching none of them is reported skipped.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_on_empty"}) {
-						Nothing to run
-					}
+				@fieldRow("b_on_empty", "When there is nothing to run", "No pipeline file, no commands and no recognisable project. Usually a misconfiguration.") {
 					@selectcomp.Select(selectcomp.Props{ID: "b_on_empty-list", Name: "on_empty_pipeline", DefaultValue: onEmptyValue(edit.OnEmptyPipeline)}) {
 						@selectcomp.Trigger(selectcomp.TriggerProps{ID: "b_on_empty", Class: "w-full"}) {
 							@selectcomp.Value(selectcomp.ValueProps{Placeholder: "Skip the job"})
@@ -438,117 +411,131 @@ templ reposEditorForm(p web.Page) {
 							}
 						}
 					}
-					@field.Description() {
-						No pipeline file, no commands below, no recognisable project. Usually a misconfiguration.
-					}
 				}
 			</div>
 		}
-		@formSection("Naming and limits", "Each one falls back to the global default when left blank.") {
-			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_check"}) {
-						Check name
-					}
+		@layouts.ListCard() {
+			@layouts.ListHead("Access", -1, "")
+			<div class="divide-y">
+				@switchRow("b_enabled", "enabled", "Enabled", "Off means webhooks for this repo are dropped, even with a valid signature.", bindingEnabledChecked(editing, edit.Enabled), false)
+				@switchRow("b_shareable", "shareable_logs", "Public build logs", "Anyone holding a run's /runs/{id} link can read its full output without signing in. Run ids are random, but treat the link as a secret.", shareableChecked(editing, edit.ShareableLogs), true)
+			</div>
+		}
+		// Rarely needed, so folded: every one of these inherits a sensible
+		// default. Open when editing a binding that already overrides one.
+		<details data-slot="list-card" class="group bg-muted/60 text-card-foreground mb-6 rounded-xl border p-1" open?={ bindingOverrides(edit) }>
+			<summary data-slot="list-head" class="flex cursor-pointer list-none items-center gap-2 px-3 pt-2 pb-2.5 [&::-webkit-details-marker]:hidden">
+				@icon.ChevronRight(icon.Props{Class: "text-muted-foreground size-4 transition-transform group-open:rotate-90"})
+				<div class="min-w-0">
+					<h2 class="text-sm font-semibold">
+						Overrides
+						if n := bindingOverrideCount(edit); n > 0 {
+							<span class="text-muted-foreground ml-1 font-normal">{ itoa(n) } set</span>
+						}
+					</h2>
+					<p class="text-muted-foreground mt-0.5 text-xs">Check name, pipeline file, timeout and fallback commands. Blank inherits the worker's defaults.</p>
+				</div>
+			</summary>
+			<div class="divide-y">
+				@fieldRow("b_check", "Check name", "What GitHub shows next to the commit. Blank uses "+settings.DefaultCheckName+".") {
 					@input.Input(input.Props{
 						ID: "b_check", Name: "check_name", Type: "text",
 						Placeholder: settings.DefaultCheckName, Value: edit.CheckName, Attributes: noAutofill,
 					})
-					@field.Description() {
-						What GitHub shows next to the commit.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_file"}) {
-						Pipeline file
-					}
+				@fieldRow("b_file", "Pipeline file", "Read from the commit being checked. Blank uses "+settings.DefaultPipelineFile+".") {
 					@input.Input(input.Props{
-						ID: "b_file", Name: "pipeline_file", Type: "text", Class: "font-mono text-xs",
+						ID: "b_file", Name: "pipeline_file", Type: "text", Class: "font-mono",
 						Placeholder: settings.DefaultPipelineFile, Value: edit.PipelineFile, Attributes: noAutofill,
 					})
-					@field.Description() {
-						Read from the commit being checked.
-					}
 				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_timeout"}) {
-						Timeout
-					}
-					@input.Input(input.Props{
-						ID: "b_timeout", Name: "timeout_seconds", Type: "number",
-						Placeholder: itoa(settings.DefaultTimeoutSeconds), Value: timeoutVal(edit.TimeoutSeconds),
-						Attributes: templ.Attributes{"min": "0", "autocomplete": "off", "inputmode": "numeric"},
-					})
-					@field.Description() {
-						Seconds. 0 or blank inherits.
-					}
+				@fieldRow("b_timeout", "Timeout", "In seconds. 0 or blank uses the default of "+secondsLabel(settings.DefaultTimeoutSeconds)+".") {
+					<div class="flex items-center gap-2">
+						@input.Input(input.Props{
+							ID: "b_timeout", Name: "timeout_seconds", Type: "number", Class: "w-32",
+							Placeholder: itoa(settings.DefaultTimeoutSeconds), Value: timeoutVal(edit.TimeoutSeconds),
+							Attributes: templ.Attributes{"min": "0", "autocomplete": "off", "inputmode": "numeric"},
+						})
+						<span class="text-muted-foreground text-xs">seconds</span>
+					</div>
 				}
-			</div>
-		}
-		@formSection("Command overrides", "Used only when the repo has no pipeline file. Leave blank to fall back to defaults inferred from the project, such as a Node package.json.") {
-			<div class="grid gap-4 sm:grid-cols-3">
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_install"}) {
-						install
-					}
-					@input.Input(input.Props{ID: "b_install", Name: "install_cmd", Type: "text", Class: "font-mono text-xs", Placeholder: "npm ci", Value: edit.InstallCmd, Attributes: noAutofill})
-				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_test"}) {
-						test
-					}
-					@input.Input(input.Props{ID: "b_test", Name: "test_cmd", Type: "text", Class: "font-mono text-xs", Placeholder: "npm test", Value: edit.TestCmd, Attributes: noAutofill})
-				}
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "b_build"}) {
-						build
-					}
-					@input.Input(input.Props{ID: "b_build", Name: "build_cmd", Type: "text", Class: "font-mono text-xs", Placeholder: "npm run build", Value: edit.BuildCmd, Attributes: noAutofill})
+				@fieldRow("b_install", "Fallback commands", "Run only when the commit has no pipeline file. Blank infers them from the project, such as a Node package.json.") {
+					<div class="grid gap-2">
+						for _, c := range []struct{ id, name, label, ph, val string }{
+							{"b_install", "install_cmd", "install", "npm ci", edit.InstallCmd},
+							{"b_test", "test_cmd", "test", "npm test", edit.TestCmd},
+							{"b_build", "build_cmd", "build", "npm run build", edit.BuildCmd},
+						} {
+							<div class="border-input flex h-8 w-full min-w-0 items-center overflow-hidden rounded-lg border focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+								<label for={ c.id } class="text-muted-foreground bg-muted/60 flex h-full w-16 shrink-0 items-center border-r px-2.5 text-xs">{ c.label }</label>
+								<input id={ c.id } name={ c.name } type="text" placeholder={ c.ph } value={ c.val } class="placeholder:text-muted-foreground/55 h-full min-w-0 flex-1 bg-transparent px-2.5 font-mono text-sm outline-none" { noAutofill... }/>
+							</div>
+						}
+					</div>
 				}
 			</div>
-		}
-		@formSection("Enabled and visibility", "") {
-			// field.Content keeps each description tied to its own checkbox.
-			// Flat, the shareable-logs warning read as a footnote on the form.
-			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-				@checkbox.Checkbox(checkbox.Props{ID: "b_enabled", Name: "enabled", Value: "1", DefaultChecked: bindingEnabledChecked(editing, edit.Enabled)})
-				@field.Content() {
-					@field.Label(field.LabelProps{For: "b_enabled"}) {
-						Enabled
-					}
-					@field.Description() {
-						Off means this repo is ignored, even when its webhook signature is valid.
-					}
-				}
-			}
-			@field.Field(field.Props{Orientation: field.OrientationHorizontal}) {
-				@checkbox.Checkbox(checkbox.Props{ID: "b_shareable", Name: "shareable_logs", Value: "1", DefaultChecked: shareableChecked(editing, edit.ShareableLogs)})
-				@field.Content() {
-					@field.Label(field.LabelProps{For: "b_shareable"}) {
-						Shareable logs
-					}
-					@field.Description() {
-						Off by default. On, anyone holding a job's <code class="font-mono">/runs/{ "{id}" }</code> link
-						reads its full build output without signing in. Job ids are random, but treat the link as a secret.
-					}
-				}
-			}
-		}
-		@formActions() {
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-				{ bindingSubmitLabel(editing) }
-			}
-			@button.Button(button.Props{Href: "/repos", Variant: button.VariantOutline, Size: button.SizeSm}) {
-				Cancel
-			}
+		</details>
+		// Pinned to the bottom of the window, so saving never needs a scroll.
+		<div class="bg-background/85 sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
 			if editing {
 				@button.Button(button.Props{Href: "/repos/" + itoa64(edit.ID) + "/resolve", Variant: button.VariantGhost, Size: button.SizeSm}) {
+					@icon.Search(icon.Props{Class: "size-3.5"})
 					Test configuration
 				}
-				<span class="text-muted-foreground text-xs">A dry run clones the repo and prints what would happen, without touching GitHub.</span>
+				<span class="text-muted-foreground hidden text-xs md:inline">Dry run: clones the repo and shows what would happen, without touching GitHub.</span>
 			}
-		}
+			<div class="ml-auto flex items-center gap-2">
+				@button.Button(button.Props{Href: cancelHref(editing, edit.ID), Variant: button.VariantOutline, Size: button.SizeSm}) {
+					Cancel
+				}
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+					{ bindingSubmitLabel(editing) }
+				}
+			</div>
+		</div>
 	</form>
+}
+
+// fieldRow is one setting: label and explanation on the left, the control on
+// the right. On a phone the two stack.
+templ fieldRow(id, label, hint string) {
+	<div class="grid gap-x-10 gap-y-2 px-4 py-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+		<div>
+			<label for={ id } class="text-sm font-medium">{ label }</label>
+			if hint != "" {
+				<p class="text-muted-foreground mt-0.5 text-xs leading-relaxed text-pretty">{ hint }</p>
+			}
+		</div>
+		<div class="min-w-0 md:max-w-xl md:pt-0.5">
+			{ children... }
+		</div>
+	</div>
+}
+
+// switchRow is an on/off setting. A checkbox underneath, so the form posts
+// name=1 exactly as before; role=switch tells assistive tech what it looks
+// like. warn tints the explanation for settings that widen who can see what.
+templ switchRow(id, name, label, hint string, on, warn bool) {
+	<label for={ id } class="flex cursor-pointer items-start justify-between gap-6 px-4 py-4">
+		<div class="min-w-0">
+			<p class="text-sm font-medium">{ label }</p>
+			<p class={ "mt-0.5 flex items-start gap-1.5 text-xs leading-relaxed text-pretty", templ.KV("text-muted-foreground", !warn), templ.KV("text-warning", warn) }>
+				if warn {
+					@icon.CircleAlert(icon.Props{Class: "mt-0.5 size-3.5 shrink-0"})
+				}
+				<span>{ hint }</span>
+			</p>
+		</div>
+		<input
+			id={ id }
+			name={ name }
+			type="checkbox"
+			value="1"
+			role="switch"
+			checked?={ on }
+			class="bg-input checked:bg-primary focus-visible:outline-ring relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full transition-colors before:absolute before:top-0.5 before:left-0.5 before:size-4 before:rounded-full before:bg-white before:shadow-sm before:transition-transform checked:before:translate-x-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+		/>
+	</label>
 }
 
 // formSection titles one group of fields inside an editor form. The form's own

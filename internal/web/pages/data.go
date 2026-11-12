@@ -200,11 +200,72 @@ const emptyPageClass = "mb-6"
 // Keep the glob out of .templ files: templ treats /* as a comment opener.
 const branchesPlaceholder = "main, release/*"
 
-func bindingFormTitle(editing bool) string {
+func bindingFormTitle(editing bool, repo string) string {
+	if editing && repo != "" {
+		return repo
+	}
 	if editing {
 		return "Edit binding"
 	}
-	return "Add a binding manually"
+	return "Add a repository"
+}
+
+func bindingFormLede(editing bool) string {
+	if editing {
+		return "Edit binding: when this repository is checked, who can read its logs, and what it overrides."
+	}
+	return "Bind one repository to the GitHub App that receives its webhooks. Only the repository is required."
+}
+
+func repoHint(editing bool) string {
+	if editing {
+		return "Fixed. To check a different repository, remove this binding and add another."
+	}
+	return "Owner and name exactly as GitHub spells them."
+}
+
+// bindingOverrideCount is how many of the folded-away overrides a binding
+// sets; the Overrides panel opens by itself when it is not zero.
+func bindingOverrideCount(b store.RepoBinding) int {
+	n := 0
+	for _, v := range []string{b.CheckName, b.PipelineFile, b.InstallCmd, b.TestCmd, b.BuildCmd} {
+		if strings.TrimSpace(v) != "" {
+			n++
+		}
+	}
+	if b.TimeoutSeconds > 0 {
+		n++
+	}
+	return n
+}
+
+func bindingOverrides(b store.RepoBinding) bool { return bindingOverrideCount(b) > 0 }
+
+// secondsLabel is a duration in seconds in the largest whole unit: 900 is
+// "15 minutes", 3600 is "1 hour", 90 stays "90 seconds".
+func secondsLabel(n int) string {
+	unit := func(v int, one string) string {
+		if v == 1 {
+			return "1 " + one
+		}
+		return itoa(v) + " " + one + "s"
+	}
+	switch {
+	case n > 0 && n%3600 == 0:
+		return unit(n/3600, "hour")
+	case n > 0 && n%60 == 0:
+		return unit(n/60, "minute")
+	}
+	return unit(n, "second")
+}
+
+// cancelHref goes back where the operator came from: the repo's own page when
+// editing, the list when adding.
+func cancelHref(editing bool, id int64) string {
+	if editing {
+		return "/repos/" + itoa64(id)
+	}
+	return "/repos"
 }
 
 func bindingFilterLine(row bindingRow) string {
@@ -231,7 +292,7 @@ func bindingSubmitLabel(editing bool) string {
 	if editing {
 		return "Save binding"
 	}
-	return "Add binding"
+	return "Add repository"
 }
 
 func pickerError(m map[string]any) string {

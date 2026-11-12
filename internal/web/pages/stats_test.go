@@ -140,3 +140,11 @@ func TestJobPagesAndRange(t *testing.T) {
 		t.Errorf("jobRange empty = %q", got)
 	}
 }
+
+func TestSecondsLabel(t *testing.T) {
+	for n, want := range map[int]string{900: "15 minutes", 60: "1 minute", 3600: "1 hour", 7200: "2 hours", 90: "90 seconds", 1: "1 second"} {
+		if got := secondsLabel(n); got != want {
+			t.Errorf("secondsLabel(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
