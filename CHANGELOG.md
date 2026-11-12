@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-12
+
 ### Added
 
 - **`CI_SETUP_TOKEN` sets the setup token**, so whoever can set the
@@ -16,6 +18,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Pick repositories, Sign in and Create the admin account use the new
+  panels.** The picker has a Source panel (App, and Coolify when there is
+  one) and a Repositories list with private / bound pills, saved from the
+  bar pinned to the bottom; choosing an App loads the list without a button.
+  The signed-out pages put their title on the muted frame and the form
+  inset, with the button in the panel's footer.
+- **An error notification stays until it is closed.** It used to disappear
+  after 14 seconds, often before a long API error could be read. Success and
+  warning notifications still close on their own.
 - **The GitHub Apps page is a list, with broken Apps listed first.** Apps that
   are not installed anywhere, or whose last check failed, get their own
   "Needs attention" list with the stored error, Install, Open on GitHub (the
@@ -78,6 +89,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A Coolify base URL behind a login page says so.** Pointing an instance at
+  an address behind Cloudflare Access or another sign-in gateway failed with
+  "invalid character '<' looking for beginning of value". It now says the API
+  call was redirected to a login page, and the Base URL hint says to use the
+  address the worker reaches directly (on the same host, usually
+  `http://127.0.0.1:8000`).
 - **Built with Go 1.27.4**, which fixes a `net/http` vulnerability
   (GO-2026-6859) that govulncheck reports as reachable from this code in
   1.26.10 and 1.27.3. The CSS build stage uses Node 26.
@@ -684,7 +701,8 @@ v1 of the configurator and worker in one Go binary.
 First release. Migrations `0001`–`0004` create the schema on first boot;
 there is nothing to upgrade from.
 
-[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.4.0...HEAD
+[unreleased]: https://github.com/openpreflight/openpreflight/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.5.0
 [2.4.0]: https://github.com/openpreflight/openpreflight/releases/tag/v2.4.0
 [2.3.2]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.2
 [2.3.1]: https://github.com/openpreflight/openpreflight/releases/tag/v2.3.1

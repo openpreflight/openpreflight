@@ -87,7 +87,8 @@ templ Toast(props ...Props) {
 		if p.Type != "" {
 			data-type={ string(p.Type) }
 		}
-		if p.Timeout > 0 {
+		// Negative: stays until closed.
+		if p.Timeout != 0 {
 			data-tui-toast-timeout={ strconv.Itoa(p.Timeout) }
 		}
 		if p.Title != "" {

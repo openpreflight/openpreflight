@@ -13,7 +13,9 @@ templ Toast(message, kind string) {
 		if kind == "err" {
 			{{ t = toast.TypeError }}
 			{{ title = "Error" }}
-			{{ timeout = 14000 }}
+			// An error often carries an API message to read or copy; it
+			// stays until closed. The page keeps any lasting state anyway.
+			{{ timeout = -1 }}
 		} else if kind == "warn" {
 			{{ t = toast.TypeWarning }}
 			{{ title = "Warning" }}

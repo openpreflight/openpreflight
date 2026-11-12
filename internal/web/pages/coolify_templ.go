@@ -1103,7 +1103,7 @@ func coolifyForm(p web.Page, editing bool, edit store.CoolifyInstance, alone boo
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = fieldRow("base_url", "Base URL", "Where the Coolify dashboard is served.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var53), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = fieldRow("base_url", "Base URL", "The Coolify root as this worker reaches it, not through a login page. On the same host that is usually http://127.0.0.1:8000.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var53), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

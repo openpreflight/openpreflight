@@ -140,6 +140,14 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		return nil
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
+		// The usual cause is a base URL behind a login proxy (Cloudflare
+		// Access, an SSO gateway): the API call is redirected to a sign-in page.
+		if final := res.Request.URL; final.Host != req.URL.Host {
+			return fmt.Errorf("coolify: %s was redirected to %s, which is not the Coolify API — use a base URL this worker reaches directly, not one behind a login page", path, final.Host)
+		}
+		if strings.Contains(res.Header.Get("Content-Type"), "text/html") {
+			return fmt.Errorf("coolify: %s returned a web page, not the Coolify API — check the base URL is the Coolify root as this worker reaches it, not another site or a login page in front of Coolify", path)
+		}
 		return fmt.Errorf("coolify: %s did not return the expected JSON (is the base URL the Coolify root?): %w", path, err)
 	}
 	return nil

@@ -4,9 +4,7 @@ import (
 	"github.com/openpreflight/openpreflight/internal/build"
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
 	"github.com/openpreflight/openpreflight/internal/web/components/empty"
-	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
@@ -14,140 +12,122 @@ import (
 
 templ Login(p web.Page) {
 	@layouts.Auth(p) {
-		@card.Card() {
-			@card.Header(card.HeaderProps{Class: "border-b"}) {
-				@card.Title() {
-					<h1 class="text-xl font-semibold tracking-tight">Sign in</h1>
-				}
-				@card.Description() {
-					Operator for this worker. The account lives on this host.
-				}
-			}
-			@card.Content() {
-				<form method="post" action="/api/v1/login" class="flex flex-col gap-4">
-					@layouts.CSRF(p.CSRFToken)
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "username"}) {
-							Username
-						}
+		@authCard("Sign in", "Operator for this worker. The account lives on this host.") {
+			<form method="post" action="/api/v1/login">
+				@layouts.CSRF(p.CSRFToken)
+				<div class="flex flex-col gap-4 p-4">
+					@authField("username", "Username", "") {
 						@input.Input(input.Props{
 							ID:         "username",
 							Name:       "username",
 							Type:       "text",
-							Class:      "h-10",
 							Required:   true,
 							Attributes: templ.Attributes{"autocomplete": "username", "autofocus": ""},
 						})
 					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "password"}) {
-							Password
-						}
+					@authField("password", "Password", "") {
 						@input.Input(input.Props{
 							ID:         "password",
 							Name:       "password",
 							Type:       "password",
-							Class:      "h-10",
 							Required:   true,
 							Attributes: templ.Attributes{"autocomplete": "current-password"},
 						})
 					}
-					@button.Button(button.Props{Type: button.TypeSubmit, Class: "mt-1 w-full", Size: button.SizeLg}) {
-						Sign in
-					}
-				</form>
-			}
+				</div>
+				@authSubmit("Sign in")
+			</form>
 		}
-		<p class="text-muted-foreground mt-4 text-center font-mono text-xs">openpreflight { build.Version }</p>
+		<p class="text-muted-foreground text-center font-mono text-xs">openpreflight { build.Version }</p>
 	}
 }
 
 templ Setup(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	@layouts.Auth(p) {
-		@card.Card() {
-			@card.Header(card.HeaderProps{Class: "border-b"}) {
-				@card.Title() {
-					<h1 class="text-xl font-semibold tracking-tight">Create the admin account</h1>
-				}
-				@card.Description() {
-					One username, one password, and the URL GitHub will call. Apps and repos are next.
-				}
-			}
-			@card.Content() {
-				<form method="post" action="/api/v1/setup" class="flex flex-col gap-5">
-					@layouts.CSRF(p.CSRFToken)
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "setup_token"}) {
-							Setup token
-						}
+		@authCard("Create the admin account", "One username, one password, and the URL GitHub will call. Apps and repositories come next.") {
+			<form method="post" action="/api/v1/setup">
+				@layouts.CSRF(p.CSRFToken)
+				<div class="flex flex-col gap-5 p-4">
+					@authField("setup_token", "Setup token", setupTokenHint) {
 						@input.Input(input.Props{
 							ID:         "setup_token",
 							Name:       "setup_token",
 							Type:       "text",
-							Class:      "h-10 font-mono",
+							Class:      "font-mono",
 							Required:   true,
 							Attributes: templ.Attributes{"autocomplete": "off", "spellcheck": "false", "autofocus": ""},
 						})
-						@field.Description() {
-							{ setupTokenHint }
-						}
 					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "username"}) {
-							Admin username
-						}
+					@authField("username", "Admin username", "") {
 						@input.Input(input.Props{
 							ID:         "username",
 							Name:       "username",
 							Type:       "text",
-							Class:      "h-10",
 							Value:      "admin",
 							Required:   true,
 							Attributes: templ.Attributes{"autocomplete": "username"},
 						})
 					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "password"}) {
-							Password
-						}
+					@authField("password", "Password", setupPasswordHint) {
 						@input.Input(input.Props{
 							ID:         "password",
 							Name:       "password",
 							Type:       "password",
-							Class:      "h-10",
 							Required:   true,
 							Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password"},
 						})
-						@field.Description() {
-							{ setupPasswordHint }
-						}
 					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "public_base_url"}) {
-							Public base URL
-						}
+					@authField("public_base_url", "Public base URL", setupURLHint) {
 						@input.Input(input.Props{
 							ID:          "public_base_url",
 							Name:        "public_base_url",
 							Type:        "url",
-							Class:       "h-10 font-mono",
+							Class:       "font-mono",
 							Placeholder: "https://ci.example.com",
 							Value:       str(m, "PublicBaseURL"),
 							Required:    true,
 						})
-						@field.Description() {
-							{ setupURLHint }
-						}
 					}
-					@button.Button(button.Props{Type: button.TypeSubmit, Class: "mt-1 w-full", Size: button.SizeLg}) {
-						Create admin and continue
-					}
-				</form>
-			}
+				</div>
+				@authSubmit("Create admin and continue")
+			</form>
 		}
-		<p class="text-muted-foreground mt-4 text-center text-xs">You can change the public URL later in Settings.</p>
+		<p class="text-muted-foreground text-center text-xs">You can change the public URL later in Settings.</p>
 	}
+}
+
+// authCard is the signed-out pages' panel: the same two tones as every
+// ListCard, title on the frame and the form inset. The narrow column keeps
+// fields stacked, so there is no label-left row here.
+templ authCard(title, lede string) {
+	@layouts.ListCard() {
+		<div data-slot="list-head" class="px-3 pt-2.5 pb-3">
+			<h1 class="text-lg font-semibold tracking-tight">{ title }</h1>
+			if lede != "" {
+				<p class="text-muted-foreground mt-1 text-sm text-pretty">{ lede }</p>
+			}
+		</div>
+		{ children... }
+	}
+}
+
+templ authField(id, label, hint string) {
+	<div class="flex flex-col gap-1.5">
+		<label for={ id } class="text-sm font-medium">{ label }</label>
+		{ children... }
+		if hint != "" {
+			<p class="text-muted-foreground text-xs leading-relaxed text-pretty">{ hint }</p>
+		}
+	</div>
+}
+
+templ authSubmit(label string) {
+	<div class="bg-muted/30 border-t px-4 py-3">
+		@button.Button(button.Props{Type: button.TypeSubmit, Class: "w-full"}) {
+			{ label }
+		}
+	</div>
 }
 
 templ Error(p web.Page) {
@@ -181,21 +161,15 @@ templ Error(p web.Page) {
 		}
 	} else {
 		@layouts.Guest(p) {
-			@card.Card(card.Props{Class: "mx-auto max-w-[440px]"}) {
-				@card.Header() {
-					@card.Title() {
-						<h1 class="text-xl font-semibold tracking-tight">{ str(m, "Heading") }</h1>
-					}
-					@card.Description() {
-						{ str(m, "Message") }
-					}
+			<div class="mx-auto max-w-[440px]">
+				@authCard(str(m, "Heading"), str(m, "Message")) {
+					<div class="bg-muted/30 px-4 py-3">
+						@button.Button(button.Props{Href: "/login", Size: button.SizeSm}) {
+							Sign in
+						}
+					</div>
 				}
-				@card.Content() {
-					@button.Button(button.Props{Href: "/login", Size: button.SizeSm}) {
-						Sign in
-					}
-				}
-			}
+			</div>
 		}
 	}
 }

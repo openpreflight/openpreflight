@@ -38,7 +38,11 @@ func Toast(message, kind string) templ.Component {
 			if kind == "err" {
 				t = toast.TypeError
 				title = "Error"
-				timeout = 14000
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "  ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				timeout = -1
 			} else if kind == "warn" {
 				t = toast.TypeWarning
 				title = "Warning"
@@ -48,7 +52,7 @@ func Toast(message, kind string) templ.Component {
 				title = "Done"
 				timeout = 7000
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

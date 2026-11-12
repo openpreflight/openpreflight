@@ -185,7 +185,7 @@ templ coolifyForm(p web.Page, editing bool, edit store.CoolifyInstance, alone bo
 				@fieldRow("name", "Name", "Yours, to tell instances apart. Blank uses the base URL.") {
 					@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "prod-platform", Value: edit.Name, Attributes: noAutofill})
 				}
-				@fieldRow("base_url", "Base URL", "Where the Coolify dashboard is served.") {
+				@fieldRow("base_url", "Base URL", "The Coolify root as this worker reaches it, not through a login page. On the same host that is usually http://127.0.0.1:8000.") {
 					@input.Input(input.Props{ID: "base_url", Name: "base_url", Type: "url", Class: "font-mono", Placeholder: "https://coolify.example.com", Required: true, Value: edit.BaseURL, Attributes: noAutofill})
 				}
 				@fieldRow("api_token", "API token", coolifyTokenHint(editing, edit.APITokenRedacted)) {
