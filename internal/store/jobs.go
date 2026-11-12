@@ -13,7 +13,7 @@ import (
 const jobCols = `id, COALESCE(binding_id, 0), github_app_id, repo, sha, ref, event, delivery_id,
 	installation_id, check_suite_id, check_run_id, check_name, status, conclusion, steps_json, error,
 	log_bytes, shareable_logs, is_fork, pull_number, skip_reason, runtime, plan_source,
-	plan_origins, created_at, started_at, finished_at`
+	plan_origins, base_sha, created_at, started_at, finished_at`
 
 func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	var (
@@ -26,7 +26,7 @@ func scanJob(sc interface{ Scan(...any) error }) (Job, error) {
 	if err := sc.Scan(&j.ID, &j.BindingID, &j.GitHubAppID, &j.Repo, &j.SHA, &j.Ref, &j.Event,
 		&j.DeliveryID, &j.InstallationID, &j.CheckSuiteID, &j.CheckRunID, &j.CheckName, &j.Status, &j.Conclusion,
 		&j.StepsJSON, &j.Error, &j.LogBytes, &shared, &isFork, &pullNumber, &j.SkipReason,
-		&j.Runtime, &j.PlanSource, &j.PlanOrigins, &created, &started, &finished); err != nil {
+		&j.Runtime, &j.PlanSource, &j.PlanOrigins, &j.BaseSHA, &created, &started, &finished); err != nil {
 		return Job{}, err
 	}
 	j.ShareableLogs = shared != 0
@@ -82,10 +82,12 @@ func NewJobID() string {
 
 // JobInput is what the webhook handler knows at enqueue time.
 type JobInput struct {
-	BindingID      int64
-	GitHubAppID    int64
-	Repo           string
-	SHA            string
+	BindingID   int64
+	GitHubAppID int64
+	Repo        string
+	SHA         string
+	// BaseSHA starts the range the path filter reads; "" means the head commit only.
+	BaseSHA        string
 	Ref            string
 	Event          string
 	DeliveryID     string
@@ -109,11 +111,11 @@ func (s *Store) EnqueueJob(in JobInput) (Job, error) {
 	id := NewJobID()
 	_, err := s.db.Exec(`INSERT INTO jobs (id, binding_id, github_app_id, repo, sha, ref, event,
 		delivery_id, installation_id, check_suite_id, check_name, status, shareable_logs, is_fork,
-		pull_number, skip_reason, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		pull_number, skip_reason, base_sha, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, nullInt64(in.BindingID), in.GitHubAppID, in.Repo, in.SHA, in.Ref, in.Event,
 		in.DeliveryID, in.InstallationID, in.CheckSuiteID, in.CheckName, JobQueued,
-		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, in.SkipReason, formatTime(now()))
+		boolInt(in.ShareableLogs), boolInt(in.IsFork), in.PullNumber, in.SkipReason, in.BaseSHA, formatTime(now()))
 	if err != nil {
 		return Job{}, fmt.Errorf("store: enqueue job: %w", err)
 	}
@@ -419,4 +421,71 @@ func (s *Store) PruneJobs(olderThan time.Duration) ([]string, error) {
 		return ids, fmt.Errorf("store: prune deliveries: %w", err)
 	}
 	return ids, nil
+}
+
+// DayCount is one UTC day's finished runs, by outcome.
+type DayCount struct {
+	Day    time.Time // midnight UTC
+	Passed int
+	Failed int // failure or error
+	Other  int // skipped or cancelled
+}
+
+// DailyJobCounts returns the last `days` UTC days, oldest first, including
+// days with no runs. Queued and running jobs are not outcomes yet.
+func (s *Store) DailyJobCounts(days int, until time.Time) ([]DayCount, error) {
+	end := until.UTC().Truncate(24 * time.Hour)
+	start := end.AddDate(0, 0, -(days - 1))
+	rows, err := s.db.Query(`SELECT substr(created_at, 1, 10), status, count(*) FROM jobs
+		WHERE created_at >= ? AND status NOT IN (?, ?)
+		GROUP BY 1, 2`, start.Format("2006-01-02"), JobQueued, JobInProgress)
+	if err != nil {
+		return nil, fmt.Errorf("store: daily counts: %w", err)
+	}
+	defer rows.Close()
+	out := make([]DayCount, days)
+	for i := range out {
+		out[i].Day = start.AddDate(0, 0, i)
+	}
+	for rows.Next() {
+		var day, status string
+		var n int
+		if err := rows.Scan(&day, &status, &n); err != nil {
+			return nil, fmt.Errorf("store: scan daily counts: %w", err)
+		}
+		d, err := time.Parse("2006-01-02", day)
+		if err != nil {
+			continue
+		}
+		i := int(d.Sub(start).Hours() / 24)
+		if i < 0 || i >= days {
+			continue
+		}
+		switch status {
+		case JobSuccess:
+			out[i].Passed += n
+		case JobFailure, JobError:
+			out[i].Failed += n
+		default:
+			out[i].Other += n
+		}
+	}
+	return out, rows.Err()
+}
+
+// CountJobs is how many jobs match a filter's repo and status, ignoring its
+// limit and offset: the total a paged list counts against.
+func (s *Store) CountJobs(f JobList) (int, error) {
+	f, err := f.clamp()
+	if err != nil {
+		return 0, err
+	}
+	var n int
+	err = s.db.QueryRow(`SELECT count(*) FROM jobs
+		WHERE (? = '' OR repo = ?) AND (? = '' OR status = ?)`,
+		f.Repo, f.Repo, f.Status, f.Status).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("store: count jobs: %w", err)
+	}
+	return n, nil
 }

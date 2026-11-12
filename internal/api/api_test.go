@@ -3,6 +3,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -81,6 +82,9 @@ func TestHealth(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"ok"`) {
 		t.Fatalf("health: %d %s", rec.Code, rec.Body.String())
 	}
+	if rec.Header().Get("X-Frame-Options") != "DENY" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatalf("security headers missing: %v", rec.Header())
+	}
 }
 
 func TestSetupIsOnlyAvailableOnce(t *testing.T) {
@@ -144,6 +148,27 @@ func TestLoginIsRateLimited(t *testing.T) {
 	other.RemoteAddr = "198.51.100.7:4321"
 	if rec := ts.do(other); rec.Code != http.StatusOK {
 		t.Fatalf("another client was locked out too: status %d", rec.Code)
+	}
+}
+
+func TestClientAddr(t *testing.T) {
+	for _, tc := range []struct {
+		name, header, value, want string
+	}{
+		{"unset ignores the header", "", "203.0.113.9", "192.0.2.1"},
+		{"cloudflare", "CF-Connecting-IP", "203.0.113.9", "203.0.113.9"},
+		{"forwarded-for takes the proxy's entry", "X-Forwarded-For", "6.6.6.6, 203.0.113.9", "203.0.113.9"},
+		{"not an ip falls back", "X-Forwarded-For", "unknown", "192.0.2.1"},
+		{"missing falls back", "X-Real-IP", "", "192.0.2.1"},
+	} {
+		r := httptest.NewRequest(http.MethodPost, "/api/v1/login", nil)
+		r.RemoteAddr = "192.0.2.1:5555"
+		if tc.value != "" {
+			r.Header.Set(cmp.Or(tc.header, "X-Forwarded-For"), tc.value)
+		}
+		if got := clientAddr(r, tc.header); got != tc.want {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
 
@@ -356,11 +381,17 @@ func TestAppManifestCreatesAnApp(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]any{
 				"id": 9191, "slug": "openpreflight-ci", "name": "openpreflight-ci",
 				"pem": pemData, "webhook_secret": "from-github-manifest",
+				"owner": map[string]any{"login": "acme", "type": "Organization"},
 			})
 		case r.Method == http.MethodPatch && r.URL.Path == "/app/hook/config":
 			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodGet && r.URL.Path == "/app/hook/config":
+			json.NewEncoder(w).Encode(map[string]any{"url": "https://ci.example.com/webhook/openpreflight-ci"})
 		case r.Method == http.MethodGet && r.URL.Path == "/app/installations":
 			json.NewEncoder(w).Encode([]any{})
+		case r.Method == http.MethodGet && r.URL.Path == "/app":
+			// The conversion already named the owner; asking again is a wasted call.
+			t.Error("callback asked GET /app for an owner the conversion gave")
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -435,6 +466,11 @@ func TestAppManifestCreatesAnApp(t *testing.T) {
 	if created.ID == 0 || created.AppID != 9191 {
 		t.Fatalf("created app: %+v", created)
 	}
+	// No installations yet: that outlives the flash, and the owner is known
+	// so the page can link to the org's settings for the App.
+	if created.LastError != store.AppNotInstalled || created.OwnerOrg != "acme" {
+		t.Fatalf("health after callback: last_error=%q owner_org=%q", created.LastError, created.OwnerOrg)
+	}
 	gotPEM, err := ts.store.DecryptPEM(created)
 	if err != nil || strings.TrimSpace(gotPEM) != strings.TrimSpace(pemData) {
 		t.Fatalf("stored pem: %v", err)
@@ -442,6 +478,75 @@ func TestAppManifestCreatesAnApp(t *testing.T) {
 	secret, err := ts.store.DecryptWebhookSecret(created)
 	if err != nil || secret != "from-github-manifest" {
 		t.Fatalf("stored webhook secret: %v %q", err, secret)
+	}
+}
+
+// A webhook URL pointing at this worker with the wrong slug (what is left when
+// GitHub refused the URL at creation) is a failed App, and loading repos does
+// not wipe it while the URL is still wrong.
+func TestAppTestFlagsAWrongWebhookURL(t *testing.T) {
+	ts := newTestServer(t)
+	token := ts.login(t)
+	hook := "https://ci.example.com/webhook/openpreflight"
+	hookDown := false
+	gh := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if hookDown && r.URL.Path == "/app/hook/config" {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		switch r.URL.Path {
+		case "/app/installations":
+			json.NewEncoder(w).Encode([]any{map[string]any{"id": 1, "account": map[string]any{"login": "acme"}}})
+		case "/app/hook/config":
+			json.NewEncoder(w).Encode(map[string]any{"url": hook})
+		case "/installation/repositories":
+			json.NewEncoder(w).Encode(map[string]any{"repositories": []any{}})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(gh.Close)
+	app, err := ts.store.CreateGitHubApp(store.GitHubAppInput{
+		Name: "hooked", Slug: "hooked", AppID: 77, PEM: manifestTestPEM(t),
+		WebhookSecret: "s", APIURL: gh.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	health := func() string {
+		got, err := ts.store.GitHubApp(app.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got.LastError
+	}
+
+	ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/"+itoa(app.ID)+"/test", "")
+	if h := health(); !strings.Contains(h, hook) || !strings.Contains(h, "/webhook/hooked") {
+		t.Fatalf("wrong webhook URL not flagged: %q", h)
+	}
+	ts.authed(t, token, http.MethodGet, "/api/v1/github-apps/"+itoa(app.ID)+"/repos", "")
+	if h := health(); !strings.Contains(h, hook) {
+		t.Fatalf("loading repos cleared a webhook URL that is still wrong: %q", h)
+	}
+	// GitHub failing to say where the webhook goes is not news that it is fixed.
+	hookDown = true
+	ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/"+itoa(app.ID)+"/test", "")
+	if h := health(); !strings.Contains(h, hook) {
+		t.Fatalf("an unreadable webhook URL cleared the stored problem: %q", h)
+	}
+	hookDown = false
+
+	hook = "https://ci.example.com/webhook/hooked"
+	ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/"+itoa(app.ID)+"/test", "")
+	if h := health(); h != "" {
+		t.Fatalf("right webhook URL still flagged: %q", h)
+	}
+	// A relay on another host is the operator's choice, not a fault.
+	hook = "https://smee.io/abc"
+	ts.authed(t, token, http.MethodPost, "/api/v1/github-apps/"+itoa(app.ID)+"/test", "")
+	if h := health(); h != "" {
+		t.Fatalf("relay URL flagged: %q", h)
 	}
 }
 
@@ -1312,5 +1417,17 @@ func TestRepoPageRedirectsUnknownBinding(t *testing.T) {
 	rec := ts.do(req)
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/repos" {
 		t.Fatalf("status %d location %q", rec.Code, rec.Header().Get("Location"))
+	}
+}
+
+func TestNewAppURL(t *testing.T) {
+	if got, _ := newAppURL(""); got != githubNewAppURL {
+		t.Fatalf("personal: %q", got)
+	}
+	if got, _ := newAppURL("winpra"); got != "https://github.com/organizations/winpra/settings/apps/new" {
+		t.Fatalf("org: %q", got)
+	}
+	if _, err := newAppURL("../evil"); err == nil {
+		t.Fatal("bad org name accepted")
 	}
 }

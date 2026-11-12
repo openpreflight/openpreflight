@@ -1,11 +1,11 @@
 package pages
 
 import (
+	"strconv"
+
 	"github.com/openpreflight/openpreflight/internal/web"
-	"github.com/openpreflight/openpreflight/internal/web/components/badge"
+	"github.com/openpreflight/openpreflight/internal/store"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
-	"github.com/openpreflight/openpreflight/internal/web/components/empty"
 	"github.com/openpreflight/openpreflight/internal/web/components/icon"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -23,8 +23,9 @@ templ Dashboard(p web.Page) {
 	{{ recent := recentOf(m) }}
 	{{ ranAny := asBool(m, "RanAny") }}
 	{{ passedAny := asBool(m, "PassedAny") }}
+	{{ daily := dailyOf(m) }}
 	@layouts.Shell(p) {
-		@layouts.PageHead("Overview", "Set the public URL, add your CI GitHub App, then enable the repos it should check. Coolify is optional.") {
+		@layouts.PageHead("Overview", dashLede(dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny))) {
 			if dashNeedApp(len(apps)) {
 				@button.Button(button.Props{Href: "/github-apps/new", Size: button.SizeSm}) {
 					Add GitHub App
@@ -36,159 +37,266 @@ templ Dashboard(p web.Page) {
 				}
 			}
 		}
-		<div class="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-			for _, s := range dashStats(recent, len(inflight), enabled, len(bindings)) {
-				@statCard(s)
+		<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			for _, t := range dashTiles(recent, daily, cards, enabled, len(bindings), len(inflight)) {
+				@statTile(t)
 			}
 		</div>
 		if !dashSetupDone(settings.PublicBaseURL, len(apps), enabled, passedAny) {
-			@layouts.SectionHead("Setup")
-			@card.Card(card.Props{Class: "mb-8"}) {
-				@card.Content() {
-					<ul class="m-0 flex list-none flex-col divide-y p-0">
-						if settings.PublicBaseURL != "" {
-							@setupRow(badge.VariantDefault, "done", "Public base URL", settings.PublicBaseURL, true, "/settings", "Settings")
-						} else {
-							@setupRow(badge.VariantDestructive, "needed", "Public base URL", "", false, "/settings", "Set it in Settings")
-						}
-						if len(apps) > 0 {
-							@setupRow(badge.VariantDefault, "done", "CI GitHub App", itoa(len(apps))+" configured", false, "/github-apps", "Manage")
-						} else {
-							@setupRow(badge.VariantDestructive, "needed", "CI GitHub App", "", false, "/github-apps/new", "Add one")
-						}
-						if enabled > 0 {
-							@setupRow(badge.VariantDefault, "done", "Enabled repo", itoa(enabled)+" of "+itoa(len(bindings))+" enabled", false, "/repos", "Manage")
-						} else {
-							@setupRow(badge.VariantDestructive, "needed", "Enabled repo", dashNoRepoHint(len(bindings)), false, "/repos", "Enable a repo")
-						}
-						if ranAny {
-							@setupRow(badge.VariantDefault, "done", "First run", "", false, "/jobs", "View jobs")
-						} else {
-							@setupRow(badge.VariantSecondary, "waiting", "First run", "push a commit, and GitHub calls the webhook", false, "", "")
-						}
-						if passedAny {
-							@setupRow(badge.VariantDefault, "done", "Passing Check Run", "", false, "", "")
-						} else if ranAny {
-							@setupRow(badge.VariantOutline, "not yet", "Passing Check Run", "a run finished, but none has passed — open it to see why", false, "", "")
-						} else {
-							@setupRow(badge.VariantSecondary, "waiting", "Passing Check Run", "the commit gets a green check here and on GitHub", false, "", "")
-						}
-						if len(coolify) > 0 {
-							@setupRow(badge.VariantDefault, "done", "Coolify", itoa(len(coolify))+" configured · optional", false, "/coolify", "Manage")
-						} else {
-							@setupRow(badge.VariantSecondary, "optional", "Coolify", "server inventory and a repo picker", false, "/coolify", "Add an instance")
-						}
-					</ul>
+			@layouts.ListCard() {
+				@layouts.ListHead("Finish setup", -1, "Coolify is optional. This list goes away once a check has passed.")
+				@layouts.List() {
+					if settings.PublicBaseURL != "" {
+						@setupRow(layouts.ToneSuccess, "done", "Public base URL", settings.PublicBaseURL, true, "/settings", "Settings")
+					} else {
+						@setupRow(layouts.ToneDanger, "needed", "Public base URL", "", false, "/settings", "Set it in Settings")
+					}
+					if len(apps) > 0 {
+						@setupRow(layouts.ToneSuccess, "done", "CI GitHub App", itoa(len(apps))+" configured", false, "/github-apps", "Manage")
+					} else {
+						@setupRow(layouts.ToneDanger, "needed", "CI GitHub App", "", false, "/github-apps/new", "Add one")
+					}
+					if enabled > 0 {
+						@setupRow(layouts.ToneSuccess, "done", "Enabled repo", itoa(enabled)+" of "+itoa(len(bindings))+" enabled", false, "/repos", "Manage")
+					} else {
+						@setupRow(layouts.ToneDanger, "needed", "Enabled repo", dashNoRepoHint(len(bindings)), false, "/repos", "Enable a repo")
+					}
+					if ranAny {
+						@setupRow(layouts.ToneSuccess, "done", "First run", "", false, "/jobs", "View jobs")
+					} else {
+						@setupRow(layouts.ToneNeutral, "waiting", "First run", "push a commit, and GitHub calls the webhook", false, "", "")
+					}
+					if passedAny {
+						@setupRow(layouts.ToneSuccess, "done", "Passing Check Run", "", false, "", "")
+					} else if ranAny {
+						@setupRow(layouts.ToneWarning, "not yet", "Passing Check Run", "a run finished, but none has passed — open it to see why", false, "", "")
+					} else {
+						@setupRow(layouts.ToneNeutral, "waiting", "Passing Check Run", "the commit gets a green check here and on GitHub", false, "", "")
+					}
+					if len(coolify) > 0 {
+						@setupRow(layouts.ToneSuccess, "done", "Coolify", itoa(len(coolify))+" configured · optional", false, "/coolify", "Manage")
+					} else {
+						@setupRow(layouts.ToneNeutral, "optional", "Coolify", "server inventory and a repo picker", false, "/coolify", "Add an instance")
+					}
 				}
 			}
 		}
 		if len(inflight) > 0 {
-			@layouts.SectionHead("Active runs") {
-				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
-					View jobs
-				}
-			}
-			@card.Card(card.Props{Class: "mb-8"}) {
-				@card.Content() {
-					@jobTable(inflight, true)
-				}
-			}
-		}
-		@layouts.SectionHead("Recent jobs") {
-			@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm}) {
-				View all
-			}
-		}
-		@card.Card(card.Props{Class: "mb-8"}) {
-			@card.Content() {
-				if len(jobs) > 0 {
-					@jobTable(jobs, true)
-				} else {
-					@empty.Empty(empty.Props{Class: emptyInCardClass}) {
-						@empty.Header() {
-							@empty.Media(empty.MediaProps{Variant: empty.MediaVariantIcon}) {
-								@icon.Inbox()
-							}
-							@empty.Title() {
-								No jobs yet
-							}
-							@empty.Description() {
-								A job appears when GitHub sends a check_suite for an enabled repo.
-							}
-						}
-						@empty.Content() {
-							@button.Button(button.Props{Href: "/repos", Size: button.SizeSm}) {
-								Enable a repo
-							}
-						}
+			@layouts.ListCard() {
+				@layouts.ListHead("Running now", len(inflight), "") {
+					@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
+						All jobs
 					}
 				}
+				@jobList(p, inflight, true)
 			}
 		}
-		if len(cards) > 0 {
-			@layouts.SectionHead("Enabled repos") {
-				@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm}) {
-					View all
-				}
-			}
-			<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-				for _, c := range cards {
-					@card.Card(card.Props{Size: card.SizeSm}) {
-						@card.Header() {
-							@card.Title(card.TitleProps{Class: "font-mono truncate"}) {
-								// The repo's own page, not its last run: the card is
-								// about the repository, and one commit is not.
-								<a class="hover:underline" href={ templ.SafeURL("/repos/" + itoa64(c.ID)) } title={ c.Repo }>{ c.Repo }</a>
-							}
-						}
-						@card.Content() {
-							@LastRun(c.LastJob)
-						}
-					}
-				}
+		// Both panels stretch to the taller one, inset and all.
+		<div class="grid gap-x-4 lg:grid-cols-3 [&>div>section]:flex [&>div>section]:h-[calc(100%-1.5rem)] [&>div>section]:flex-col [&>div>section>:last-child]:flex-1">
+			<div class="min-w-0">
+				@reposPanel(cards, recent)
 			</div>
+			<div class="min-w-0 lg:col-span-2">
+				@activityPanel(daily)
+			</div>
+		</div>
+		@layouts.ListCard() {
+			@layouts.ListHead("Recent jobs", -1, "") {
+				@button.Button(button.Props{Href: "/jobs", Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
+					All jobs
+				}
+			}
+			if len(jobs) > 0 {
+				@jobList(p, jobs, true)
+			} else {
+				@jobsEmpty(false)
+			}
 		}
 	}
 }
 
 // setupRow is one line of the setup checklist. The state badge sits in a fixed
 // column so every label starts at the same x, whatever the badge says.
-templ setupRow(variant badge.Variant, state, label, detail string, mono bool, href, action string) {
-	<li class="grid grid-cols-[5rem_1fr] items-baseline gap-x-3 py-3 first:pt-0 last:pb-0">
+templ setupRow(tone layouts.Tone, state, label, detail string, mono bool, href, action string) {
+	<li class="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-3">
 		<span>
-			@badge.Badge(badge.Props{Variant: variant}) {
-				{ state }
-			}
+			@layouts.Status(state, tone)
 		</span>
-		<div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-			<span>{ label }</span>
+		<div class="min-w-0">
+			<p class="text-sm font-medium">{ label }</p>
 			if detail != "" {
-				if mono {
-					<span class="text-muted-foreground font-mono text-xs">{ detail }</span>
-				} else {
-					<span class="text-muted-foreground text-xs">{ detail }</span>
-				}
-			}
-			if href != "" {
-				@button.Button(button.Props{Href: href, Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
-					{ action }
-				}
+				<p class={ "text-muted-foreground truncate text-xs", templ.KV("font-mono", mono) }>{ detail }</p>
 			}
 		</div>
+		if href != "" {
+			@button.Button(button.Props{Href: href, Variant: button.VariantOutline, Size: button.SizeSm}) {
+				{ action }
+			}
+		}
 	</li>
 }
 
-// statCard is one number on the Overview strip. A tile rather than a row in a
-// table: the number is the point, and a table buries it in a column.
-templ statCard(s dashStat) {
-	@card.Card() {
-		@card.Content(card.ContentProps{Class: "flex flex-col gap-1"}) {
-			<div class="flex items-center justify-between gap-2">
-				<span class="text-muted-foreground text-xs font-medium">{ s.Label }</span>
-				@s.Icon(icon.Props{Class: "text-muted-foreground size-4 shrink-0"})
+// statTile is one number on Overview, in the two-tone frame every panel uses:
+// label on the frame, the number and its context on the inset.
+templ statTile(t dashTile) {
+	<section data-slot="list-card" class="bg-muted/60 rounded-xl border p-1">
+		<div data-slot="list-head" class="text-muted-foreground flex items-center justify-between gap-2 px-3 pt-1.5 pb-2 text-sm">
+			<span>{ t.Label }</span>
+			@t.Icon(icon.Props{Class: "size-4 shrink-0"})
+		</div>
+		<div class="px-4 pt-3.5 pb-3">
+			<div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+				<p class="text-3xl leading-none font-semibold tracking-tight tabular-nums">{ t.Value }<span class="text-muted-foreground/60 font-normal">{ t.Unit }</span></p>
+				if t.Chip != "" {
+					<span title={ t.ChipHint }>
+						@layouts.Status(t.Chip, t.ChipTone)
+					</span>
+				}
 			</div>
-			<span class="text-2xl leading-none font-semibold tracking-tight tabular-nums">{ s.Value }</span>
-			<span class="text-muted-foreground text-xs">{ s.Caption }</span>
+			<div class="text-muted-foreground mt-3 space-y-0.5 border-t pt-2.5 text-xs">
+				for _, l := range t.Lines {
+					<p class="truncate">
+						{ l[0] }
+						<span class="text-foreground font-medium">{ l[1] }</span>
+					</p>
+				}
+			</div>
+		</div>
+	</section>
+}
+
+// reposPanel is every enabled repo with its last ten runs as a strip of
+// squares, oldest on the left: a repo that has been flaky reads differently
+// from one that just broke.
+templ reposPanel(cards []dashRepo, recent []store.Job) {
+	{{ hist := repoHistory(recent) }}
+	@layouts.ListCard() {
+		@layouts.ListHead("Repos", len(cards), "Last ten runs, newest on the right.") {
+			@button.Button(button.Props{Href: "/repos", Variant: button.VariantLink, Size: button.SizeSm, Class: "h-auto px-0"}) {
+				All repos
+			}
+		}
+		if len(cards) > 0 {
+			@layouts.List() {
+				for _, c := range cards {
+					<li class="relative px-3 py-2.5 transition-colors hover:bg-muted/40">
+						<div class="flex min-w-0 items-center gap-2">
+							<span class={ "size-2 shrink-0 rounded-full", repoDotClass(c.LastJob) } aria-hidden="true"></span>
+							<a class="row-link min-w-0 flex-1 truncate text-sm font-medium" href={ templ.SafeURL("/repos/" + itoa64(c.ID)) } title={ c.Repo }>{ c.Repo }</a>
+						</div>
+						<div class="mt-1.5 flex items-center justify-between gap-3 pl-4">
+							<span class="text-muted-foreground truncate text-xs">
+								if c.LastJob.ID != "" {
+									{ web.JobStatusLabel(c.LastJob) } · { jobRefLabel(c.LastJob) } · { web.Ago(c.LastJob.CreatedAt) }
+								} else {
+									no runs yet
+								}
+							</span>
+							<span class="flex shrink-0 gap-0.5" role="img" aria-label={ historyLabel(hist[c.Repo]) }>
+								for _, j := range hist[c.Repo] {
+									<span class={ "h-3.5 w-1.5 rounded-[2px]", historyClass(j) } title={ web.JobStatusLabel(j) + " · " + jobRefLabel(j) + " · " + web.Ago(j.CreatedAt) }></span>
+								}
+							</span>
+						</div>
+					</li>
+				}
+			}
+		} else {
+			<p class="text-muted-foreground px-4 py-8 text-center text-sm">No repo is enabled yet.</p>
 		}
 	}
+}
+
+// activityPanel is completed runs per day (the day each was queued) for two
+// weeks, stacked by outcome.
+// HTML rather than SVG: the bars are flex boxes, so the chart is as wide as
+// its panel without stretching any text. Each day has a hover and focus
+// tooltip; the list under the chart is the table view.
+templ activityPanel(daily []store.DayCount) {
+	{{ bars, top, total, failed := activityChart(daily) }}
+	@layouts.ListCard() {
+		@layouts.ListHead("Activity", -1, itoa(total)+" runs in 14 days, "+itoa(failed)+" failed.") {
+			<ul class="text-muted-foreground flex items-center gap-3 text-xs" aria-label="Legend">
+				<li class="flex items-center gap-1.5"><span class="bg-chart-pass size-2 rounded-full"></span>Passed</li>
+				<li class="flex items-center gap-1.5"><span class="bg-chart-fail size-2 rounded-full"></span>Failed</li>
+				<li class="flex items-center gap-1.5"><span class="bg-chart-other size-2 rounded-full"></span>Skipped or cancelled</li>
+			</ul>
+		}
+		<div class="px-4 pt-5 pb-3">
+			<div class="relative h-44 pl-7">
+				// Gridlines at 0, half and the top: recessive, dashed, labelled.
+				for _, g := range []int{top, top / 2, 0} {
+					<div class="pointer-events-none absolute right-0 left-7 border-t border-dashed border-border" style={ gridTop(g, top) }>
+						<span class="text-muted-foreground absolute -top-2 -left-7 w-5 text-right text-[10px] tabular-nums">{ itoa(g) }</span>
+					</div>
+				}
+				<div class="relative flex h-full items-end gap-1.5 sm:gap-2" role="list" aria-label="Finished runs per day">
+					for _, b := range bars {
+						<div class="group relative flex h-full flex-1 items-end justify-center outline-none" role="listitem" tabindex="0" aria-label={ b.Title }>
+							<div class="flex w-full max-w-7 flex-col-reverse gap-[2px] [&>*:last-child]:rounded-t-[4px]" style={ "height: " + b.Height }>
+								if b.Pass > 0 {
+									<div class="bg-chart-pass min-h-[2px]" style={ flexOf(b.Pass) }></div>
+								}
+								if b.Fail > 0 {
+									<div class="bg-chart-fail min-h-[2px]" style={ flexOf(b.Fail) }></div>
+								}
+								if b.Other > 0 {
+									<div class="bg-chart-other min-h-[2px]" style={ flexOf(b.Other) }></div>
+								}
+							</div>
+							<div class="bg-popover text-popover-foreground pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-max -translate-x-1/2 rounded-md border px-2.5 py-1.5 text-xs shadow-md group-hover:block group-focus-visible:block">
+								<p class="font-medium">{ b.Label }</p>
+								<p class="text-muted-foreground">{ itoa(b.Pass) } passed · { itoa(b.Fail) } failed · { itoa(b.Other) } skipped</p>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+			<div class="mt-2 flex gap-1.5 pl-7 sm:gap-2" aria-hidden="true">
+				for _, b := range bars {
+					<span class="text-muted-foreground flex-1 text-center text-[10px] whitespace-nowrap">
+						if b.ShowLabel {
+							{ b.Label }
+						}
+					</span>
+				}
+			</div>
+		</div>
+	}
+}
+
+func gridTop(v, top int) string {
+	return "top: " + strconv.FormatFloat(100-float64(v)*100/float64(top), 'f', 1, 64) + "%"
+}
+
+func flexOf(n int) string { return "flex: " + itoa(n) + " 1 0" }
+
+// The class strings stay in this .templ file: Tailwind does not scan pages/*.go.
+func historyClass(j store.Job) string {
+	switch {
+	case j.Status == store.JobSuccess:
+		return "bg-chart-pass"
+	case failedJob(j):
+		return "bg-chart-fail"
+	}
+	return "bg-chart-other"
+}
+
+func repoDotClass(j store.Job) string {
+	if j.ID == "" {
+		return "bg-muted-foreground/40"
+	}
+	return jobDotClass(j)
+}
+
+func historyLabel(jobs []store.Job) string {
+	p, f := 0, 0
+	for _, j := range jobs {
+		if j.Status == store.JobSuccess {
+			p++
+		} else if failedJob(j) {
+			f++
+		}
+	}
+	return "Last " + itoa(len(jobs)) + " runs: " + itoa(p) + " passed, " + itoa(f) + " failed"
 }

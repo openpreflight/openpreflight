@@ -30,7 +30,7 @@ If you change `internal/web/layouts`, `internal/web/pages`, or
 (the Dockerfile does both at image-build time):
 
 ```bash
-templ generate ./internal/web/...
+go tool templ generate ./internal/web/...
 cd internal/web && npm ci && npm run css
 ```
 

@@ -8,6 +8,7 @@
 
 # Local planning notes
 .plans/*
+graphify-out/
 
 # Node — internal/web (Tailwind for the Go UI)
 node_modules/

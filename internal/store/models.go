@@ -60,8 +60,10 @@ type GitHubApp struct {
 	CheckName  string     `json:"check_name"`
 	LastSeenAt *time.Time `json:"last_seen_at"`
 	LastError  string     `json:"last_error"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	// OwnerOrg is the owning organization's login, or '' for a personal account.
+	OwnerOrg  string    `json:"owner_org"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	PEMRedacted           string `json:"pem"`
 	WebhookSecretRedacted string `json:"webhook_secret"`
@@ -146,6 +148,7 @@ type Job struct {
 	GitHubAppID    int64      `json:"github_app_id"`
 	Repo           string     `json:"repo"`
 	SHA            string     `json:"sha"`
+	BaseSHA        string     `json:"base_sha"`
 	Ref            string     `json:"ref"`
 	Event          string     `json:"event"`
 	DeliveryID     string     `json:"delivery_id"`

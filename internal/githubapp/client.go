@@ -176,6 +176,28 @@ func (c *Client) Installations(ctx context.Context) ([]Installation, error) {
 	return out, nil
 }
 
+// OwnerOrg returns the login of the organization that owns the App, or "" when
+// a personal account owns it.
+func (c *Client) OwnerOrg(ctx context.Context) (string, error) {
+	auth, err := c.appAuth()
+	if err != nil {
+		return "", err
+	}
+	var app struct {
+		Owner struct {
+			Login string `json:"login"`
+			Type  string `json:"type"`
+		} `json:"owner"`
+	}
+	if err := c.do(ctx, http.MethodGet, c.apiURL+"/app", auth, nil, &app); err != nil {
+		return "", err
+	}
+	if app.Owner.Type != "Organization" {
+		return "", nil
+	}
+	return app.Owner.Login, nil
+}
+
 // nextPage advances a per_page=100 cursor. GitHub sends Link headers, but the
 // offset form is enough here and keeps the response reader simple.
 func nextPage(current string, seen int) string {

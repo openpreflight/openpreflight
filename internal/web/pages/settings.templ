@@ -3,9 +3,6 @@ package pages
 import (
 	"github.com/openpreflight/openpreflight/internal/web"
 	"github.com/openpreflight/openpreflight/internal/web/components/button"
-	"github.com/openpreflight/openpreflight/internal/web/components/card"
-	"github.com/openpreflight/openpreflight/internal/web/components/checkbox"
-	"github.com/openpreflight/openpreflight/internal/web/components/field"
 	"github.com/openpreflight/openpreflight/internal/web/components/input"
 	"github.com/openpreflight/openpreflight/internal/web/layouts"
 )
@@ -36,14 +33,8 @@ templ Settings(p web.Page) {
 }
 
 templ settingsShell(section, title, lede string) {
-	@layouts.PageHead(title, lede) {
-		if section != "admin" {
-			@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Attributes: templ.Attributes{"form": "settings-form"}}) {
-				Save settings
-			}
-		}
-	}
-	<div class="grid gap-6 xl:grid-cols-[14rem_1fr]">
+	@layouts.PageHead(title, lede)
+	<div class="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)]">
 		@settingsNav(section)
 		<div class="space-y-6">
 			{ children... }
@@ -52,8 +43,8 @@ templ settingsShell(section, title, lede string) {
 }
 
 templ settingsNav(current string) {
-	<nav class="text-sm xl:sticky xl:top-20 xl:self-start" aria-label="Settings">
-		<ul class="flex flex-row gap-1 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible xl:pb-0">
+	<nav class="text-sm lg:sticky lg:top-20 lg:self-start" aria-label="Settings">
+		<ul class="flex flex-row gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
 			@settingsNavItem("/settings", "Configuration", current == "configuration")
 			@settingsNavItem("/settings/runner", "Runner", current == "runner")
 			@settingsNavItem("/settings/logs", "Logs", current == "logs")
@@ -72,46 +63,27 @@ templ settingsNavItem(href, label string, active bool) {
 	</li>
 }
 
+// Each settings page is one form: a panel of label-left rows, the same as
+// the repository editor, with Save at the foot of the panel it saves.
 templ settingsConfiguration(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ settings := settingsOf(m) }}
-	<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
-		@layouts.CSRF(p.CSRFToken)
-		<input type="hidden" name="next" value="/settings"/>
-		@card.Card() {
-			@card.Content(card.ContentProps{Class: "space-y-4"}) {
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "public_base_url"}) {
-						Public base URL
-					}
-					@input.Input(input.Props{ID: "public_base_url", Name: "public_base_url", Type: "url", Value: settings.PublicBaseURL, Placeholder: "https://ci.example.com"})
-					@field.Description() {
-						{ settingsURLHint() }
-					}
-				}
-				<div class="grid gap-4 sm:grid-cols-2">
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "default_check_name"}) {
-							Default check name
-						}
-						@input.Input(input.Props{ID: "default_check_name", Name: "default_check_name", Type: "text", Value: settings.DefaultCheckName})
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "default_pipeline_file"}) {
-							Default pipeline file
-						}
-						@input.Input(input.Props{ID: "default_pipeline_file", Name: "default_pipeline_file", Type: "text", Value: settings.DefaultPipelineFile})
-					}
-				</div>
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "default_timeout_seconds"}) {
-						Default timeout (seconds)
-					}
-					@input.Input(input.Props{ID: "default_timeout_seconds", Name: "default_timeout_seconds", Type: "number", Value: itoa(settings.DefaultTimeoutSeconds), Attributes: templ.Attributes{"min": "30"}})
-				}
+	@settingsForm(p, "/settings", "Save changes") {
+		@fieldRow("public_base_url", "Public base URL", settingsURLHint()) {
+			@input.Input(input.Props{ID: "public_base_url", Name: "public_base_url", Type: "url", Class: "font-mono", Value: settings.PublicBaseURL, Placeholder: "https://ci.example.com", Attributes: noAutofill})
+		}
+		@fieldRow("default_check_name", "Default check name", "What GitHub shows next to a commit when neither the App nor the repo names the check.") {
+			@input.Input(input.Props{ID: "default_check_name", Name: "default_check_name", Type: "text", Value: settings.DefaultCheckName, Attributes: noAutofill})
+		}
+		@fieldRow("default_pipeline_file", "Default pipeline file", "Read from the commit being checked when the repo does not name its own.") {
+			@input.Input(input.Props{ID: "default_pipeline_file", Name: "default_pipeline_file", Type: "text", Class: "font-mono", Value: settings.DefaultPipelineFile, Attributes: noAutofill})
+		}
+		@fieldRow("default_timeout_seconds", "Default timeout", "Now "+secondsLabel(settings.DefaultTimeoutSeconds)+". A job still running after this is stopped and fails. At least 30 seconds.") {
+			@unitInput("seconds") {
+				@input.Input(input.Props{ID: "default_timeout_seconds", Name: "default_timeout_seconds", Type: "number", Class: "w-32", Value: itoa(settings.DefaultTimeoutSeconds), Attributes: templ.Attributes{"min": "30", "inputmode": "numeric"}})
 			}
 		}
-	</form>
+	}
 }
 
 templ settingsRunner(p web.Page) {
@@ -119,96 +91,80 @@ templ settingsRunner(p web.Page) {
 	{{ settings := settingsOf(m) }}
 	{{ dockerOK := asBool(m, "DockerAvailable") }}
 	{{ dockerHost := str(m, "DockerHost") }}
-	<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
-		@layouts.CSRF(p.CSRFToken)
-		<input type="hidden" name="next" value="/settings/runner"/>
-		@card.Card() {
-			@card.Content(card.ContentProps{Class: "space-y-4"}) {
-				<div class="grid gap-4 sm:grid-cols-2">
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "max_concurrent_jobs"}) {
-							Max concurrent jobs
-						}
-						@input.Input(input.Props{ID: "max_concurrent_jobs", Name: "max_concurrent_jobs", Type: "number", Value: itoa(settings.MaxConcurrentJobs), Attributes: templ.Attributes{"min": "1", "max": "32"}})
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "default_runtime"}) {
-							Default Docker runtime
-						}
-						@input.Input(input.Props{ID: "default_runtime", Name: "default_runtime", Type: "text", Value: settings.DefaultRuntime, Placeholder: "node:24"})
-						@field.Description() {
-							{ dockerHint(dockerOK, dockerHost) }
-						}
-					}
-				</div>
-				@field.Field(field.Props{Orientation: field.OrientationHorizontal, Class: "items-center"}) {
-					@checkbox.Checkbox(checkbox.Props{ID: "skip_fork_prs", Name: "skip_fork_prs", Value: "1", DefaultChecked: settings.SkipForkPRs})
-					@field.Label(field.LabelProps{For: "skip_fork_prs"}) {
-						Skip fork pull requests
-					}
-				}
-				@field.Description() {
-					Leave on unless Docker is working and a default runtime is set. Fork jobs always run in Docker.
-				}
-			}
+	// The handler tells this form apart by max_concurrent_jobs: an unchecked
+	// box posts nothing, so that field is what makes "off" mean off.
+	@settingsForm(p, "/settings/runner", "Save changes") {
+		@fieldRow("max_concurrent_jobs", "Max concurrent jobs", "How many jobs this process runs at once. The rest wait in the queue. 1 to 32.") {
+			@input.Input(input.Props{ID: "max_concurrent_jobs", Name: "max_concurrent_jobs", Type: "number", Class: "w-32", Value: itoa(settings.MaxConcurrentJobs), Attributes: templ.Attributes{"min": "1", "max": "32", "inputmode": "numeric"}})
 		}
-	</form>
+		@fieldRow("default_runtime", "Default Docker runtime", dockerHint(dockerOK, dockerHost)) {
+			@input.Input(input.Props{ID: "default_runtime", Name: "default_runtime", Type: "text", Class: "font-mono", Value: settings.DefaultRuntime, Placeholder: "node:24", Attributes: noAutofill})
+		}
+		@switchRow("skip_fork_prs", "skip_fork_prs", "Skip fork pull requests", "Leave on unless Docker is working and a default runtime is set. Fork jobs always run in Docker.", settings.SkipForkPRs, false)
+	}
 }
 
 templ settingsLogs(p web.Page) {
 	{{ m := asMap(p.Data) }}
 	{{ settings := settingsOf(m) }}
-	<form id="settings-form" method="post" action="/api/v1/settings" class="space-y-6">
+	@settingsForm(p, "/settings/logs", "Save changes") {
+		@fieldRow("max_log_bytes", "Max log size per job", "Now "+humanBytes(settings.MaxLogBytes)+". The log stops growing at this size; the run carries on.") {
+			@unitInput("bytes") {
+				@input.Input(input.Props{ID: "max_log_bytes", Name: "max_log_bytes", Type: "number", Class: "w-40", Value: itoa64(settings.MaxLogBytes), Attributes: templ.Attributes{"min": "4096", "inputmode": "numeric"}})
+			}
+		}
+		@fieldRow("log_retention_days", "Log retention", retentionLabel(settings.LogRetentionDays)+" Job rows and log files older than this are pruned hourly.") {
+			@unitInput("days") {
+				@input.Input(input.Props{ID: "log_retention_days", Name: "log_retention_days", Type: "number", Class: "w-32", Value: itoa(settings.LogRetentionDays), Attributes: templ.Attributes{"min": "1", "max": "3650", "inputmode": "numeric"}})
+			}
+		}
+	}
+}
+
+templ settingsAdmin(p web.Page) {
+	<form method="post" action="/api/v1/password">
 		@layouts.CSRF(p.CSRFToken)
-		<input type="hidden" name="next" value="/settings/logs"/>
-		@card.Card() {
-			@card.Content(card.ContentProps{Class: "space-y-4"}) {
-				<div class="grid gap-4 sm:grid-cols-2">
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "max_log_bytes"}) {
-							Max log bytes per job
-						}
-						@input.Input(input.Props{ID: "max_log_bytes", Name: "max_log_bytes", Type: "number", Value: itoa64(settings.MaxLogBytes), Attributes: templ.Attributes{"min": "4096"}})
-						@field.Description() {
-							Logs stop growing at this size; the run continues.
-						}
-					}
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "log_retention_days"}) {
-							Log retention (days)
-						}
-						@input.Input(input.Props{ID: "log_retention_days", Name: "log_retention_days", Type: "number", Value: itoa(settings.LogRetentionDays), Attributes: templ.Attributes{"min": "1", "max": "3650"}})
-						@field.Description() {
-							Job rows and log files older than this are pruned hourly.
-						}
+		@layouts.ListCard() {
+			<div>
+				<div class="divide-y">
+					@fieldRow("password", "New password", "At least 12 characters. Every other session is signed out.") {
+						@input.Input(input.Props{
+							ID:         "password",
+							Name:       "password",
+							Type:       "password",
+							Required:   true,
+							Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password"},
+						})
 					}
 				</div>
-			}
+				@settingsSave("Update password")
+			</div>
 		}
 	</form>
 }
 
-templ settingsAdmin(p web.Page) {
-	@card.Card() {
-		@card.Content() {
-			<form method="post" action="/api/v1/password" class="flex flex-col gap-4">
-				@layouts.CSRF(p.CSRFToken)
-				@field.Field() {
-					@field.Label(field.LabelProps{For: "password"}) {
-						New password
-					}
-					@input.Input(input.Props{
-						ID:         "password",
-						Name:       "password",
-						Type:       "password",
-						Required:   true,
-						Attributes: templ.Attributes{"minlength": "12", "autocomplete": "new-password"},
-					})
-				}
-				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm, Variant: button.VariantSecondary}) {
-					Update password
-				}
-			</form>
+// settingsForm is one settings section: its rows in a panel, Save at the foot.
+templ settingsForm(p web.Page, next, label string) {
+	<form id="settings-form" method="post" action="/api/v1/settings">
+		@layouts.CSRF(p.CSRFToken)
+		<input type="hidden" name="next" value={ next }/>
+		@layouts.ListCard() {
+			<div>
+				<div class="divide-y">
+					{ children... }
+				</div>
+				@settingsSave(label)
+			</div>
 		}
-	}
+	</form>
+}
+
+// settingsSave ends every settings panel: a rule, then the button, next to
+// the fields it saves rather than in the page header.
+templ settingsSave(label string) {
+	<div class="bg-muted/30 flex justify-end border-t px-4 py-3">
+		@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+			{ label }
+		}
+	</div>
 }
