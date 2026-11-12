@@ -1,7 +1,7 @@
 # CSS is compiled from Tailwind at image-build time so a forgotten
 # `npm run css` cannot ship stale styles. The runtime image stays a
 # static Go binary.
-FROM node:22.23.4-alpine AS css
+FROM node:26.13.0-alpine AS css
 WORKDIR /web
 COPY internal/web/package.json internal/web/package-lock.json ./
 RUN npm ci
