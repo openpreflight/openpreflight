@@ -21,6 +21,19 @@ func TestLoadRequiresSecretKey(t *testing.T) {
 	}
 }
 
+func TestLoadSetupToken(t *testing.T) {
+	t.Setenv("CI_SECRET_KEY", strings.Repeat("k", 40))
+	t.Setenv("CI_SETUP_TOKEN", "short")
+	if _, err := Load(); err == nil {
+		t.Fatal("a guessable CI_SETUP_TOKEN was accepted")
+	}
+	t.Setenv("CI_SETUP_TOKEN", "  sixteen-chars-ok  ")
+	cfg, err := Load()
+	if err != nil || cfg.SetupToken != "sixteen-chars-ok" {
+		t.Fatalf("got %q, %v", cfg.SetupToken, err)
+	}
+}
+
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("CI_SECRET_KEY", strings.Repeat("k", 40))
 	t.Setenv("LISTEN_ADDR", "")

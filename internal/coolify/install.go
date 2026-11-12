@@ -38,6 +38,7 @@ func WorkerCompose() string {
       CI_SECRET_KEY: ${CI_SECRET_KEY}
       CI_PUBLIC_BASE_URL: ${CI_PUBLIC_BASE_URL:-}
       CI_BOOTSTRAP_ADMIN_PASSWORD: ${CI_BOOTSTRAP_ADMIN_PASSWORD:-}
+      CI_SETUP_TOKEN: ${CI_SETUP_TOKEN:-}
       CI_DOCKER_HOST: unix:///var/run/docker.sock
       LISTEN_ADDR: ":8080"
       DATA_DIR: /data
