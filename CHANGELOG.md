@@ -50,11 +50,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and opens on its own when a binding sets one. Save and Cancel sit in a bar
   pinned to the bottom of the window. The Coolify field only appears when
   there is an instance to pick.
+- **Every form uses the same rows.** Settings (Configuration, Runner, Logs,
+  Admin), the GitHub App editor and the Coolify add / edit form now use the
+  same label-left rows as the repository form. Numbers show their unit
+  ("seconds", "bytes", "days"), Skip fork pull requests is a switch, and each
+  settings panel saves from its own footer. The App editor's long form keeps
+  Save and Cancel pinned to the bottom of the window. Adding an App puts
+  "Create the App on GitHub" in a panel with the webhook URL, permissions and
+  events it will ask for.
+- **The dry run reads like a run page.** The verdict heads a panel with a
+  pill (would run / would skip / would fail), steps are a list with the
+  layer that supplied each command, and the ref box is a single row.
 - Each GitHub App reads as its own card: what it is and its state on top,
   then a rule and a footer with its webhook URL and its actions.
 - Coolify instances are a list with their last error on the row; adding one
   is folded under the list.
-- Settings forms save from a button under the fields, not the page header.
 - The sidebar footer is one line (Docker state and version); the theme
   toggle says which theme it is on.
 

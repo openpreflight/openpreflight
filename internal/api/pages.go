@@ -445,7 +445,7 @@ func (s *Server) pageReposNew(w http.ResponseWriter, r *http.Request, user store
 	if !ok {
 		return
 	}
-	p := s.page(w, r, &user, "Add a binding", "repos", base.data)
+	p := s.page(w, r, &user, "Add a repository", "repos", base.data)
 	p.Crumbs = []web.Crumb{
 		{Label: "Repos", Href: "/repos"},
 		{Label: "New"},

@@ -168,64 +168,53 @@ templ Coolify(p web.Page) {
 // once there is something in the list, and open when editing or when it is the
 // only thing on the page.
 templ coolifyForm(p web.Page, editing bool, edit store.CoolifyInstance, alone bool) {
-	<details id="add" class="group bg-card mb-8 scroll-mt-20 overflow-hidden rounded-xl border" open?={ editing || alone }>
-		<summary class="hover:bg-muted/40 flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+	<details id="add" data-slot="list-card" class="group bg-muted/60 text-card-foreground mb-6 scroll-mt-20 rounded-xl border p-1" open?={ editing || alone }>
+		<summary data-slot="list-head" class="flex cursor-pointer list-none items-center gap-2 px-3 pt-2 pb-2.5 [&::-webkit-details-marker]:hidden">
 			@icon.ChevronRight(icon.Props{Class: "text-muted-foreground size-4 transition-transform group-open:rotate-90"})
-			if editing {
-				Edit { edit.Name }
-			} else {
-				Add an instance
-			}
+			<h2 class="text-sm font-semibold">
+				if editing {
+					Edit { edit.Name }
+				} else {
+					Add an instance
+				}
+			</h2>
 		</summary>
-		<div class="border-t p-4">
-				<form method="post" action={ templ.SafeURL(coolifyFormAction(editing, edit.ID)) } class="flex flex-col gap-4">
-					@layouts.CSRF(p.CSRFToken)
-					<div class="grid gap-4 sm:grid-cols-2">
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "name"}) {
-								Name
-							}
-							@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "prod-platform", Value: edit.Name, Attributes: noAutofill})
-						}
-						@field.Field() {
-							@field.Label(field.LabelProps{For: "base_url"}) {
-								Base URL
-							}
-							@input.Input(input.Props{ID: "base_url", Name: "base_url", Type: "url", Placeholder: "https://coolify.example.com", Required: true, Value: edit.BaseURL, Attributes: noAutofill})
-						}
-					</div>
-					@field.Field() {
-						@field.Label(field.LabelProps{For: "api_token"}) {
-							API token
-						}
-						@input.Input(input.Props{ID: "api_token", Name: "api_token", Type: "password", Placeholder: "3|Waobq…", Required: !editing, Attributes: secretAttrs})
-						@field.Description() {
-							if editing {
-								Leave blank to keep the stored token. Current: <span class="font-mono">{ edit.APITokenRedacted }</span>
-							} else {
-								Coolify UI: <strong>Security → API Tokens</strong> (some versions:
-								<strong>Keys &amp; Tokens</strong>). Read-only is enough for inventory. The token is stored
-								encrypted and never shown again.
-							}
-						}
+		<form method="post" action={ templ.SafeURL(coolifyFormAction(editing, edit.ID)) }>
+			@layouts.CSRF(p.CSRFToken)
+			<div class="divide-y">
+				@fieldRow("name", "Name", "Yours, to tell instances apart. Blank uses the base URL.") {
+					@input.Input(input.Props{ID: "name", Name: "name", Type: "text", Placeholder: "prod-platform", Value: edit.Name, Attributes: noAutofill})
+				}
+				@fieldRow("base_url", "Base URL", "Where the Coolify dashboard is served.") {
+					@input.Input(input.Props{ID: "base_url", Name: "base_url", Type: "url", Class: "font-mono", Placeholder: "https://coolify.example.com", Required: true, Value: edit.BaseURL, Attributes: noAutofill})
+				}
+				@fieldRow("api_token", "API token", coolifyTokenHint(editing, edit.APITokenRedacted)) {
+					@input.Input(input.Props{ID: "api_token", Name: "api_token", Type: "password", Placeholder: "3|Waobq…", Required: !editing, Attributes: secretAttrs})
+				}
+			</div>
+			<div class="bg-muted/30 flex items-center justify-end gap-2 border-t px-4 py-3">
+				if editing {
+					@button.Button(button.Props{Href: "/coolify", Variant: button.VariantOutline, Size: button.SizeSm}) {
+						Cancel
 					}
-					<div class="flex flex-wrap items-center gap-2">
-						@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
-							if editing {
-								Save
-							} else {
-								Add and test
-							}
-						}
-						if editing {
-							@button.Button(button.Props{Href: "/coolify", Variant: button.VariantOutline, Size: button.SizeSm}) {
-								Cancel
-							}
-						}
-					</div>
-				</form>
-		</div>
+				}
+				@button.Button(button.Props{Type: button.TypeSubmit, Size: button.SizeSm}) {
+					if editing {
+						Save changes
+					} else {
+						Add and test
+					}
+				}
+			</div>
+		</form>
 	</details>
+}
+
+func coolifyTokenHint(editing bool, redacted string) string {
+	if editing {
+		return "Leave blank to keep the stored token. Current: " + redacted
+	}
+	return "In Coolify: Security → API Tokens (some versions: Keys & Tokens). Read-only is enough. Stored encrypted and never shown again."
 }
 
 // coolifyRow is one instance: what it is, whether its last check worked, and

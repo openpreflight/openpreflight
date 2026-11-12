@@ -450,14 +450,13 @@ templ reposEditorForm(p web.Page) {
 					})
 				}
 				@fieldRow("b_timeout", "Timeout", "In seconds. 0 or blank uses the default of "+secondsLabel(settings.DefaultTimeoutSeconds)+".") {
-					<div class="flex items-center gap-2">
+					@unitInput("seconds") {
 						@input.Input(input.Props{
 							ID: "b_timeout", Name: "timeout_seconds", Type: "number", Class: "w-32",
 							Placeholder: itoa(settings.DefaultTimeoutSeconds), Value: timeoutVal(edit.TimeoutSeconds),
 							Attributes: templ.Attributes{"min": "0", "autocomplete": "off", "inputmode": "numeric"},
 						})
-						<span class="text-muted-foreground text-xs">seconds</span>
-					</div>
+					}
 				}
 				@fieldRow("b_install", "Fallback commands", "Run only when the commit has no pipeline file. Blank infers them from the project, such as a Node package.json.") {
 					<div class="grid gap-2">
@@ -475,8 +474,7 @@ templ reposEditorForm(p web.Page) {
 				}
 			</div>
 		</details>
-		// Pinned to the bottom of the window, so saving never needs a scroll.
-		<div class="bg-background/85 sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+		@formBar() {
 			if editing {
 				@button.Button(button.Props{Href: "/repos/" + itoa64(edit.ID) + "/resolve", Variant: button.VariantGhost, Size: button.SizeSm}) {
 					@icon.Search(icon.Props{Class: "size-3.5"})
@@ -492,68 +490,6 @@ templ reposEditorForm(p web.Page) {
 					{ bindingSubmitLabel(editing) }
 				}
 			</div>
-		</div>
+		}
 	</form>
-}
-
-// fieldRow is one setting: label and explanation on the left, the control on
-// the right. On a phone the two stack.
-templ fieldRow(id, label, hint string) {
-	<div class="grid gap-x-10 gap-y-2 px-4 py-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-		<div>
-			<label for={ id } class="text-sm font-medium">{ label }</label>
-			if hint != "" {
-				<p class="text-muted-foreground mt-0.5 text-xs leading-relaxed text-pretty">{ hint }</p>
-			}
-		</div>
-		<div class="min-w-0 md:max-w-xl md:pt-0.5">
-			{ children... }
-		</div>
-	</div>
-}
-
-// switchRow is an on/off setting. A checkbox underneath, so the form posts
-// name=1 exactly as before; role=switch tells assistive tech what it looks
-// like. warn tints the explanation for settings that widen who can see what.
-templ switchRow(id, name, label, hint string, on, warn bool) {
-	<label for={ id } class="flex cursor-pointer items-start justify-between gap-6 px-4 py-4">
-		<div class="min-w-0">
-			<p class="text-sm font-medium">{ label }</p>
-			<p class={ "mt-0.5 flex items-start gap-1.5 text-xs leading-relaxed text-pretty", templ.KV("text-muted-foreground", !warn), templ.KV("text-warning", warn) }>
-				if warn {
-					@icon.CircleAlert(icon.Props{Class: "mt-0.5 size-3.5 shrink-0"})
-				}
-				<span>{ hint }</span>
-			</p>
-		</div>
-		<input
-			id={ id }
-			name={ name }
-			type="checkbox"
-			value="1"
-			role="switch"
-			checked?={ on }
-			class="bg-input checked:bg-primary focus-visible:outline-ring relative mt-0.5 h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full transition-colors before:absolute before:top-0.5 before:left-0.5 before:size-4 before:rounded-full before:bg-white before:shadow-sm before:transition-transform checked:before:translate-x-4 focus-visible:outline-2 focus-visible:outline-offset-2"
-		/>
-	</label>
-}
-
-// formSection titles one group of fields inside an editor form. The form's own
-// "Command overrides" heading was the pattern; every group has one now, because
-// a dozen unlabelled boxes read as one undifferentiated list.
-//
-// A plain h2 rather than fieldset/legend: a <legend> is rendered out of flow
-// against the fieldset's top edge, which eats the gap above each section, and
-// these are heterogeneous fields that each carry their own label rather than a
-// radio group needing the grouping semantics.
-templ formSection(title, note string) {
-	<div class="space-y-4">
-		<div>
-			<h2 class="text-base font-semibold">{ title }</h2>
-			if note != "" {
-				<p class="text-muted-foreground mt-1 text-sm leading-relaxed">{ note }</p>
-			}
-		</div>
-		{ children... }
-	</div>
 }
