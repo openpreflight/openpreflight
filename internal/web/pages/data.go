@@ -818,7 +818,8 @@ func niceCeil(n int) int {
 	}
 }
 
-// repoHistory is each repo's last ten finished runs, oldest first, from the
+// repoHistory is each repo's last ten completed runs (skipped and cancelled
+// included; running ones left out), oldest first, from the
 // recent jobs the page already loaded.
 // ponytail: bounded by those 100 recent jobs; a quiet repo next to a busy one
 // shows fewer squares. A per-repo query fixes that if it matters.
@@ -835,8 +836,6 @@ func repoHistory(recent []store.Job) map[string][]store.Job {
 
 func dailyOf(m map[string]any) []store.DayCount { return get[[]store.DayCount](m, "Daily") }
 
-// appSubtitle names an App without repeating its own title: the slug is only
-// worth a line when it differs from the name it was derived from.
 // splitApps puts Apps that cannot do their job (not installed, or failing)
 // apart from the ones that can, so the broken ones are listed first.
 func splitApps(apps []store.GitHubApp) (attention, connected []store.GitHubApp) {
@@ -879,6 +878,8 @@ func appOwnerSubtitle(a store.GitHubApp) string {
 	return appSubtitle(a)
 }
 
+// appSubtitle names an App without repeating its own title: the slug is only
+// worth a line when it differs from the name it was derived from.
 func appSubtitle(a store.GitHubApp) string {
 	if a.Slug != "" && a.Slug != a.Name {
 		return a.Slug + " · App ID " + itoa64(a.AppID)

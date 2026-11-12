@@ -438,7 +438,7 @@ func (s *Store) DailyJobCounts(days int, until time.Time) ([]DayCount, error) {
 	start := end.AddDate(0, 0, -(days - 1))
 	rows, err := s.db.Query(`SELECT substr(created_at, 1, 10), status, count(*) FROM jobs
 		WHERE created_at >= ? AND status NOT IN (?, ?)
-		GROUP BY 1, 2`, start.Format(timeFmt), JobQueued, JobInProgress)
+		GROUP BY 1, 2`, start.Format("2006-01-02"), JobQueued, JobInProgress)
 	if err != nil {
 		return nil, fmt.Errorf("store: daily counts: %w", err)
 	}

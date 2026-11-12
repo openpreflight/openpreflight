@@ -70,6 +70,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Test checks where GitHub sends the App's webhooks.** A webhook URL that
+  is missing, or points at this worker under the wrong slug (what is left
+  when GitHub refuses the URL at creation), marks the App failed with the URL
+  to set. Before, the next successful Test or repo load cleared that warning
+  while GitHub still delivered nothing. A URL on another host (a relay such
+  as smee) is left alone.
+- Leaving the Add repository or App inspect page before GitHub answers no
+  longer saves "context canceled" as the App's error.
+- The Activity chart's first day counted no runs created in its first second.
+- Creating an App from the manifest takes its owner from GitHub's reply
+  instead of asking again, and Test only asks while the owner is unknown.
+- The Activity panel says "runs", not "finished runs", and its legend says
+  "Skipped or cancelled", matching what the chart counts.
 - Long messages in a notification wrap inside it instead of running off the
   edge.
 - **Errors that last are shown on the page, not in a toast.** A run's error

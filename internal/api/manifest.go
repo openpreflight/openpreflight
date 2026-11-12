@@ -147,6 +147,9 @@ func (s *Server) callbackAppManifest(w http.ResponseWriter, r *http.Request, _ s
 		s.badRequest(w, r, err)
 		return
 	}
+	if org := conv.OwnerOrg(); org != "" {
+		s.store.SetGitHubAppOwnerOrg(app.ID, org)
+	}
 	hook := webhookURL(settings.PublicBaseURL, app.Slug)
 	var hookErr error
 	if hook != "" {

@@ -207,18 +207,19 @@ templ reposPanel(cards []dashRepo, recent []store.Job) {
 	}
 }
 
-// activityPanel is finished runs per day for two weeks, stacked by outcome.
+// activityPanel is completed runs per day (the day each was queued) for two
+// weeks, stacked by outcome.
 // HTML rather than SVG: the bars are flex boxes, so the chart is as wide as
 // its panel without stretching any text. Each day has a hover and focus
 // tooltip; the list under the chart is the table view.
 templ activityPanel(daily []store.DayCount) {
 	{{ bars, top, total, failed := activityChart(daily) }}
 	@layouts.ListCard() {
-		@layouts.ListHead("Activity", -1, itoa(total)+" finished runs in 14 days, "+itoa(failed)+" failed.") {
+		@layouts.ListHead("Activity", -1, itoa(total)+" runs in 14 days, "+itoa(failed)+" failed.") {
 			<ul class="text-muted-foreground flex items-center gap-3 text-xs" aria-label="Legend">
 				<li class="flex items-center gap-1.5"><span class="bg-chart-pass size-2 rounded-full"></span>Passed</li>
 				<li class="flex items-center gap-1.5"><span class="bg-chart-fail size-2 rounded-full"></span>Failed</li>
-				<li class="flex items-center gap-1.5"><span class="bg-chart-other size-2 rounded-full"></span>Skipped</li>
+				<li class="flex items-center gap-1.5"><span class="bg-chart-other size-2 rounded-full"></span>Skipped or cancelled</li>
 			</ul>
 		}
 		<div class="px-4 pt-5 pb-3">
