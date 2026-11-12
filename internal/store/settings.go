@@ -65,7 +65,7 @@ func (s *Store) Settings() (Settings, error) {
 
 func (s *Store) seedSettings(v Settings) error {
 	ts := formatTime(now())
-	_, err := s.db.Exec(`INSERT INTO settings (id, public_base_url, default_check_name,
+	_, err := s.db.Exec(`INSERT OR IGNORE INTO settings (id, public_base_url, default_check_name,
 		default_pipeline_file, default_timeout_seconds, max_concurrent_jobs, max_log_bytes,
 		max_workspace_bytes, log_retention_days, skip_fork_prs, default_runtime, created_at, updated_at)
 		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
