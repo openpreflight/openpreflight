@@ -28,7 +28,7 @@ RUN go build -trimpath \
 
 # Runtime: git is required to check out commits, and Node is the default
 # pipeline runtime (README Pipelines). Everything runs as a non-root user.
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache git "nodejs>=22.23.4-r0" npm ca-certificates tini docker-cli \
  && addgroup -g 10001 ci \
  && adduser -D -u 10001 -G ci -h /home/ci ci \
